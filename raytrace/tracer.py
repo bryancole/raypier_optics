@@ -1,4 +1,4 @@
-#    Copyright © ${year}, Teraview Ltd.
+#    Copyright 2009, Teraview Ltd.
 #
 #    This file is part of Raytrace.
 #

@@ -1,4 +1,4 @@
-#    Copyright © 2009, Teraview Ltd., Bryan Cole
+#    Copyright 2009, Teraview Ltd., Bryan Cole
 #
 #    This file is part of Raytrace.
 #
