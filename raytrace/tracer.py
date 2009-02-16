@@ -644,7 +644,7 @@ class RayTraceModel(HasTraits):
         
     def trace_ray_source(self, ray_source, optics):
         """trace a ray source"""
-        rays = ray_source.InputDetailRays
+        rays = ray_source.InputRays
         traced_rays = []
         limit = self.recursion_limit
         count = 0
