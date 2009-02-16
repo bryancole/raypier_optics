@@ -19,7 +19,7 @@
 import numpy
 from enthought.traits.api import HasTraits, Int, Float, Range,\
      Bool, Property, Array, Event, List, cached_property, Str,\
-     Instance, Tuple, on_trait_change
+     Instance, Tuple, on_trait_change, Trait
 
 from enthought.traits.ui.api import View, Item
 
@@ -118,29 +118,34 @@ class BaseRaySource(HasTraits):
     
     InputRays = Property(Instance(RayCollection), depends_on="max_ray_len")
     TracedRays = List(RayCollection)
+    
+    InputDetailRays = Property(Instance(RayCollection), depends_on="InputRays")
+    TracedDetailRays = List(RayCollection)
+
+    detail_resolution = Int(32)
 
     max_ray_len = Float(200.0)
     
-    scale_factor = Float(1.0)
+    scale_factor = Float(0.2)
     
     show_start = Bool(True)
     show_polarisation = Bool(False)
     show_direction = Bool(False)
     
     #idx selector for the input ways which should be visualised
-    view_ray_ids = Array(dtype=numpy.int)
+    view_ray_ids = Trait(None, Array(dtype=numpy.int))
     
-    tube = Instance(tvtk.TubeFilter, ())
-    sphere = Instance(tvtk.SphereSource, ())
-    data_source = Instance(tvtk.ProgrammableSource)
+    tube = Instance(tvtk.TubeFilter, (), transient=True)
+    sphere = Instance(tvtk.SphereSource, (), transient=True)
+    data_source = Instance(tvtk.ProgrammableSource, transient=True)
     
-    ray_actor = Instance(tvtk.Actor)
-    start_actor = Instance(tvtk.Actor)
+    ray_actor = Instance(tvtk.Actor, transient=True)
+    start_actor = Instance(tvtk.Actor, transient=True)
     #field_actor = Instance(tvtk.Actor)
     
-    actors = Property(List)
+    actors = Property(List, transient=True)
     
-    vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)} )
+    vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)}, transient=True)
     
     def _TracedRays_changed(self):
         self.data_source.modified()
@@ -174,7 +179,11 @@ class BaseRaySource(HasTraits):
                     id_mask = numpy.setmember1d(rays.parent_ids, ids)
                 except (NameError, AttributeError):
                     id_mask = numpy.zeros(rays.length.shape[0], dtype=numpy.bool)
-                    id_mask[self.view_ray_ids] = True
+                    view_ray_ids = self.view_ray_ids
+                    if view_ray_ids is not None:
+                        id_mask[self.view_ray_ids] = True
+                    else:
+                        id_mask[:] = True
                 
                 start_pos = rays.origin[id_mask]
                 end_pos = rays.termination[id_mask]
@@ -268,7 +277,9 @@ class ConfocalRaySource(BaseRaySource):
     theta = Range(0.0,90.0,value=30)
     working_dist = Float(100.0)
     
-    view_ray_ids = numpy.arange(20)
+    principle_axes = Property(Tuple(Array,Array), depends_on="direction")
+    
+    #view_ray_ids = numpy.arange(20)
     
     InputRays = Property(Instance(RayCollection), 
                          depends_on="focus, direction, number, theta, working_dist, max_ray_len")
@@ -282,6 +293,20 @@ class ConfocalRaySource(BaseRaySource):
                        Item('show_start'),
                        Item('scale_factor'),
                        )
+    
+    @cached_property
+    def _get_principle_axes(self):
+        direction = self.direction
+        max_axis = numpy.abs(direction).argmax()
+        if max_axis==0:
+            v = numpy.array([0.,1.,0.])
+        else:
+            v = numpy.array([1.,0.,0.])
+        d1 = numpy.cross(direction, v)
+        d1 = normaliseVector1d(d1)
+        d2 = numpy.cross(direction, d1)
+        d2 = normaliseVector1d(d2)
+        return (d1, d2)
     
     @on_trait_change("focus, direction, number, theta, working_dist, max_ray_len")
     def on_update(self):
@@ -298,15 +323,8 @@ class ConfocalRaySource(BaseRaySource):
         theta = self.theta
         radius = numpy.tan(numpy.pi * theta/180) * working_dist
         
-        max_axis = numpy.abs(direction).argmax()
-        if max_axis==0:
-            v = numpy.array([0.,1.,0.])
-        else:
-            v = numpy.array([1.,0.,0.])
-        d1 = numpy.cross(direction, v)
-        d1 = normaliseVector1d(d1)
-        d2 = numpy.cross(direction, d1)
-        d2 = normaliseVector1d(d2)
+        d1, d2 = self.principle_axes
+        
         angles = (i*2*numpy.pi/count for i in xrange(count))
         offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
         
@@ -322,4 +340,38 @@ class ConfocalRaySource(BaseRaySource):
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
         return rays
     
+    @cached_property
+    def _get_InputDetailRays(self):
+        focus = numpy.array(self.focus)
+        direction = numpy.array(self.direction)
+        working_dist = self.working_dist
+        origin = focus - direction*working_dist
+        count = self.number
+        theta = self.theta
+        radius = numpy.tan(numpy.pi * theta/180)
+        
+        d1, d2 = self.principle_axes
+        
+        slen = self.detail_resolution * 1j
+        newaxis = numpy.newaxis
+        
+        d1o, d2o = numpy.ogrid[-radius:radius:slen,-radius:radius:slen]
+        
+        offsets = (d1o[:,:,newaxis]*d1[newaxis,newaxis,:] \
+                    + d2o[:,:,newaxis]*d2[newaxis,newaxis,:]).reshape(-1,3)
+                    
+        in_rad = (offsets**2).sum(axis=-1) < radius**2
+        
+        offsets = offsets[in_rad,:]
 
+        origins = origin[newaxis,:] + offsets*working_dist
+        directions = normaliseVector(direction[newaxis,:] - origins)
+        
+        rays = RayCollection(origin=origins, direction=directions,
+                             max_length=self.max_ray_len)
+        rays.set_polarisation(1, 0, 0)
+        size = origins.shape[0],1
+        rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
+        rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
+        rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
+        return rays

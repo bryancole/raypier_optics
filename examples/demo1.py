@@ -12,7 +12,11 @@ import numpy
 source = ConfocalRaySource(focus=(0,0,0),
                             direction=(0,1,0),
                             working_dist = 100.,
+                            number=20,
+                            detail_resolution=32,
                             theta=10.)
+
+#print source.InputDetailRays.origin.shape
                             
 m1 = PECMirror(name="M1",
                 centre=(0,-40,0),
@@ -66,5 +70,12 @@ e2 = Ellipsoid(focus1=(0,40,40),
                 
 model = RayTraceModel(optics=[m1,m2,m3,m4,m5,e1,e2],
                     sources=[source,])
-                    
+ 
+#model.trace_detail_async()
+#import time
+#start = time.clock()
+#model.trace_all()
+#end = time.clock()
+#print "traced in", end - start                   
+
 model.configure_traits()

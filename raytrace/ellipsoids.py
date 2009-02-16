@@ -45,18 +45,18 @@ class Ellipsoid(BaseMirror):
     axes = Property(Tuple, depends_on="focus1, focus2, size",
                  desc="(major, minor) axis lengths")
     
-    ellipse_trans = Instance(tvtk.Transform, ())
+    ellipse_trans = Instance(tvtk.Transform, (), transient=True)
     
-    combined_trans = Instance(tvtk.Transform)
+    combined_trans = Instance(tvtk.Transform, transient=True)
     
-    f1_glyph = Instance(tvtk.SphereSource, ())
-    f2_glyph = Instance(tvtk.SphereSource, ())
+    f1_glyph = Instance(tvtk.SphereSource, (), transient=True)
+    f2_glyph = Instance(tvtk.SphereSource, (), transient=True)
     
-    f1_act = Instance(tvtk.Follower, ())
-    f2_act = Instance(tvtk.Follower, ())
+    f1_act = Instance(tvtk.Follower, (), transient=True)
+    f2_act = Instance(tvtk.Follower, (), transient=True)
     
-    vtk_grid = Instance(tvtk.ProgrammableSource, ())
-    vtk_quadric = Instance(tvtk.Quadric, ())
+    vtk_grid = Instance(tvtk.ProgrammableSource, (), transient=True)
+    vtk_quadric = Instance(tvtk.Quadric, (), transient=True)
     
     vtkproperty = tvtk.Property(opacity = 0.7,
                              color = (0.8,0.8,0))

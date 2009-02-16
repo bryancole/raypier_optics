@@ -87,9 +87,9 @@ class PECMirror(BaseMirror):
     thickness = Float(5.0, desc="purely for visualisation purposes")
     
     vtk_cylinder = Instance(tvtk.CylinderSource, (),
-                            dict(resolution=32))
+                            dict(resolution=32), transient=True)
     
-    cyl_trans = Instance(tvtk.Transform, ())
+    cyl_trans = Instance(tvtk.Transform, (), transient=True)
     
     vtkproperty = tvtk.Property(color=(0.8,0.8,0.8),
                                 representation="surface")

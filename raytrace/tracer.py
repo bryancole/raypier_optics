@@ -28,6 +28,8 @@ from enthought.tvtk.api import tvtk
 from enthought.tvtk.pyface.scene_model import SceneModel
 from enthought.tvtk.pyface.scene_editor import SceneEditor
 import numpy
+import threading
+import wx
 from itertools import chain, izip, islice
 from raytrace.sources import BaseRaySource, collectRays, RayCollection
 
@@ -118,7 +120,7 @@ class ModelObject(HasTraits):
     dir_y = Property(depends_on="direction")
     dir_z = Property(depends_on="direction")
     
-    actors = Instance(tvtk.ActorCollection)
+    actors = Instance(tvtk.ActorCollection, transient=True)
     
     def get_actors(self, scene):
         return self.actors
@@ -176,17 +178,17 @@ class ModelObject(HasTraits):
         
     
 class Traceable(ModelObject):
-    vtkproperty = Instance(tvtk.Property)
+    vtkproperty = Instance(tvtk.Property, transient=True)
     
     tolerance = Float(0.0001) #excludes ray-segments below this length
-    transform = Instance(tvtk.Transform, ())
+    transform = Instance(tvtk.Transform, (), transient=True)
     update = Event() #request re-tracing
     render = Event() #request rerendering
     
     intersections = List([])
     
     #all Traceables have a pipeline to generate a VTK visualisation of themselves
-    pipeline = Any #a tvtk.DataSetAlgorithm ?
+    pipeline = Any(transient=True) #a tvtk.DataSetAlgorithm ?
     
     polydata = Property(depends_on=['update', ])
     
@@ -426,9 +428,9 @@ class Optic(Traceable):
     
 class VTKOptic(Optic):
     """Polygonal optics using a vtkOBBTree to do the ray intersections"""
-    data_source = Instance(tvtk.ProgrammableSource, ())
+    data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
     
-    obb = Instance(tvtk.OBBTree, ())
+    obb = Instance(tvtk.OBBTree, (), transient=True)
     
     def __getstate__(self):
         d = super(VTKOptic, self).__getstate__()
@@ -579,7 +581,7 @@ class RayTraceModel(HasTraits):
             scene.add_actors(o.get_actors(scene))
         
         for optic in opticList:
-            optic.on_trait_change(self.render, "update")
+            optic.on_trait_change(self.trace_all, "update")
             optic.on_trait_change(self.render_vtk, "render")
         self.update = True
     
@@ -595,7 +597,7 @@ class RayTraceModel(HasTraits):
         self.update = True
         
     @on_trait_change("update")
-    def render(self):
+    def trace_all(self):
         optics = self.optics
         if optics:
             for o in optics:
@@ -604,24 +606,68 @@ class RayTraceModel(HasTraits):
                 self.trace_ray_source(ray_source, optics)
             for o in optics:
                 o.update_complete()
-        self.scene.render()
+        self.render_vtk()
+        
+    def trace_detail_async(self):
+        optics = [o.clone_traits() for o in self.optics]
+        for child, parent in izip(optics, self.optics):
+            child.shadow_parent = parent
+        sources = [s.clone_traits() for s in self.sources]
+        for child, parent in izip(sources, self.sources):
+            child.shadow_parent = parent
+        
+        self.thd = threading.Thread(target=self.async_trace, 
+                               args=(optics, sources))
+        self.thd.start()
+        
+    def async_trace(self, optics, sources):
+        """called in a thread to do background tracing"""
+        for o in optics:
+            o.intersections = []
+        for ray_source in sources:
+            self.trace_ray_source_detail(ray_source, optics)
+        for o in optics:
+            o.update_complete()
+            
+        wx.CallAfter(self.on_trace_complete, optics, sources)
+        
+    def on_trace_complete(self, optics, sources):
+        for s in sources:
+            s.shadow_parent.copy_traits(s)
+        for o in optics:
+            o.shadow_parent.copy_traits(o)
+        print "async trace complete"
         
     def render_vtk(self):
-        self.scene.render()
+        if self.scene is not None:
+            self.scene.render()
         
     def trace_ray_source(self, ray_source, optics):
         """trace a ray source"""
-        rays = ray_source.InputRays
+        rays = ray_source.InputDetailRays
         traced_rays = []
         limit = self.recursion_limit
         count = 0
         while (rays is not None) and count<limit:
-            print "count", count
+            #print "count", count
             traced_rays.append(rays)
             rays = self.trace_segment(rays, optics)
             count += 1
         ray_source.TracedRays = traced_rays
         ray_source.data_source.modified()
+            
+    def trace_ray_source_detail(self, ray_source, optics):
+        """trace a ray source"""
+        rays = ray_source.InputDetailRays
+        traced_rays = []
+        limit = self.recursion_limit
+        count = 0
+        while (rays is not None) and count<limit:
+            #print "count", count
+            traced_rays.append(rays)
+            rays = self.trace_segment(rays, optics)
+            count += 1
+        ray_source.TracedDetailRays = traced_rays
         
     def trace_segment(self, rays, optics):
         """trace a RayCollection"""
@@ -661,7 +707,7 @@ class RayTraceModel(HasTraits):
         for source in source_list:
             for actor in source.actors:
                 scene.add_actor(actor)
-            source.on_trait_change(self.render, "update")
+            source.on_trait_change(self.trace_all, "update")
         self.update = True
         
         
