@@ -120,6 +120,8 @@ class ModelObject(HasTraits):
     dir_y = Property(depends_on="direction")
     dir_z = Property(depends_on="direction")
     
+    transform = Instance(tvtk.Transform, (), transient=True)
+    
     actors = Instance(tvtk.ActorCollection, transient=True)
     
     def get_actors(self, scene):
@@ -176,12 +178,16 @@ class ModelObject(HasTraits):
         #print "set direction", -phi, -theta
         self._orientation = -phi, -theta
         
+        
+class Probe(ModelObject):
+    pass
+        
     
 class Traceable(ModelObject):
     vtkproperty = Instance(tvtk.Property, transient=True)
     
     tolerance = Float(0.0001) #excludes ray-segments below this length
-    transform = Instance(tvtk.Transform, (), transient=True)
+
     update = Event() #request re-tracing
     render = Event() #request rerendering
     
@@ -564,6 +570,7 @@ class RayTraceModel(HasTraits):
     
     optics = List(Traceable)
     sources = List(BaseRaySource)
+    probes = List(Probe)
     
     optical_path = Float(0.0, transient=True)
     
@@ -596,6 +603,20 @@ class RayTraceModel(HasTraits):
         scene.add_actors(actors)
         self.update = True
         
+    def _probes_changed(self, probeList):
+        scene = self.scene
+        #del scene.actor_list[:]    
+        for p in probeList:
+            scene.add_actors(p.get_actors(scene))
+        for probe in probeList:
+            probe.on_trait_change(self.update_probes, "update")
+            probe.on_trait_change(self.render_vtk, "render")
+        self.update = True
+        
+    def update_probes(self):
+        if self.scene is not None:
+            self.render_vtk()
+        
     @on_trait_change("update")
     def trace_all(self):
         optics = self.optics
@@ -608,24 +629,31 @@ class RayTraceModel(HasTraits):
                 o.update_complete()
         self.render_vtk()
         
-    def trace_detail_async(self):
+    def trace_detail(self, async=False):
         optics = [o.clone_traits() for o in self.optics]
         for child, parent in izip(optics, self.optics):
             child.shadow_parent = parent
         sources = [s.clone_traits() for s in self.sources]
         for child, parent in izip(sources, self.sources):
             child.shadow_parent = parent
+        probes = [p.clone_traits() for p in self.probes]
+        for child, parent in izip(probes, self.probes):
+            child.shadow_parent = parent
+        if async:
+            self.thd = threading.Thread(target=self.async_trace, 
+                                args=(optics, sources, probes))
+            self.thd.start()
+        else:
+            self.async_trace(optics, sources, probes)
         
-        self.thd = threading.Thread(target=self.async_trace, 
-                               args=(optics, sources))
-        self.thd.start()
-        
-    def async_trace(self, optics, sources):
+    def async_trace(self, optics, sources, probes):
         """called in a thread to do background tracing"""
         for o in optics:
             o.intersections = []
         for ray_source in sources:
             self.trace_ray_source_detail(ray_source, optics)
+        for probe in probes:
+            probe.find_intersections(ray_source)
         for o in optics:
             o.update_complete()
             
@@ -657,7 +685,7 @@ class RayTraceModel(HasTraits):
         ray_source.data_source.modified()
             
     def trace_ray_source_detail(self, ray_source, optics):
-        """trace a ray source"""
+        """trace a ray source, using it's detailed rays"""
         rays = ray_source.InputDetailRays
         traced_rays = []
         limit = self.recursion_limit
@@ -734,6 +762,13 @@ tree_editor = TreeEditor(
                         label="=Ray Sources",
                         view = View(),
                         ),
+                        TreeNode(
+                        node_for=[RayTraceModel],
+                        children='probes',
+                        auto_open=True,
+                        label="=Probes",
+                        view = View(),
+                        ),
                        TreeNode(
                         node_for=[Traceable],
                         children='',
@@ -742,6 +777,12 @@ tree_editor = TreeEditor(
                         ),
                        TreeNode(
                         node_for=[BaseRaySource],
+                        children='',
+                        auto_open=True,
+                        label="name",
+                        ),
+                        TreeNode(
+                        node_for=[Probe],
                         children='',
                         auto_open=True,
                         label="name",
@@ -780,45 +821,4 @@ ray_tracer_view = View(
 RayTraceModel.class_trait_view("traits_view", ray_tracer_view)
     
         
-def BuildRaySet(origin, direction, radius, count):
-    origin = numpy.asarray(origin)
-    direction = numpy.asarray(direction)
-    max_axis = numpy.abs(direction).argmax()
-    if max_axis==0:
-        v = numpy.array([0.,1.,0.])
-    else:
-        v = numpy.array([1.,0.,0.])
-    d1 = numpy.cross(direction, v)
-    d1 = normaliseVector(d1)
-    d2 = numpy.cross(direction, d1)
-    d2 = normaliseVector(d2)
-    angles = (i*2*numpy.pi/count for i in xrange(count))
-    offsets = (d1*numpy.sin(a) + d2*numpy.cos(a) for a in angles)
-    posns = (origin + radius*offset for offset in offsets)
-    rays = [Ray(origin=o, direction=direction) for o in posns]
-    return rays
-        
 
-def BuildConfocalRaySet(focus, direction, theta, working_dist, count):
-    focus = numpy.asarray(focus)
-    direction = normaliseVector(direction)
-    origin = focus - direction*working_dist
-    radius = numpy.tan(numpy.pi * theta/180) * working_dist
-    
-    max_axis = numpy.abs(direction).argmax()
-    if max_axis==0:
-        v = numpy.array([0.,1.,0.])
-    else:
-        v = numpy.array([1.,0.,0.])
-    d1 = numpy.cross(direction, v)
-    d1 = normaliseVector(d1)
-    d2 = numpy.cross(direction, d1)
-    d2 = normaliseVector(d2)
-    angles = (i*2*numpy.pi/count for i in xrange(count))
-    offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
-    
-    origins = [origin + offset for offset in offsets]
-    directions = [normaliseVector(direction*working_dist - offset) 
-                    for offset in offsets]
-    rays = [Ray(origin=o, direction=d) for o,d in izip(origins, directions)]
-    return rays

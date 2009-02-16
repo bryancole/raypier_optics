@@ -6,14 +6,19 @@ from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel
 from raytrace.ellipsoids import Ellipsoid
 from raytrace.mirrors import PECMirror
+from raytrace.probes import PolarisationProbe
 
 import numpy
+
+p1 = PolarisationProbe(centre=(30,30,30),
+                        size=100.,
+                        direction=(1,1,1))
 
 source = ConfocalRaySource(focus=(0,0,0),
                             direction=(0,1,0),
                             working_dist = 100.,
                             number=20,
-                            detail_resolution=32,
+                            detail_resolution=5,
                             theta=10.)
 
 #print source.InputDetailRays.origin.shape
@@ -69,7 +74,8 @@ e2 = Ellipsoid(focus1=(0,40,40),
                 Z_bounds=(40-15.,40+15.))      
                 
 model = RayTraceModel(optics=[m1,m2,m3,m4,m5,e1,e2],
-                    sources=[source,])
+                    sources=[source,],
+                    probes=[p1,])
  
 #model.trace_detail_async()
 #import time
