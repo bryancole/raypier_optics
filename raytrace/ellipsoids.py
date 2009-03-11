@@ -33,14 +33,15 @@ from raytrace.mirrors import BaseMirror
 
 class Ellipsoid(BaseMirror):
     name = "Ellipsoid"
-    focus1 = Tuple(-50,0,0)
-    focus2 = Tuple(0, 50, 0)
+    focus1 = Tuple(-50.,0.,0.)
+    focus2 = Tuple(0., 50., 0.)
     size = Float(100.0)
     X_bounds = Tuple(-25., 25.)
     Y_bounds = Tuple(-25., 25.)
     Z_bounds = Tuple(0., 50.)
     
     show_foci = Bool(True)
+    foci_Actors = Instance(tvtk.ActorCollection, ())
     
     axes = Property(Tuple, depends_on="focus1, focus2, size",
                  desc="(major, minor) axis lengths")
@@ -91,8 +92,8 @@ class Ellipsoid(BaseMirror):
         return t
     
     def _show_foci_changed(self, val):
-        self.f1_act.visibility = val
-        self.f2_act.visibility = val
+        for act in self.foci_Actors:
+            act.visibility = val
         self.render = True
     
     def create_grid(self):
@@ -177,7 +178,7 @@ class Ellipsoid(BaseMirror):
         return transF
     
     def get_actors(self, scene):
-        actors = self.actors
+        actors = []
         
         sList = [self.f1_glyph, self.f2_glyph]
         cList = [(0,1,0),(1,0,0)]
@@ -227,7 +228,13 @@ class Ellipsoid(BaseMirror):
         
         actors.append(act1)
         actors.append(act2)
-        return actors
+        
+        for actor in actors:
+            self.actors.append(actor)
+            self.foci_Actors.append(actor)
+            actor.visibility = self.show_foci
+        
+        return self.actors
     
     def trace_rays(self, rays):
         """traces a RayCollection. Reimplemented from base class

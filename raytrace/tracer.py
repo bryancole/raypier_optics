@@ -19,7 +19,7 @@
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
-            self, Str, Bool, PythonValue
+            self, Str, Bool, PythonValue, Enum
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
@@ -104,6 +104,7 @@ class Direction(HasTraits):
 
 class ModelObject(HasTraits):
     name = Str("A traceable component")
+    
     centre = Tuple(0.,0.,0.) #position
     
     _orientation = Tuple(float, float)
@@ -122,7 +123,24 @@ class ModelObject(HasTraits):
     
     transform = Instance(tvtk.Transform, (), transient=True)
     
+    display = Enum("shaded", "wireframe", "hidden")
+    
     actors = Instance(tvtk.ActorCollection, transient=True)
+    render = Event() #request rerendering (but not necessarily re-tracing)
+    
+    def _display_changed(self, vnew):
+        if vnew=="shaded":
+            for actor in self.actors:
+                actor.visibility = True
+                actor.property.representation = "surface"
+        elif vnew=="wireframe":
+            for actor in self.actors:
+                actor.visibility = True
+                actor.property.representation = "wireframe"
+        else:
+            for actor in self.actors:
+                actor.visibility = False
+        self.render = True
     
     def get_actors(self, scene):
         return self.actors
@@ -189,7 +207,6 @@ class Traceable(ModelObject):
     tolerance = Float(0.0001) #excludes ray-segments below this length
 
     update = Event() #request re-tracing
-    render = Event() #request rerendering
     
     intersections = List([])
     
@@ -197,7 +214,6 @@ class Traceable(ModelObject):
     pipeline = Any(transient=True) #a tvtk.DataSetAlgorithm ?
     
     polydata = Property(depends_on=['update', ])
-    
     
     def _actors_default(self):
         pipeline = self.pipeline
@@ -261,6 +277,7 @@ class Traceable(ModelObject):
 Traceable.uigroup = VGroup(
                    Item('name', editor=TitleEditor(), springy=False,
                         show_label=False),
+                   Item('display'),
                    VGroup(
                    Item('orientation', editor=ScrubberEditor()),
                    Item('elevation', editor=ScrubberEditor()),

@@ -147,6 +147,18 @@ class BaseRaySource(HasTraits):
     
     vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)}, transient=True)
     
+    def eval_angular_spread(self, idx):
+        """A helper method to evaluate the angular spread of a ray-segment.
+        @param idx: the index of the RayCollection in the TracedRay list 
+                    to analyse
+                    
+        @returns: the average angle from the mean ray, in degrees"""
+        rays = self.TracedRays[idx]
+        ave_dir = normaliseVector(rays.direction.mean(axis=0))
+        dotprod = (ave_dir[numpy.newaxis,:] * rays.direction).sum(axis=1)
+        angles = numpy.arccos(dotpod)*180 / numpy.pi
+        return angles.mean()
+    
     def _TracedRays_changed(self):
         self.data_source.modified()
         
