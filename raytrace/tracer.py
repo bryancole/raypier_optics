@@ -32,6 +32,7 @@ import threading
 import wx
 from itertools import chain, izip, islice
 from raytrace.sources import BaseRaySource, collectRays, RayCollection
+from raytrace.constraints import BaseConstraint
 
 Vector = Array(shape=(3,))
 
@@ -588,6 +589,7 @@ class RayTraceModel(HasTraits):
     optics = List(Traceable)
     sources = List(BaseRaySource)
     probes = List(Probe)
+    constraints = List(BaseConstraint)
     
     optical_path = Float(0.0, transient=True)
     
@@ -628,6 +630,11 @@ class RayTraceModel(HasTraits):
         for probe in probeList:
             probe.on_trait_change(self.update_probes, "update")
             probe.on_trait_change(self.render_vtk, "render")
+        self.update = True
+        
+    def _constraints_changed(self, constraintsList):
+        for constraint in constraintsList:
+            constraint.on_trait_change(self.trace_all, "update")
         self.update = True
         
     def update_probes(self):
@@ -798,8 +805,21 @@ tree_editor = TreeEditor(
                         auto_open=True,
                         label="name",
                         ),
-                        TreeNode(
+                       TreeNode(
                         node_for=[Probe],
+                        children='',
+                        auto_open=True,
+                        label="name",
+                        ),
+                       TreeNode(
+                        node_for=[RayTraceModel],
+                        children='constraints',
+                        auto_open=True,
+                        label="=Constraints",
+                        view = View()
+                        ),
+                       TreeNode(
+                        node_for=[BaseConstraint],
                         children='',
                         auto_open=True,
                         label="name",
