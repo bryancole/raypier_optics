@@ -17,22 +17,26 @@
 
 
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
-            Property, List, Instance, on_trait_change, Range, Any,\
+            Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
             self, Str, Bool, PythonValue, Enum
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
             ShellEditor
+            
+from enthought.traits.ui.file_dialog import save_file
+            
 from enthought.tvtk.api import tvtk
 from enthought.tvtk.pyface.scene_model import SceneModel
 from enthought.tvtk.pyface.scene_editor import SceneEditor
 import numpy
-import threading
+import threading, os
 import wx
-from itertools import chain, izip, islice
+from itertools import chain, izip, islice, count
 from raytrace.sources import BaseRaySource, collectRays, RayCollection
 from raytrace.constraints import BaseConstraint
+from raytrace.has_queue import HasQueue, on_trait_change
 
 Vector = Array(shape=(3,))
 
@@ -44,6 +48,8 @@ ROField = TextEditor(auto_set=False, enter_set=True, evaluate=float)
 VectorEditor = TupleEditor(labels=['x','y','z'], auto_set=False, enter_set=True)
 
 dotprod = lambda a,b: (a*b).sum(axis=-1)[...,numpy.newaxis]
+
+counter = count()
 
 def transformPoints(t, pts):
     """Apply a vtkTransform to a numpy array of points"""
@@ -103,7 +109,7 @@ class Direction(HasTraits):
     z = Float
 
 
-class ModelObject(HasTraits):
+class ModelObject(HasQueue):
     name = Str("A traceable component")
     
     centre = Tuple(0.,0.,0.) #position
@@ -197,6 +203,11 @@ class ModelObject(HasTraits):
         #print "set direction", -phi, -theta
         self._orientation = -phi, -theta
         
+    def make_step_shape(self):
+        """Creates an OpenCascade BRep Shape
+        representation of the object, which can be
+        exported to STEP format"""
+        return False
         
 class Probe(ModelObject):
     pass
@@ -583,7 +594,7 @@ class BeamStop(VTKOptic):
         return P1 + P2
     
     
-class RayTraceModel(HasTraits):
+class RayTraceModel(HasQueue):
     scene = Instance(SceneModel, (), {'background':(1,1,0.8)}, transient=True)
     
     optics = List(Traceable)
@@ -594,11 +605,14 @@ class RayTraceModel(HasTraits):
     optical_path = Float(0.0, transient=True)
     
     update = Event()
+    _updating = Bool(False)
     
     Self = self
     ShellObj = PythonValue(transient=True)
         
     recursion_limit = Int(10, desc="maximum number of refractions or reflections")
+    
+    save_btn = Button("Save scene")
     
     def _optics_changed(self, opticList):
         scene = self.scene
@@ -609,7 +623,7 @@ class RayTraceModel(HasTraits):
         for optic in opticList:
             optic.on_trait_change(self.trace_all, "update")
             optic.on_trait_change(self.render_vtk, "render")
-        self.update = True
+        self.trace_all()
     
     def _rays_changed(self, rayList):
         scene = self.scene
@@ -620,7 +634,7 @@ class RayTraceModel(HasTraits):
             property = actor.property
             property.color = (1,0.5,0)
         scene.add_actors(actors)
-        self.update = True
+        self.trace_all()
         
     def _probes_changed(self, probeList):
         scene = self.scene
@@ -630,20 +644,26 @@ class RayTraceModel(HasTraits):
         for probe in probeList:
             probe.on_trait_change(self.update_probes, "update")
             probe.on_trait_change(self.render_vtk, "render")
-        self.update = True
+        self.trace_all()
         
     def _constraints_changed(self, constraintsList):
         for constraint in constraintsList:
             constraint.on_trait_change(self.trace_all, "update")
-        self.update = True
+        self.trace_all()
         
     def update_probes(self):
         if self.scene is not None:
             self.render_vtk()
         
-    @on_trait_change("update")
     def trace_all(self):
+        if not self._updating:
+            self._updating = True
+            self.update = True
+        
+    @on_trait_change("update", dispatch="queued")
+    def do_update(self):
         optics = self.optics
+        print "trace", counter.next()
         if optics:
             for o in optics:
                 o.intersections = []
@@ -652,6 +672,7 @@ class RayTraceModel(HasTraits):
             for o in optics:
                 o.update_complete()
         self.render_vtk()
+        self._updating = False
         
     def trace_detail(self, async=False):
         optics = [o.clone_traits() for o in self.optics]
@@ -753,6 +774,35 @@ class RayTraceModel(HasTraits):
         new_rays = collectRays(*children)
         new_rays.parent = rays
         return new_rays
+    
+    def _save_btn_changed(self):
+        filename = save_file()
+        if not filename: return
+        fmap = {".stp": self.write_to_STEP,
+                ".step": self.write_to_STEP,
+                ".wrl": self.write_to_VRML,
+                ".vrml": self.write_to_VRML}
+        ext = os.path.splitext(filename)[-1].lower()
+        try:
+            fmap[ext](filename)
+        except KeyError:
+            self.write_to_STEP(filename)
+    
+    def write_to_VRML(self, fname):
+        scene = self.scene
+        if scene is not None:
+            renwin = scene._renwin
+            if filename:
+                writer = tvtk.VRMLExporter(file_name=fname,
+                                           render_window=renwin)
+                writer.update()
+                writer.write()
+                
+    def write_to_STEP(self, fname):
+        from raytrace.step_export import export_shapes
+        optics = self.optics
+        shapes = filter(None, (o.make_step_shape() for o in optics))
+        export_shapes(shapes, fname)
         
     def _sources_changed(self, source_list):
         scene = self.scene
@@ -760,7 +810,7 @@ class RayTraceModel(HasTraits):
             for actor in source.actors:
                 scene.add_actor(actor)
             source.on_trait_change(self.trace_all, "update")
-        self.update = True
+        self.trace_all()
         
         
 tree_editor = TreeEditor(
@@ -842,9 +892,12 @@ ray_tracer_view = View(
                        show_labels=False,
                        dock="vertical"
                        ),
-                       Item('Self', 
-                            id="TracerModelID",
-                            editor=tree_editor, width=200),
+                       VGroup(Item('Self', 
+                                id="TracerModelID",
+                                editor=tree_editor, width=200),
+                            Item('save_btn'),
+                            show_labels=False
+                            ),
                     show_labels=False,
                     dock="horizontal",
                     id="raytrace.model"

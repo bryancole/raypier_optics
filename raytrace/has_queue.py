@@ -3,13 +3,16 @@ from enthought.traits.has_traits import HasTraits, \
         
 from enthought.traits.trait_notifiers import TraitChangeNotifyWrapper
 
-from collections import deque, defaultdict
-import threading
+from collections import deque
+from threading import currentThread
 from functools import wraps
 
 
 @wraps(_on_trait_change)
-def on_trait_change ( name, post_init = False, dispatch="same", *names ):
+def on_trait_change ( name, post_init = False, 
+                      dispatch="same", 
+                      retrigger="all",
+                      *names ):
     """ overrides the has_traits.on_trait_change decorator to
     add some extra metadata to the trait handler function to
     indicate the dispatch-method
@@ -17,32 +20,73 @@ def on_trait_change ( name, post_init = False, dispatch="same", *names ):
     def decorator( function ):
         function = _on_trait_change(name, post_init, *names)( function )
         function.dispatch = dispatch
+        function.retrigger = retrigger
         return function
     return decorator
 
 
 class QueuedTraitChangeNotifyWrapper(TraitChangeNotifyWrapper):
-    def dispatch(self, handler, *args):
-        this_thd = threading.currentThread()
-        notification_queue = self.object()._notification_queue
+    def __init__(self, handler, owner):
+        retrigger = getattr(handler, 'retrigger', 'all')
+        self.dispatch = getattr(self, self._policy_map[retrigger])
+        TraitChangeNotifyWrapper.__init__(self, handler, owner)
+    
+    def _dispatch_all(self, handler, *args):
+        this_thd = currentThread()
+        notification_queue = self.object().__notification_queue__
         this_queue = notification_queue[this_thd]
         this_queue.append((handler, args))
+        
+    def _dispatch_replace(self, handler, *args):
+        this_thd = currentThread()
+        notification_queue = self.object().__notification_queue__
+        this_queue = notification_queue[this_thd]
+        handlers = [h for h,a in this_queue]
+        count = handlers.count(handler)
+        for i in xrange(count):
+            idx = [h for h,a in this_queue].index(handler)
+            del this_queue[idx]
+        this_queue.append((handler, args))
+        
+    _policy_map = {'all': '_dispatch_all',
+                   'replace': '_dispatch_replace'}
             
+            
+def wrap_queue( func ):
+    def wrapped( self, *args, **kwds ):
+        s = super(HasQueue, self)
+        q = self.__notification_queue__
+        thd = currentThread()
+        if thd not in q:
+            q[thd] = this_q = deque()
+            try:
+                func(self, *args, **kwds)
+                while True:
+                    try:
+                        handler, args = this_q.popleft()
+                        handler(*args)
+                    except IndexError:
+                        break
+            finally:
+                del q[thd]
+        else:
+            func(self, *args, **kwds)
+    return wrapped
+
 
 class HasQueue(HasTraits):    
     """
     This subclass of HasTraits add a new method of trait notification
-    dispatch: "queued". The notification queue is per-instance and per-thread. When 
-    any attribute on the instance is set, the queue is processed (although
-    setting non-trait attributes will not place anything on the queue, so
-    no actions will take place).
+    dispatch: "queued". By default the scope of the queue is global across all
+    subclasses of HasQueue but you can limit this by adding a __notification_queue__={}
+    class attribute to specific subclasses, or even instances. 
+    
+    When any trait on the instance is set, the queue is processed after all
+    synchronous trait handlers (dispatch="same") have completed.
     
     Use the on_trait_change decorator defined in this module to define the dispatch
     method (the has_trait.on_trait_change decorator doesn't allow a dispatch
     keyword).
-    
-    "queued" trait-change-handlers are effectively processed after all 
-    other ("same") handlers. 
     
     multiple firing of handlers will still occur (i.e. setting a handler to "queued"
     doesn't change the number of times it fires, only the ordering). If re-triggering is 
@@ -52,11 +96,11 @@ class HasQueue(HasTraits):
     breadth-first traversal of the dependancy tree (whereas all "same" gives
     a depth-first traversal).
     """
-    def __init__(self, *args, **kwds):
-        this = super(HasQueue, self)
-        this.__init__(*args, **kwds)
-        this.__setattr__("_notification_queue", 
-                            defaultdict(deque) )
+    __notification_queue__ = {}
+    
+    __init__ = wrap_queue( HasTraits.__init__ )
+    
+    trait_set = wrap_queue( HasTraits.trait_set )
         
     def _on_trait_change( self, handler, name = None, remove = False,
                                  dispatch = 'same', priority = False ):
@@ -68,22 +112,26 @@ class HasQueue(HasTraits):
     
     def __setattr__(self, name, val):
         """is there a better way to intercept trait-assignment?"""
-        q = self._notification_queue
-        thd = threading.currentThread()
-        if thd not in q:
-            q[thd] = this_q = deque()
-            try:
-                super(HasQueue, self).__setattr__(name, val)
-                while True:
-                    try:
-                        handler, args = this_q.popleft()
-                        handler(*args)
-                    except IndexError:
-                        break
-            finally:
-                del q[thd]
+        s = super(HasQueue, self)
+        if name in self.trait_names():
+            q = self.__notification_queue__
+            thd = currentThread()
+            if thd not in q:
+                q[thd] = this_q = deque()
+                try:
+                    s.__setattr__(name, val)
+                    while True:
+                        try:
+                            handler, args = this_q.popleft()
+                            handler(*args)
+                        except IndexError:
+                            break
+                finally:
+                    del q[thd]
+            else:
+                s.__setattr__(name, val)
         else:
-            super(HasQueue, self).__setattr__(name, val)
+            s.__setattr__(name, val)
 
 HasQueue.set_trait_dispatch_handler("queued", QueuedTraitChangeNotifyWrapper)
 
@@ -105,37 +153,27 @@ if __name__=="__main__":
         b = Float(0.0)
         c = Float(0.0)
         d = Float(0.0)
-        e = Float(0.0)
-        
-        e_fired = Bool(False)
         
         @on_trait_change("a", dispatch="same")
         def change_a(self, vnew):
             print "a changed to", vnew
-            self.b = vnew + 1
             self.c = vnew + 2
+            self.b = vnew + 1
             
         @on_trait_change("b", dispatch="same")
         def change_b(self, vnew):
             print "b changed to", vnew
             self.d = vnew + 3
             
-        @on_trait_change("c", dispatch="queued")
+        @on_trait_change("c", dispatch="same")
         def change_c(self, vnew):
             print "c changed to", vnew
             self.d = vnew + 4
             
-        @on_trait_change("d", dispatch="same")
+        @on_trait_change("d", dispatch="queued", retrigger="replace")
         def change_d(self, vnew):
             print "d changed to", vnew
-            if not self.e_fired:
-                self.e_fired = True
-                self.e = vnew + 5
-            
-        @on_trait_change("e", dispatch="queued")
-        def change_e(self, vnew):
-            print "e changed to", vnew, self.d + 5
-            self.e_fired = False
+            self.e = vnew + 5
             
     t = test()
     t.a = 1.0

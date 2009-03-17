@@ -101,6 +101,13 @@ class PECMirror(BaseMirror):
                         ),
                    )
     
+    def make_step_shape(self):
+        from raytrace.step_export import make_cylinder
+        return make_cylinder(self.centre, 
+                             self.direction, 
+                             self.diameter/2, 
+                             self.thickness)
+    
     @on_trait_change("diameter, thickness")
     def config_pipeline(self):
         cyl = self.vtk_cylinder

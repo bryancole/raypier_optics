@@ -17,6 +17,7 @@
 
 
 import numpy
+
 from enthought.traits.api import HasTraits, Int, Float, Range,\
      Bool, Property, Array, Event, List, cached_property, Str,\
      Instance, Tuple, on_trait_change, Trait
@@ -24,7 +25,6 @@ from enthought.traits.api import HasTraits, Int, Float, Range,\
 from enthought.traits.ui.api import View, Item
 
 from enthought.tvtk.api import tvtk
-
 
 Vector = Array(shape=(3,))
 
@@ -158,6 +158,19 @@ class BaseRaySource(HasTraits):
         dotprod = (ave_dir[numpy.newaxis,:] * rays.direction).sum(axis=1)
         angles = numpy.arccos(dotpod)*180 / numpy.pi
         return angles.mean()
+    
+    def make_step_shape(self):
+        from raytrace.step_export import make_wire, make_compound, pairs
+        def make_forward_map(parent, child):
+            pmap = [[]]*parent.origin.shape[0]
+            for c_id,p_id in enumerate(child.parent_ids):
+                pmap[p_id].append(c_id)
+            return pmap
+        mapList = [make_forward_map(p, c) for p,c in pairs(self.TracedRays)]
+        wireList = [[]]*self.InputRays.origin.shape[0]
+        
+        
+        
     
     def _TracedRays_changed(self):
         self.data_source.modified()
