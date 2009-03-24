@@ -31,12 +31,16 @@ from enthought.tvtk.api import tvtk
 from enthought.tvtk.pyface.scene_model import SceneModel
 from enthought.tvtk.pyface.scene_editor import SceneEditor
 import numpy
-import threading, os
+import threading, os, itertools
 import wx
 from itertools import chain, izip, islice, count
-from raytrace.sources import BaseRaySource, collectRays, RayCollection
+from raytrace.sources import BaseRaySource
+from raytrace.rays import RayCollection, collectRays
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
+from raytrace.faces import Face
+from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
+        transformVectors, dotprod
 
 Vector = Array(shape=(3,))
 
@@ -47,61 +51,8 @@ ComplexEditor = TextEditor(auto_set=False, enter_set=True,
 ROField = TextEditor(auto_set=False, enter_set=True, evaluate=float)
 VectorEditor = TupleEditor(labels=['x','y','z'], auto_set=False, enter_set=True)
 
-dotprod = lambda a,b: (a*b).sum(axis=-1)[...,numpy.newaxis]
-
 counter = count()
 
-def transformPoints(t, pts):
-    """Apply a vtkTransform to a numpy array of points"""
-    out = tvtk.Points()
-    t.transform_points(pts, out)
-    return numpy.asarray(out)
-
-def transformVectors(t, pts):
-    """Apply a vtkTransform to a numpy array of vectors.
-    I.e. ignore the translation component"""
-    out = tvtk.DoubleArray(number_of_components=3)
-    t.transform_vectors(pts, out)
-    return numpy.asarray(out)
-
-def transformNormals(t, pts):
-    """Apply a vtkTransform to a numpy array of normals.
-    I.e. ignore the translation component and normalise
-    the resulting magnitudes"""
-    out = tvtk.DoubleArray(number_of_components=3)
-    t.transform_normals(pts, out)
-    return numpy.asarray(out)
-
-def normaliseVector(a):
-    """normalise a (3,) vector or a (n,3) array of vectors"""
-    a= numpy.asarray(a)
-    mag = numpy.sqrt((a**2).sum(axis=-1))
-    return (a.T/mag).T
-
-
-def Convert_to_SP(input_v, normal_v, E1_vector, E1_amp, E2_amp):
-    """
-    All inputs are 2D arrays
-    """
-    cross = numpy.cross
-    
-    E2_vector = cross(input_v, E1_vector)
-    
-    v = cross(input_v, normal_v)
-    S_vector = numpy.where(numpy.all(v==0, axis=1).reshape(-1,1)*numpy.ones(3), 
-                           normaliseVector(E1_vector),
-                           normaliseVector(v) )
-    
-    v = cross(input_v, S_vector)
-    P_vector = normaliseVector(v)
-    
-    S_amp = E1_amp*dotprod(E1_vector,S_vector) + E2_amp*dotprod(E2_vector, S_vector)
-                
-    P_amp = E1_amp*dotprod(E1_vector,P_vector) + E2_amp*dotprod(E2_vector, P_vector)
-    
-    return S_amp, P_amp, S_vector, P_vector
-
-    
     
 class Direction(HasTraits):
     x = Float
@@ -123,6 +74,8 @@ class ModelObject(HasQueue):
     
     direction_btn = Button("set")
     direction = Property(Tuple(float,float,float),depends_on="_orientation")
+    
+    x_axis = Property(Tuple(float,float,float),depends_on="_orientation, rotation")
     
     dir_x = Property(depends_on="direction")
     dir_y = Property(depends_on="direction")
@@ -184,6 +137,15 @@ class ModelObject(HasQueue):
         #print "set transform", self._orientation
         self.update = True
         
+    def _get_x_axis(self):
+        temp = tvtk.Transform()
+        o,e = self._orientation
+        temp.rotate_z(o)
+        temp.rotate_x(e)
+        temp.rotate_z(self.rotation)
+        direct = temp.transform_point(1,0,0)
+        return direct
+        
     @cached_property
     def _get_direction(self):
         temp = tvtk.Transform()
@@ -209,23 +171,28 @@ class ModelObject(HasQueue):
         exported to STEP format"""
         return False
         
+        
 class Probe(ModelObject):
     pass
         
     
 class Traceable(ModelObject):
     vtkproperty = Instance(tvtk.Property, transient=True)
-    
-    tolerance = Float(0.0001) #excludes ray-segments below this length
 
     update = Event() #request re-tracing
     
     intersections = List([])
     
+    faces = List(Face, desc="list of traceable faces (Face instances)")
+    
     #all Traceables have a pipeline to generate a VTK visualisation of themselves
     pipeline = Any(transient=True) #a tvtk.DataSetAlgorithm ?
     
     polydata = Property(depends_on=['update', ])
+    
+    def _faces_changed(self, vnew):
+        for face in vnew:
+            face.transform = self.tranform
     
     def _actors_default(self):
         pipeline = self.pipeline
@@ -245,45 +212,42 @@ class Traceable(ModelObject):
     
     def trace_rays(self, rays):
         """traces a RayCollection.
+        
+        @param rays: a RayCollection instance
+        @param face_id: id of the face to trace. If None, trace all faces
+        
         returns - a recarray of intersetions with the same size as rays
-                  dtype=(('length','d'),('cell','i'),('point','d',[3,]))
+                  dtype=(('length','d'),('face','O'),('point','d',[3,]))
                   
                   'length' is the physical length from the start of the ray
                   to the intersection
                   
                   'cell' is the ID of the intersecting face
                   
-                  'point' is the position coord of the intersection
+                  'point' is the position coord of the intersection (in world coords)
         """
+        p1 = rays.origin
+        p2 = p1 + rays.max_length*rays.direction
+        t = self.transform
+        inv_t = t.linear_inverse
+        P1 = transformPoints(inv_t, p1)
+        P2 = transformPoints(inv_t, p2)
         
-        raise NotImplementedError
+        if len(self.faces)>1:
+            traces = numpy.column_stack([f.intersect(P1, P2) for f in self.faces])   
+            nearest = numpy.argmin(traces['length'], axis=1)
+            ar = numpy.arange(traces.shape[0])
+            shortest = traces[ar,nearest]
+        else:
+            shortest = self.faces[0].intersect(P1, P2)
+            
+        t_points = shortest['point']
+        points = transformPoints(t, t_points)
+        shortest['point'] = points
+        return shortest
     
     def update_complete(self):
         pass
-    
-    def eval_children(self, rays, points, cells, mask):
-        """
-        actually calculates the new ray-segments. Physics here
-        for Fresnel reflections.
-        
-        rays - a RayCollection object
-        points - a (Nx3) array of intersection coordinates
-        cells - a length N array of cell ids
-        mask - a bool array selecting items for this Optic
-        """
-        raise NotImplementedError
-    
-    def compute_normal(self, point, cell_ids):
-        """
-        Computes the surface normal vectors for a given array of
-        intersection points
-        
-        @param point: (n,3) array of points
-        @param cells: (n,) array of ints giving the cell IDs for each intersection
-        
-        @return: (n,3) array, the normal vectors (should have unit magnitude)
-        """
-        raise NotImplementedError
 
 
 Traceable.uigroup = VGroup(
@@ -336,19 +300,23 @@ class Optic(Traceable):
         """
         raise NotImplementedError
     
-    def eval_children(self, rays, points, cells, mask):
+    def eval_children(self, rays, points, cells, mask=slice(None,None,None)):
         """
         actually calculates the new ray-segments. Physics here
         for Fresnel reflections.
         
         rays - a RayCollection object
         points - a (Nx3) array of intersection coordinates
-        cells - a length N array of cell ids
+        cells - a length N array of cell ids (a.k.a. face ids), or an int
         mask - a bool array selecting items for this Optic
         """
         points = points[mask]
-        cells = cells[mask] ###reshape not necessary
-        normal = self.compute_normal(points, cells)
+        if isinstance(cells, int):
+            normal = self.compute_normal(points, cells)
+            cells = numpy.ones(points.shape[0], numpy.int) * cells
+        else:
+            cells = cells[mask] ###reshape not necessary
+            normal = self.compute_normal(points, cells)
         input_v = rays.direction[mask]
         
         parent_ids = numpy.arange(mask.shape[0])[mask]
@@ -525,73 +493,6 @@ class VTKOptic(Optic):
             return None
         short = min(data, key=lambda a: a[0])
         return short[0], short[1], short[2], self
-        
-    
-class BeamStop(VTKOptic):
-    name = "Beam Stop"
-    height = Float #distance between parallel faces
-    width = Float #width of parallel faces
-    
-    _polydata = Property(depends_on=['height', 'width'])
-    
-    ray_count = Property(Int, depends_on=['intersections_items'])
-    ave_ray_length = Float(0.0)
-    ave_power = Float(0.0)
-    
-    traits_view = View(VGroup(
-                       Traceable.uigroup,
-                       Item('ray_count', style="readonly",height=-25),
-                       Item('ave_ray_length', label="path length",
-                            style="readonly",height=-25),
-                       Item('ave_power', label="incident power",
-                            style="readonly",height=-25)
-                       )
-                       )
-    
-    @cached_property
-    def _get__polydata(self):
-        h = self.height/2
-        w = self.width/2
-        points = [(-w,-h,0),
-                  (w,-h,0),
-                  (w,h,0),
-                  (-w,h,0)]
-        cells = [(0,1,2),
-                 (2,3,0)
-                 ]
-        pd = tvtk.PolyData(points=numpy.array(points), 
-                           polys=numpy.array(cells))
-        return pd
-    
-    def _get_ray_count(self):
-        return len(self.intersections)
-    
-    def eval_children(self, seg, point, cell_id):
-        return []
-    
-    def update_complete(self):
-        try:
-            ave = sum(seg.cum_length for seg in self.intersections)/len(self.intersections)
-        except ZeroDivisionError:
-            ave = 0.0
-        self.ave_ray_length = ave
-        
-#        for seg in self.intersections:
-#            print seg.E1_amp, seg.E2_amp
-        
-        try:
-            pwr = sum(self.eval_pwr(seg) for seg in self.intersections)/len(self.intersections)
-        except ZeroDivisionError:
-            pwr = 0.0
-        self.ave_power = pwr
-        
-    @staticmethod
-    def eval_pwr(seg):
-        E1 = seg.E1_amp
-        E2 = seg.E2_amp
-        P1 = (abs(E1)**2)
-        P2 = (abs(E2)**2)
-        return P1 + P2
     
     
 class RayTraceModel(HasQueue):
@@ -722,53 +623,79 @@ class RayTraceModel(HasQueue):
         limit = self.recursion_limit
         count = 0
         while (rays is not None) and count<limit:
-            #print "count", count
+            print "count", count
             traced_rays.append(rays)
             rays = self.trace_segment(rays, optics)
             count += 1
+        print "END", count
         ray_source.TracedRays = traced_rays
         ray_source.data_source.modified()
-            
-    def trace_ray_source_detail(self, ray_source, optics):
-        """trace a ray source, using it's detailed rays"""
-        rays = ray_source.InputDetailRays
-        traced_rays = []
-        limit = self.recursion_limit
-        count = 0
-        while (rays is not None) and count<limit:
-            #print "count", count
-            traced_rays.append(rays)
-            rays = self.trace_segment(rays, optics)
-            count += 1
-        ray_source.TracedDetailRays = traced_rays
+        
+    def trace_sequence(self, input_rays, faces_sequence):
+        """
+        Perform a sequential ray-trace.
+        
+        @param input_rays: a RayCollection instance
+        @param optics_sequence: a list of Face instances or lists of Faces
+        
+        returns - the traced rays, as a list of RayCollections including
+                the initial input rays
+        """
+        traced_rays = [rays]
+        rays = input_rays
+        for faces in faces_sequence:
+            if isinstance(faces, Face):
+                intersections = face.trace_rays(rays)
+                mask = intersections['length']!=numpy.Infinity
+                intersections = intersections[mask]
+                points = intersections['point']
+                children = face.eval_children(rays, points)
+            else:
+                intersections = numpy.column_stack([f.trace_rays(rays) for f in faces])
+                shortest = numpy.argmin(intersections['length'], axis=1)
+                ar = numpy.arange(size)
+                lengths = intersections['length'][ar,shortest]
+                
+                #now remove infinite rays
+                mask = lengths!=numpy.Infinity
+                shortest = shortest[mask]
+                ar = ar[mask]
+                
+            rays = children
+            traces_rays.append(rays)
+        return traced_rays
         
     def trace_segment(self, rays, optics):
         """trace a RayCollection"""
         size = rays.origin.shape[0]
         #optic.trace_rays should return a 1d recarray with 
-        #dtype=(('length','f8'),('cell','i2'),('point','f8',[3,]))
+        #dtype=(('length','f8'),('face','O'),('point','f8',[3,]))
         intersections = numpy.column_stack([o.trace_rays(rays) for o in optics])
+        
         shortest = numpy.argmin(intersections['length'], axis=1)
         ar = numpy.arange(size)
-        lengths = intersections['length'][ar,shortest]
+        
+        intersections = intersections[ar,shortest] #reduce 2D to 1D
+        lengths = intersections['length']
         
         #now remove infinite rays
         mask = lengths!=numpy.Infinity
-        shortest = shortest[mask]
-        ar = ar[mask]
+        intersections = intersections[mask]
         
-        optic_ixt = numpy.choose(shortest, optics)
-        cell_ids = intersections['cell'][ar,shortest]
+        faces = intersections['face']
+        
         if intersections.size==1:
-            points = intersections['point'][ar,shortest,:]
+            points = intersections['point']
         else:
-            points = intersections['point'][:,ar,shortest].T
+            points = intersections['point']
+            
         lengthsT = lengths.reshape(-1,1)
         #print "shape", lengthsT.shape, lengthsT.dtype, lengthsT[:5]
         rays.length = lengthsT
-        pair_mask = ((o, o==optic_ixt) for o in numpy.unique(optic_ixt))
-        children = [o.eval_children(rays, points, cell_ids, m) 
-                    for o,m in pair_mask]
+        
+        face_mask = ((f, faces==f) for f in set(faces))
+        
+        children = [f.eval_children(rays, points, m) for f,m in face_mask]
         if len(children)==0:
             return None
         new_rays = collectRays(*children)
@@ -801,7 +728,9 @@ class RayTraceModel(HasQueue):
     def write_to_STEP(self, fname):
         from raytrace.step_export import export_shapes
         optics = self.optics
+        sources = self.sources
         shapes = filter(None, (o.make_step_shape() for o in optics))
+        shapes.extend([s.make_step_shape() for s in sources])
         export_shapes(shapes, fname)
         
     def _sources_changed(self, source_list):

@@ -23,11 +23,17 @@ from enthought.tvtk.api import tvtk
 
 
 from raytrace.tracer import Traceable, normaliseVector, NumEditor,\
-     ComplexEditor, VectorEditor, Convert_to_SP, transformPoints, dotprod
+     ComplexEditor, VectorEditor
      
+from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
+from faces import CircularFace, PECFace
 
 import math, numpy
+
+
+class PECCircularFace(CircularFace, PECFace):
+    pass
 
 
 class BaseMirror(Traceable):
@@ -36,7 +42,7 @@ class BaseMirror(Traceable):
         n = numpy.asarray([t.transform_vector(0,0,-1),])
         return numpy.ones(points.shape) * n
     
-    def eval_children(self, rays, points, cells, mask):
+    def eval_children(self, rays, points, cells, mask=slice(None,None,None)):
         """
         actually calculates the new ray-segments. Physics here
         for Fresnel reflections.
@@ -101,6 +107,13 @@ class PECMirror(BaseMirror):
                         ),
                    )
     
+    def _diameter_changed(self, dnew):
+        self.faces[0].diameter = dnew
+    
+    def _faces_default(self):
+        return [PECCircularFace(transform=self.transform,
+                                diameter = self.diameter)]
+    
     def make_step_shape(self):
         from raytrace.step_export import make_cylinder
         return make_cylinder(self.centre, 
@@ -130,74 +143,6 @@ class PECMirror(BaseMirror):
         self.config_pipeline()
         return transF2
     
-#    def trace_segment(self, seg, last_optic=None, last_cell=None):
-#        """
-#        only one cell
-#        """
-#        p1 = seg.origin
-#        p2 = p1 + seg.MAX_RAY_LENGTH*seg.direction
-#        t = self.transform
-#        inv_t = self.transform.linear_inverse
-#        x1,y1,z1 = inv_t.transform_point(p1)
-#        x2,y2,z2 = inv_t.transform_point(p2)
-#        
-#        r = self.diameter/2
-#
-#        if (z1 >= 0) and (z2 > 0):
-#            return
-#        elif (z1 <= 0) and (z2 < 0):
-#            return
-#        if abs(z1) < self.tolerance:
-#            return
-#
-#        h = -z1/(z2-z1)
-#        X = x1 + h*(x2-x1)
-#        Y = y1 + h*(y2-y1)
-#        #print X, Y, X**2 + Y**2, r**2
-#        if (X**2 + Y**2) > r**2:
-#            return
-#
-#        pt = numpy.asarray(t.transform_point(X,Y,0))
-#        cell = 0
-#        dist = numpy.sqrt(((pt-p1)**2).sum())
-#        return dist, pt, cell, self
-    
-    def trace_rays(self, rays):
-        """re-implemented from base class"""
-        max_length = rays.max_length
-        p1 = rays.origin
-        p2 = p1 + max_length*rays.direction
-        t = self.transform
-        inv_t = t.linear_inverse
-        P1 = transformPoints(inv_t, p1)
-        P2 = transformPoints(inv_t, p2)
-        
-        r = self.diameter/2
-        
-        x1,y1,z1 = P1.T
-        x2,y2,z2 = P2.T
-        
-        h = -z1/(z2-z1)
-        X = x1 + h*(x2-x1)
-        Y = y1 + h*(y2-y1)
-        
-        length = max_length*h
-        
-        mask = (X**2 + Y**2) > r**2
-        mask = numpy.logical_or(mask, h < self.tolerance)
-        mask = numpy.logical_or(mask, h > 1.0)
-        
-        length[mask] = numpy.Infinity
-        
-        t_points = numpy.column_stack((X, Y, numpy.zeros_like(X)))
-        points = transformPoints(t, t_points)
-    
-        dtype=([('length','f8'),('cell','i2'),('point','f8',3)])
-        result = numpy.zeros(p1.shape[0], dtype=dtype)
-        result['length'] = length
-        result['point'] = points
-        
-        return result
             
 if __name__=="__main__":
     from ray_tracer import RayTraceModel, BuildRaySet, BuildConfocalRaySet

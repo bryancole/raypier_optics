@@ -236,7 +236,7 @@ class Ellipsoid(BaseMirror):
         
         return self.actors
     
-    def trace_rays(self, rays):
+    def trace_rays(self, rays, face_id=None):
         """traces a RayCollection. Reimplemented from base class
         
         returns - a recarray of intersetions with the same size as rays
@@ -296,9 +296,9 @@ class Ellipsoid(BaseMirror):
         #pts[1,:,:] = transformPoints(inv_et, points[1,:,:])
         pts = transformPoints(inv_et, points.reshape(-1,3)).reshape(2,-1,3)
         
-        xmin, xmax = self.X_bounds
-        ymin, ymax = self.Y_bounds
-        zmin, zmax = self.Z_bounds
+        xmin, xmax = min(self.X_bounds), max(self.X_bounds)
+        ymin, ymax = min(self.Y_bounds), max(self.Y_bounds)
+        zmin, zmax = min(self.Z_bounds), max(self.Z_bounds)
         
         mask = (d<0.0)[newaxis,:] #shape=(1,N)
         mask = numpy.logical_or(mask, pts[:,:,0]>xmax) #shape=(2,N)
@@ -341,3 +341,14 @@ class Ellipsoid(BaseMirror):
         normals = transformNormals(t, n)
         return normals
     
+    def make_step_shape(self):
+        from raytrace.step_export import make_ellipsoid_mirror
+        return make_ellipsoid_mirror(self.focus1, 
+                                     self.focus2, 
+                                     self.size/2.,
+                                     self.X_bounds, 
+                                     self.Y_bounds, 
+                                     self.Z_bounds, 
+                                     self.centre, 
+                                     self.direction,
+                                     self.x_axis)

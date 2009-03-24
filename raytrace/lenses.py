@@ -126,7 +126,7 @@ class PlanoConvexLens(BaseLens):
         grid.modified()
         return transF
     
-    def trace_rays(self, rays):
+    def trace_rays(self, rays, face_id=None):
         p1 = rays.origin
         p2 = p1 + rays.max_length*rays.direction
         t = self.transform
@@ -134,19 +134,25 @@ class PlanoConvexLens(BaseLens):
         P1 = transformPoints(inv_t, p1)
         P2 = transformPoints(inv_t, p2)
         
-        plane = self.intersect_with_planeT(P1, P2)
-        sphere = self.intersect_with_sphereT(P1, P2)
-        
-        choice = numpy.argmin([plane[0], sphere[0]], axis=0)
-        
         dtype=([('length','f8'),('cell','i2'),('point','f8',3)])
         result = numpy.zeros(p1.shape[0], dtype=dtype)
         
-        result['length'] = numpy.choose(choice, [plane[0], sphere[0]]) * rays.max_length
-        result['cell'] = choice
-        
-        points = numpy.choose(choice.reshape(-1,1)*numpy.ones((1,3),'i'), [plane[1], sphere[1]])
-        result['point'] = transformPoints(t, points)
+        if face_id is None:
+            plane = self.intersect_with_planeT(P1, P2)
+            sphere = self.intersect_with_sphereT(P1, P2)
+            
+            choice = numpy.argmin([plane[0], sphere[0]], axis=0)
+            
+            result['length'] = numpy.choose(choice, [plane[0], sphere[0]]) * rays.max_length
+            result['cell'] = choice
+            points = numpy.choose(choice.reshape(-1,1)*numpy.ones((1,3),'i'), [plane[1], sphere[1]])
+            result['point'] = transformPoints(t, points)
+        else:
+            intersect = {0: self.intersect_with_planeT,
+                         1: self.intersect_with_sphereT}[face_id]
+            result['length'] = intersect[0] * rays.max_length
+            results['cell'] = face_id
+            result['point'] = transformPoints(t, intersect[1])
         return result
     
     def intersect_with_planeT(self, p1, p2):
@@ -203,32 +209,35 @@ class PlanoConvexLens(BaseLens):
         trans = self.transform
         inv_trans = trans.linear_inverse
         
-#        if cell_id==0:
-#            #intersection with plane face
-#            return normaliseVector(trans.transform_vector(0,0,-1))
-#        elif cell_id==1:
-#            #spherical surface
-#            P = inv_trans.transform_point(point)
-#            grad = self.vtk_sphere.function_gradient(P)
-#            if self.curvature < 0.0:
-#                grad = tuple(-a for a in grad)
-#            Grad = trans.transform_vector(grad)
-#            return normaliseVector(Grad)
-#        else:
-#            raise ValueError("unknown cell ID")
-        
-        P = transformPoints(inv_trans, points)
-        centre = numpy.array(self.vtk_sphere.center)
-        radius = self.vtk_sphere.radius
-        curve = self.curvature
-        grad = (P - centre)*2
-        if curve < 0.0:
-            grad *= -1
-        
-        normals = transformNormals(trans, grad)
-        
-        normals[cell_ids==0] = numpy.array(trans.transform_normal(0,0,-1))
-        return normals
+        if isinstance(cell_ids, int):
+            if cell_id==0:
+                #intersection with plane face
+                return normaliseVector(trans.transform_normal(0,0,-1))
+            elif cell_id==1:
+                #spherical surface
+                P = transformPoints(inv_trans, points)
+                centre = numpy.array(self.vtk_sphere.center)
+                radius = self.vtk_sphere.radius
+                curve = self.curvature
+                grad = (P - centre)*2
+                if curve < 0.0:
+                    grad *= -1
+                return transformNormals(trans, grad)
+            else:
+                raise ValueError("unknown cell ID")
+        else:            
+            P = transformPoints(inv_trans, points)
+            centre = numpy.array(self.vtk_sphere.center)
+            radius = self.vtk_sphere.radius
+            curve = self.curvature
+            grad = (P - centre)*2
+            if curve < 0.0:
+                grad *= -1
+            
+            normals = transformNormals(trans, grad)
+            
+            normals[cell_ids==0] = numpy.array(trans.transform_normal(0,0,-1))
+            return normals
 
         
 if __name__=="__main__":

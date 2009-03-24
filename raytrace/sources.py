@@ -26,90 +26,11 @@ from enthought.traits.ui.api import View, Item
 
 from enthought.tvtk.api import tvtk
 
+from raytrace.rays import RayCollection
+from raytrace.utils import normaliseVector
+
 Vector = Array(shape=(3,))
 
-def normaliseVector(a):
-    a= numpy.asarray(a)
-    mag = numpy.sqrt((a**2).sum(axis=-1)).reshape(-1,1)
-    return a/mag
-
-def normaliseVector1d(a):
-    a= numpy.asarray(a)
-    mag = numpy.sqrt((a**2).sum())
-    return a/mag
-
-
-VectorArray = Array(shape=(None,3), dtype=numpy.double)
-
-def collectRays(*rayList):
-    """Combines a sequence of RayCollections into a single larger one"""
-    origin = numpy.vstack([r.origin for r in rayList])
-    direction = numpy.vstack([r.direction for r in rayList])
-    length = numpy.vstack([r.length for r in rayList])
-    optic = numpy.concatenate([r.optic for r in rayList])
-    face_id = numpy.concatenate([r.face_id for r in rayList])
-    refractive_index = numpy.vstack([r.refractive_index for r in rayList])
-    E_vector = numpy.vstack([r.E_vector for r in rayList])
-    E1_amp = numpy.vstack([r.E1_amp for r in rayList])
-    E2_amp = numpy.vstack([r.E2_amp for r in rayList])
-    parent_ids = numpy.concatenate([r.parent_ids for r in rayList])
-    
-    #parent = rayList[0].parent
-    max_length = max(r.max_length for r in rayList)
-    
-    newRays = RayCollection(origin=origin, direction=direction,
-                            length=length, optic=optic,
-                            face_id=face_id, refractive_index=refractive_index,
-                            E_vector=E_vector, E1_amp=E1_amp,
-                            E2_amp = E2_amp, parent_ids=parent_ids,
-                            max_length=max_length)
-    return newRays
-
-
-class RayCollection(HasTraits):
-    origin = VectorArray
-    direction = Property(VectorArray)
-    length = Array(shape=(None,1), dtype=numpy.double)
-    termination = Property(depends_on="origin, direction, length")
-    
-    optic = Array(shape=(None,), dtype=numpy.object)
-    face_id = Array(shape=(None,), dtype=numpy.uint32)
-    
-    refractive_index = Array(shape=(None,1), dtype=numpy.complex128)
-    
-    E_vector = VectorArray
-    E1_amp = Array(shape=(None,1), dtype=numpy.complex128)
-    E2_amp = Array(shape=(None,1), dtype=numpy.complex128)
-    
-    parent = Instance("RayCollection")
-    parent_ids = Array(shape=(None,), dtype=numpy.uint32)
-    
-    max_length = Float
-    
-    def set_polarisation(self, Ex, Ey, Ez):
-        E = numpy.array([Ex, Ey, Ez])
-        
-        orth = numpy.cross(E, self.direction)
-        para = numpy.cross(orth, self.direction)
-        para /= numpy.sqrt((para**2).sum(axis=1)).reshape(-1,1)
-        
-        self.E_vector = para
-    
-    def _length_default(self):
-        return numpy.ones((self.origin.shape[0],1)) * numpy.Infinity
-    
-    def _get_termination(self):
-        length = self.length.clip(0, self.max_length).reshape(-1,1)
-        try:
-            return self.origin + length*self.direction
-        except:
-            pass
-    
-    def _get_direction(self):
-        return self._direction
-    
-    def _set_direction(self, d):
-        self._direction = normaliseVector(d)
 
 
 class BaseRaySource(HasTraits):
@@ -147,6 +68,12 @@ class BaseRaySource(HasTraits):
     
     vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)}, transient=True)
     
+    def get_sequence_to_target(self, optic, face_id):
+        seq = [set(izip(r.optic, r.face_id)) for r in self.TracedRays[1:]]
+        if not seq: return None
+        return seq
+        
+    
     def eval_angular_spread(self, idx):
         """A helper method to evaluate the angular spread of a ray-segment.
         @param idx: the index of the RayCollection in the TracedRay list 
@@ -160,17 +87,9 @@ class BaseRaySource(HasTraits):
         return angles.mean()
     
     def make_step_shape(self):
-        from raytrace.step_export import make_wire, make_compound, pairs
-        def make_forward_map(parent, child):
-            pmap = [[]]*parent.origin.shape[0]
-            for c_id,p_id in enumerate(child.parent_ids):
-                pmap[p_id].append(c_id)
-            return pmap
-        mapList = [make_forward_map(p, c) for p,c in pairs(self.TracedRays)]
-        wireList = [[]]*self.InputRays.origin.shape[0]
-        
-        
-        
+        from raytrace.step_export import make_rays_both
+        #return make_rays_4(self.TracedRays, self.scale_factor)
+        return make_rays_both(self.TracedRays, self.scale_factor)
     
     def _TracedRays_changed(self):
         self.data_source.modified()
@@ -215,11 +134,11 @@ class BaseRaySource(HasTraits):
                 ids = numpy.argwhere(id_mask)[:,0]
                 interleaved = numpy.array([start_pos, end_pos]).swapaxes(0,1).reshape(-1,3)
                 pointArrayList.append(interleaved)
-                
-            points = numpy.vstack(pointArrayList)
-            output.points=points
-            lines = list([i,i+1] for i in xrange(0,points.shape[0],2))
-            output.lines = lines
+            if pointArrayList:
+                points = numpy.vstack(pointArrayList)
+                output.points=points
+                lines = list([i,i+1] for i in xrange(0,points.shape[0],2))
+                output.lines = lines
         source.set_execute_method(execute)
         return source
     
@@ -276,9 +195,9 @@ class ParallelRaySource(BaseRaySource):
         else:
             v = numpy.array([1.,0.,0.])
         d1 = numpy.cross(direction, v)
-        d1 = normaliseVector1d(d1)
+        d1 = normaliseVector(d1)
         d2 = numpy.cross(direction, d1)
-        d2 = normaliseVector1d(d2)
+        d2 = normaliseVector(d2)
         angles = (i*2*numpy.pi/count for i in xrange(count))
         offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
         
@@ -328,9 +247,9 @@ class ConfocalRaySource(BaseRaySource):
         else:
             v = numpy.array([1.,0.,0.])
         d1 = numpy.cross(direction, v)
-        d1 = normaliseVector1d(d1)
+        d1 = normaliseVector(d1)
         d2 = numpy.cross(direction, d1)
-        d2 = normaliseVector1d(d2)
+        d2 = normaliseVector(d2)
         return (d1, d2)
     
     @on_trait_change("focus, direction, number, theta, working_dist, max_ray_len")
@@ -353,8 +272,10 @@ class ConfocalRaySource(BaseRaySource):
         angles = (i*2*numpy.pi/count for i in xrange(count))
         offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
         
-        origins = numpy.array([origin + offset for offset in offsets])
-        directions = normaliseVector([direction*working_dist - offset 
+        origins = numpy.array([origin] + 
+                              [origin + offset for offset in offsets])
+        directions = normaliseVector([direction] + 
+                                     [direction*working_dist - offset 
                                       for offset in offsets])
         rays = RayCollection(origin=origins, direction=directions,
                              max_length=self.max_ray_len)
