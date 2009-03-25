@@ -22,7 +22,7 @@ from enthought.traits.ui.api import View, Item, VGroup
 from enthought.tvtk.api import tvtk
 import numpy
 
-from raytrace.tracer import Probe, Traceable, NumEditor
+from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection
 
 class PolarisationProbe(Probe):

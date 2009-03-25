@@ -19,23 +19,29 @@ a module for parabolic optics e.g. OAPs
 """
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, \
-            Tuple, Event, cached_property, Set, Int, Trait, Bool
+            Tuple, Event, cached_property, Set, Int, Trait, Bool, PrototypedFrom
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
 from enthought.tvtk.api import tvtk
 import numpy
 
-from raytrace.tracer import Traceable, normaliseVector, NumEditor,\
+from raytrace.bases import Traceable, normaliseVector, NumEditor,\
             VectorEditor, transformPoints, transformNormals
 #from raytrace.sources import RayCollection
 from raytrace.mirrors import BaseMirror
+from raytrace.faces import EllipsoidFace, PECFace, Face
+
+
+class PECEllipsoidFace(EllipsoidFace, PECFace):
+    pass
 
 
 class Ellipsoid(BaseMirror):
     name = "Ellipsoid"
     focus1 = Tuple(-50.,0.,0.)
     focus2 = Tuple(0., 50., 0.)
-    size = Float(100.0)
+    size = Float(100.0, desc="twice the major axis length, or the distance from one\
+ focus to the ellipsoid edge to the other focus")
     X_bounds = Tuple(-25., 25.)
     Y_bounds = Tuple(-25., 25.)
     Z_bounds = Tuple(0., 50.)
@@ -73,6 +79,32 @@ class Ellipsoid(BaseMirror):
                         Item("Z_bounds")
                        ),
                        )
+    
+    def _faces_default(self):
+        print "owner", self
+        print "focus1", self.focus1
+        f = PECEllipsoidFace(owner=self)
+        print f.owner
+        print f.focus1
+        return [f]
+    
+    @on_trait_change("focus1, focus2, size")
+    def config_trans(self, *args):
+        f1 = numpy.asarray(self.focus1)
+        f2 = numpy.asarray(self.focus2)
+        size = self.size
+        centre = (f2+f1)/2.
+        ellipse_t = self.ellipse_trans
+        ellipse_t.identity()
+        #ellipse major axis along the X axis
+        delta = f2 - f1
+        ax = normaliseVector(delta)
+        axy = numpy.sqrt(ax[0]**2 + ax[1]**2)
+        ellipse_t.rotate_y(numpy.arctan2(ax[2], axy)*180/numpy.pi)
+        
+        ellipse_t.rotate_z(-numpy.arctan2(ax[1],ax[0])*180/numpy.pi)
+        
+        ellipse_t.translate(*-centre)
     
     @cached_property
     def _get_axes(self):
@@ -235,111 +267,6 @@ class Ellipsoid(BaseMirror):
             actor.visibility = self.show_foci
         
         return self.actors
-    
-    def trace_rays(self, rays, face_id=None):
-        """traces a RayCollection. Reimplemented from base class
-        
-        returns - a recarray of intersetions with the same size as rays
-                  dtype=(('length','d'),('cell','i'),('point','d',[3,]))
-                  
-                  'length' is the physical length from the start of the ray
-                  to the intersection
-                  
-                  'cell' is the ID of the intersecting face
-                  
-                  'point' is the position coord of the intersection
-        """
-        p1 = rays.origin
-        p2 = p1 + rays.max_length*rays.direction
-        
-#        t = self.transform
-#        inv_t = t.linear_inverse
-        
-#        P1 = transformPoints(inv_t, p1)
-#        P2 = transformPoints(inv_t, p2)
-#        
-#        #now transform into ellipse frame...
-        et = self.ellipse_trans
-        inv_et = et.linear_inverse
-#        PP1 = transformPoints(et, P1)
-#        PP2 = transformPoints(et, P2)
-        
-        t = self.combined_trans
-        inv_t = t.linear_inverse
-        PP1 = transformPoints(inv_t, p1)
-        PP2 = transformPoints(inv_t, p2)
-        
-        r = PP1
-        s = PP2 - PP1
-        
-        rx, ry, rz = r.T
-        sx, sy, sz = s.T
-        
-        xa,xb = self.axes
-        
-        B = xb**2
-        A = xa**2
-        
-        a = A*(sz*sz + sy*sy) + B*sx*sx
-        b = 2*( A*(rz*sz + ry*sy) + B*rx*sx )
-        c = A*(rz*rz + ry*ry) + B*rx*rx - A*B
-        
-        d = b*b - 4*a*c
-        sqd = numpy.sqrt(d)
-        roots = numpy.array([(-b + sqd)/(2*a), 
-                                    (-b - sqd)/(2*a)]) #shape=(2,N)
-        newaxis = numpy.newaxis
-        points = r[newaxis,:,:] + roots[:,:,newaxis]*s[newaxis,:,:] #shape=(2,N,3)
-        
-        #pts = numpy.empty_like(points)
-        #pts[0,:,:] = transformPoints(inv_et, points[0,:,:]) #shape=(2,N,3)
-        #pts[1,:,:] = transformPoints(inv_et, points[1,:,:])
-        pts = transformPoints(inv_et, points.reshape(-1,3)).reshape(2,-1,3)
-        
-        xmin, xmax = min(self.X_bounds), max(self.X_bounds)
-        ymin, ymax = min(self.Y_bounds), max(self.Y_bounds)
-        zmin, zmax = min(self.Z_bounds), max(self.Z_bounds)
-        
-        mask = (d<0.0)[newaxis,:] #shape=(1,N)
-        mask = numpy.logical_or(mask, pts[:,:,0]>xmax) #shape=(2,N)
-        mask = numpy.logical_or(mask, pts[:,:,0]<xmin)
-        mask = numpy.logical_or(mask, pts[:,:,1]>ymax)
-        mask = numpy.logical_or(mask, pts[:,:,1]<ymin)
-        mask = numpy.logical_or(mask, pts[:,:,2]>zmax)
-        mask = numpy.logical_or(mask, pts[:,:,2]<zmin)
-        
-        mask = numpy.logical_or(mask, roots < self.tolerance)
-        mask = numpy.logical_or(mask, roots > 1.0)
-        
-        roots[mask] = numpy.Infinity
-        
-        nearest_id = roots.argmin(axis=0) #shape = (N,)
-        idx = numpy.arange(nearest_id.shape[0])
-        nearest = points[nearest_id, idx, :]
-        h_nearest = roots[nearest_id, idx]
-        
-        new_pts = transformPoints(t, nearest)
-        
-        dtype=([('length','f8'),('cell','i2'),('point','f8',3)])
-        result = numpy.empty(p1.shape[0], dtype=dtype)
-        result['length'] = h_nearest*rays.max_length
-        result['point'] = new_pts
-        result['cell'] = 0
-        return result
-    
-    def compute_normal(self, points, cells):
-        t = self.combined_trans
-        inv_t = t.linear_inverse
-        
-        #transform to ellipse reference frame
-        P = transformPoints(inv_t, points)
-        a,b = self.axes
-        nx = P[:,0]/-(a**2)
-        ny = P[:,1]/-(b**2)
-        nz = P[:,2]/-(b**2)
-        n = numpy.column_stack([nx, ny, nz]) 
-        normals = transformNormals(t, n)
-        return normals
     
     def make_step_shape(self):
         from raytrace.step_export import make_ellipsoid_mirror

@@ -16,17 +16,20 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from enthought.traits.api import HasTraits, Instance, Float, Complex,\
-        Tuple, Property, on_trait_change
+        Tuple, Property, on_trait_change, PrototypedFrom, Any
 
 from enthought.tvtk.api import tvtk
 
 import numpy
 
-from raytrace.utils import Convert_to_SP, dotprod
+from raytrace.utils import Convert_to_SP, dotprod, transformPoints,\
+        transformNormals
 from raytrace.rays import RayCollection
 
 class Face(HasTraits):
-    transform = Instance(tvtk.Transform, transient=True)
+    owner = Any #Instance(klass="raytrace.tracer.Traceable")
+    
+    transform = PrototypedFrom('owner')
     
     tolerance = Float(0.0001) #excludes ray-segments below this length
     
@@ -60,17 +63,17 @@ class Face(HasTraits):
     
 
 class CircularFace(Face):
-    diameter = Float
+    diameter = PrototypedFrom('owner')
     
     def trace_rays(self, rays):
         raise NotImplementedError
     
-    def intersect(self, P1, P2):
+    def intersect(self, P1, P2, max_lenth):
         """
         Calculate intersection point for a ray segment between two points
         P1 and P2, in the local coordinate system.
         """
-        max_length = numpy.sqrt(((P2 - P1)**2).sum())
+        max_length = numpy.sqrt(((P2 - P1)**2).sum(axis=1))
         r = self.diameter/2
         
         x1,y1,z1 = P1.T
@@ -105,49 +108,20 @@ class CircularFace(Face):
     
 
 class EllipsoidFace(Face):
-    focus1 = Tuple(Float, Float, Float)
-    focus2 = Tuple(Float, Float, Float)
-    major_axis = Float
-    minor_axis = Property(Float, depends_on="focus1, focus2, major_axis")
+    focus1 = PrototypedFrom('owner')
+    focus2 = PrototypedFrom('owner')
+    size = PrototypedFrom('owner')
     
-    ellipse_trans = Instance(tvtk.Transform, (), transient=True)
-    combined_trans = Instance(tvtk.Transform, transient=True)
+    axes = PrototypedFrom('owner')
     
-    X_bounds = Tuple(Float, Float)
-    Y_bounds = Tuple(Float, Float)
-    Z_bounds = Tuple(Float, Float)
+    ellipse_trans = PrototypedFrom('owner')
+    combined_trans = PrototypedFrom('owner')
     
-    def _get_minor_axis(self):
-        f1 = numpy.asarray(self.focus1)
-        f2 = numpy.asarray(self.focus2)
-        delta = f2 - f1
-        size = self.major_axis*2
-        h = numpy.sqrt((delta**2).sum())
-        b = 0.5 * numpy.sqrt(size**2 - h**2)
-        return b
+    X_bounds = PrototypedFrom('owner')
+    Y_bounds = PrototypedFrom('owner')
+    Z_bounds = PrototypedFrom('owner')
     
-    @on_trait_change("focus1, focus2, major_axis")
-    def config_trans(self, *args):
-        f1 = numpy.asarray(self.focus1)
-        f2 = numpy.asarray(self.focus2)
-        
-        centre = (f2+f1)/2.
-        ellipse_t = self.ellipse_trans
-        ellipse_t.identity()
-        #ellipse major axis along the X axis
-        delta = f2 - f1
-        ax = normaliseVector(delta)
-        axy = numpy.sqrt(ax[0]**2 + ax[1]**2)
-        ellipse_t.rotate_y(numpy.arctan2(ax[2], axy)*180/numpy.pi)
-        
-        ellipse_t.rotate_z(-numpy.arctan2(ax[1],ax[0])*180/numpy.pi)
-        
-        ellipse_t.translate(*-centre)
-    
-    def trace_rays(self, rays):
-        raise NotImplementedError
-    
-    def intersect(self, P1, P2):
+    def intersect(self, P1, P2, max_length):
         et = self.ellipse_trans
         inv_et = et.linear_inverse
         PP1 = transformPoints(et, P1)
@@ -199,17 +173,33 @@ class EllipsoidFace(Face):
         
         nearest_id = roots.argmin(axis=0) #shape = (N,)
         idx = numpy.arange(nearest_id.shape[0])
-        nearest = points[nearest_id, idx, :]
+        nearest = pts[nearest_id, idx, :]
         h_nearest = roots[nearest_id, idx]
         
-        dtype=([('length','f8'),('point','f8',3)])
-        result = numpy.empty(p1.shape[0], dtype=dtype)
-        result['length'] = h_nearest*rays.max_length
+        dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
+        result = numpy.empty(P1.shape[0], dtype=dtype)
+        result['length'] = h_nearest*max_length
+        result['face'] = self
         result['point'] = nearest
         return result
     
     def compute_normal(self, points):
-        return self.normal
+        """computes the surface normal in the global coordinate system"""
+        t = self.combined_trans
+        inv_t = t.linear_inverse
+        
+        #transform to ellipse reference frame
+        P = transformPoints(inv_t, points)
+        a,b = self.axes
+        nx = P[:,0]/-(a**2)
+        ny = P[:,1]/-(b**2)
+        nz = P[:,2]/-(b**2)
+        n = numpy.column_stack([nx, ny, nz]) 
+        normals = transformNormals(t, n)
+        return normals
+    
+    
+    
 
 
 class SphericalFace(Face):
@@ -238,10 +228,9 @@ class PECFace(Face):
         n = rays.refractive_index[mask]
         normal = self.compute_normal(points)
         input_v = rays.direction[mask]
-        
         parent_ids = numpy.arange(mask.shape[0])[mask]
         optic = numpy.repeat([self,], points.shape[0] )
-        
+
         S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
                                                    normal, 
                                                    rays.E_vector[mask], 
@@ -392,6 +381,5 @@ class DielectricFace(Face):
                                face_id = cells,
                                refractive_index=refractive_index) 
             
-    
-    
+
     

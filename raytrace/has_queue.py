@@ -64,9 +64,9 @@ def wrap_queue( func ):
                 while True:
                     try:
                         handler, args = this_q.popleft()
-                        handler(*args)
                     except IndexError:
                         break
+                    handler(*args)
             finally:
                 del q[thd]
         else:
@@ -123,9 +123,9 @@ class HasQueue(HasTraits):
                     while True:
                         try:
                             handler, args = this_q.popleft()
-                            handler(*args)
                         except IndexError:
                             break
+                        handler(*args)
                 finally:
                     del q[thd]
             else:
