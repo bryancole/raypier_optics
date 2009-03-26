@@ -16,7 +16,9 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from enthought.traits.api import HasTraits, Instance, Float, Complex,\
-        Tuple, Property, on_trait_change, PrototypedFrom, Any
+        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str
+        
+from enthought.traits.ui.api import View, Item
 
 from enthought.tvtk.api import tvtk
 
@@ -28,13 +30,34 @@ from raytrace.rays import RayCollection
 
 class Face(HasTraits):
     owner = Any #Instance(klass="raytrace.tracer.Traceable")
-    
+    name = Str("a traceable face")
     transform = PrototypedFrom('owner')
     
     tolerance = Float(0.0001) #excludes ray-segments below this length
     
+    traits_view = View()
+    
+    def __repr__(self):
+        cls_name = str(self.__class__.__name__)
+        return "%s of %s"%(cls_name, self.owner.name)
+    
     def trace_rays(self, rays):
-        raise NotImplementedError
+        owner = self.owner
+        max_length = rays.max_length
+        p1 = rays.origin
+        p2 = p1 + max_length*rays.direction
+        t = owner.transform
+        inv_t = t.linear_inverse
+        P1 = transformPoints(inv_t, p1)
+        P2 = transformPoints(inv_t, p2)
+        
+        intersections = self.intersect(P1, P2, max_length)
+            
+        t_points = intersections['point']
+        points = transformPoints(t, t_points)
+        mask = numpy.ones(rays.number, numpy.bool) #intersections['length'] != numpy.Infinity
+        children = self.eval_children(rays, points, mask)
+        return children
     
     def intersect(self, P1, P2):
         raise NotImplementedError
@@ -63,10 +86,8 @@ class Face(HasTraits):
     
 
 class CircularFace(Face):
+    name = "circular face"
     diameter = PrototypedFrom('owner')
-    
-    def trace_rays(self, rays):
-        raise NotImplementedError
     
     def intersect(self, P1, P2, max_lenth):
         """
@@ -108,6 +129,7 @@ class CircularFace(Face):
     
 
 class EllipsoidFace(Face):
+    name = "ellipsoid face"
     focus1 = PrototypedFrom('owner')
     focus2 = PrototypedFrom('owner')
     size = PrototypedFrom('owner')
@@ -184,7 +206,10 @@ class EllipsoidFace(Face):
         return result
     
     def compute_normal(self, points):
-        """computes the surface normal in the global coordinate system"""
+        """computes the surface normal in the global coordinate system
+        
+        @param points: a Nx3 array
+        """
         t = self.combined_trans
         inv_t = t.linear_inverse
         

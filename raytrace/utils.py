@@ -45,7 +45,9 @@ def transformNormals(t, pts):
     t.transform_normals(pts, out)
     return numpy.asarray(out)
 
-dotprod = lambda a,b: (a*b).sum(axis=-1)[...,numpy.newaxis]
+def dotprod(a,b):
+    """dot-product along last axis"""
+    return (a*b).sum(axis=-1)[...,numpy.newaxis]
 
 def Convert_to_SP(input_v, normal_v, E1_vector, E1_amp, E2_amp):
     """

@@ -25,6 +25,14 @@ from raytrace.utils import normaliseVector
 
 VectorArray = Array(shape=(None,3), dtype=numpy.double)
 
+def shift_cells(rayList):
+    total = 0
+    for rays in rayList:
+        cells = rays.cells
+        if cells is not None:
+            yield rays.cells + total
+        total += rays.number
+
 def collectRays(*rayList):
     """Combines a sequence of RayCollections into a single larger one"""
     origin = numpy.vstack([r.origin for r in rayList])
@@ -40,12 +48,15 @@ def collectRays(*rayList):
     #parent = rayList[0].parent
     max_length = max(r.max_length for r in rayList)
     
+    cells = numpy.vstack(list(shift_cells(rayList)))
+    
     newRays = RayCollection(origin=origin, direction=direction,
                             length=length, face=face,
                             refractive_index=refractive_index,
                             E_vector=E_vector, E1_amp=E1_amp,
                             E2_amp = E2_amp, parent_ids=parent_ids,
-                            max_length=max_length)
+                            max_length=max_length,
+                            cells = cells)
     return newRays
 
 
@@ -54,6 +65,8 @@ class RayCollection(HasTraits):
     direction = Property(VectorArray)
     length = Array(shape=(None,1), dtype=numpy.double)
     termination = Property(depends_on="origin, direction, length")
+    
+    number = Property(Int, depends_on="origin")
     
     face = Array(shape=(None,), dtype=numpy.object)
     
@@ -67,6 +80,32 @@ class RayCollection(HasTraits):
     parent_ids = Array(shape=(None,), dtype=numpy.uint32)
     
     max_length = Float
+    
+    cells = Array(shape=(None,None), dtype=numpy.uint32,
+                  desc="ray topology (optional)")
+    
+    def __init__(self, *args, **kwds):
+        super(RayCollection, self).__init__(*args, **kwds)
+        if 'cells' not in kwds:
+            self._evaluate_cells()
+    
+    def _evaluate_cells(self):
+        parent = self.parent
+        if parent is None:
+            return
+        parent_cells = parent.cells
+        if parent_cells is None:
+            return
+        parent_ids = self.parent_ids
+        forward_map = numpy.ones(parent.number, numpy.int) * -1
+        forward_map[parent_ids] = numpy.arange(self.number)
+        
+        newcells = forward_map[parent_cells]
+        #now remove invalid ones i.e. with id<0
+        mask = (newcells>=0).all(axis=1)
+        
+        newcells = newcells[mask,:]
+        self.cells = newcells
     
     def set_polarisation(self, Ex, Ey, Ez):
         E = numpy.array([Ex, Ey, Ez])
@@ -93,3 +132,5 @@ class RayCollection(HasTraits):
     def _set_direction(self, d):
         self._direction = normaliseVector(d)
         
+    def _get_number(self):
+        return self.origin.shape[0]

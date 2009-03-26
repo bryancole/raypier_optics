@@ -57,7 +57,31 @@ class Direction(HasTraits):
     z = Float
 
 
-class ModelObject(HasQueue):
+class Renderable(HasQueue):
+    display = Enum("shaded", "wireframe", "hidden")
+    
+    actors = Instance(tvtk.ActorCollection, (), transient=True)
+    render = Event() #request rerendering (but not necessarily re-tracing)
+    
+    def _display_changed(self, vnew):
+        if vnew=="shaded":
+            for actor in self.actors:
+                actor.visibility = True
+                actor.property.representation = "surface"
+        elif vnew=="wireframe":
+            for actor in self.actors:
+                actor.visibility = True
+                actor.property.representation = "wireframe"
+        else:
+            for actor in self.actors:
+                actor.visibility = False
+        self.render = True
+    
+    def get_actors(self, scene):
+        return self.actors
+
+
+class ModelObject(Renderable):
     name = Str("A traceable component")
     
     centre = Tuple(0.,0.,0.) #position
@@ -79,28 +103,6 @@ class ModelObject(HasQueue):
     dir_z = Property(depends_on="direction")
     
     transform = Instance(tvtk.Transform, (), transient=True)
-    
-    display = Enum("shaded", "wireframe", "hidden")
-    
-    actors = Instance(tvtk.ActorCollection, transient=True)
-    render = Event() #request rerendering (but not necessarily re-tracing)
-    
-    def _display_changed(self, vnew):
-        if vnew=="shaded":
-            for actor in self.actors:
-                actor.visibility = True
-                actor.property.representation = "surface"
-        elif vnew=="wireframe":
-            for actor in self.actors:
-                actor.visibility = True
-                actor.property.representation = "wireframe"
-        else:
-            for actor in self.actors:
-                actor.visibility = False
-        self.render = True
-    
-    def get_actors(self, scene):
-        return self.actors
     
     def _direction_btn_changed(self):
         d = self.direction
@@ -169,7 +171,7 @@ class ModelObject(HasQueue):
         return False
         
         
-class Probe(ModelObject):
+class Probe(Renderable):
     pass
         
     

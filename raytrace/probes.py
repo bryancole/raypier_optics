@@ -15,15 +15,19 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from enthought.traits.api import on_trait_change, Float, Instance,Event
+from enthought.traits.api import on_trait_change, Float, Instance,Event, Int,\
+        Property, Button, Str
 
-from enthought.traits.ui.api import View, Item, VGroup
+from enthought.traits.ui.api import View, Item, VGroup, DropEditor
 
 from enthought.tvtk.api import tvtk
 import numpy
 
-from raytrace.bases import Probe, Traceable, NumEditor
+from raytrace.bases import Probe, Traceable, NumEditor, Vector
 from raytrace.sources import RayCollection
+from raytrace.rays import collectRays
+from raytrace.point_spread_func import PSF
+
 
 class PolarisationProbe(Probe):
     size = Float(25.0)
@@ -78,4 +82,76 @@ class PolarisationProbe(Probe):
         @param rays: a RayCollection instance
         """
         raise NotImplementedError
+      
+      
+class PointSpreadFunction(Probe):
+    position = Vector(desc="centre point of the point grid on which the PSF is evaluated")
+    direction = Vector(desc="normal vector of the grid plane")
+    orientation = Vector(desc="x_axis direction of the grid plane. This is projected onto\
+    the grid plane to get the actual axis direction")
+    
+    point_spacing = Float(0.05) #in mm
+    size = Int(30)
+    
+    psf = Instance(PSF)
+    
+    wavelength = Float(100.0, desc="wavelength, in microns")
+    
+    ray_source = Instance(klass="raytrace.sources.BaseRaySource")
+    
+    exit_pupil_offset = Float(100.0)
+    aperture = Float(1.0)
+    
+    eval_btn = Button("calculate")
+    
+    def _psf_default(self):
+        return PSF(owner=self) 
         
+    def _eval_btn_fired(self):
+        source = self.ray_source
+        
+        pass
+        
+class FaceCenteredPSF(PointSpreadFunction):
+    name = Property(Str, depends_on="target_face")
+    position = Property(Vector, depends_on="target_face",
+                        desc="centre point of the point grid on which the PSF is evaluated")
+    direction = Property(Vector, depends_on="target_face",
+                      desc="normal vector of the grid plane")
+    orientation = Property(Vector, depends_on="target_face",
+                           desc="x_axis direction of the grid plane. This is projected onto\
+    the grid plane to get the actual axis direction")
+    
+    target_face = Instance(klass="raytrace.faces.Face")
+    
+    traits_view = View(Item('eval_btn', show_label=False),
+                       VGroup(
+                           Item('point_spacing'),
+                           Item('size'),
+                           Item('exit_pupil_offset'),
+                           Item('ray_source', editor=DropEditor()),
+                           Item('target_face', editor=DropEditor())
+                           ),
+                        resizable=True)
+    
+    def _get_name(self):
+        optic = self.target_face.owner
+        idx = optic.faces.index(self.target_face)
+        return "PSF on %s, face %d"%(optic.name, idx)
+                       
+    def _get_centre(self):
+        return numpy.asarray(self.face.owner.centre)
+    
+    def _get_direction(self):
+        return -numpy.asarray(self.face.owner.direction)
+    
+    def _get_orientation(self):
+        return numpy.asarray(self.face.owner.x_axis)
+    
+    def _eval_btn_fired(self):
+        source = self.ray_source
+        
+        sequence = source.get_sequence_to_face(self.target_face)
+        input_rays = source.InputDetailRays
+        
+        result = self.psf.do_trace(input_rays, sequence)

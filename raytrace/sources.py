@@ -17,6 +17,7 @@
 
 
 import numpy
+import itertools
 
 from enthought.traits.api import HasTraits, Int, Float, Range,\
      Bool, Property, Array, Event, List, cached_property, Str,\
@@ -68,11 +69,36 @@ class BaseRaySource(HasTraits):
     
     vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)}, transient=True)
     
-    def get_sequence_to_target(self, optic, face_id):
-        seq = [set(izip(r.optic, r.face_id)) for r in self.TracedRays[1:]]
-        if not seq: return None
-        return seq
+    def __repr__(self):
+        return self.name
+    
+    def get_sequence_to_face(self, face):
+        """returns a list of list of Face objects, those encountered
+        on the route to the target face"""
+        #find the first RayCollection which contains the target face
+        for rays in self.TracedRays[1:]:
+            faces = list(rays.face)
+            if face in faces:
+                break
+        else:
+            raise ValueError("no rays trace to this face")
         
+        seq = []
+        
+        #now iterate back up the ray-tree collecting only the faces
+        #on the path to the target face
+        parent = rays.parent
+        ids = rays.parent_ids[face==rays.face]
+        while True:
+            if parent == self.TracedRays[0]:
+                break
+            faces = list(numpy.unique1d(parent.face[ids]))
+            seq.append(faces)
+            ids = parent.parent_ids[ids]
+            rays = parent
+            parent = rays.parent
+        seq.reverse()
+        return seq
     
     def eval_angular_spread(self, idx):
         """A helper method to evaluate the angular spread of a ray-segment.

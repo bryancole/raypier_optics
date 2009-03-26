@@ -61,7 +61,7 @@ class RayTraceModel(HasQueue):
     _updating = Bool(False)
     
     Self = self
-    ShellObj = PythonValue(transient=True)
+    ShellObj = PythonValue({}, transient=True)
         
     recursion_limit = Int(10, desc="maximum number of refractions or reflections")
     
@@ -295,6 +295,10 @@ class RayTraceModel(HasQueue):
         self.trace_all()
         
         
+def on_dclick(obj):
+    obj.edit_traits(kind="live")
+        
+        
 tree_editor = TreeEditor(
                 nodes=[
                        TreeNode(
@@ -327,8 +331,8 @@ tree_editor = TreeEditor(
                         ),
                        TreeNode(
                         node_for=[Traceable],
-                        children='',
-                        auto_open=True,
+                        children='faces',
+                        auto_open=False,
                         label="name",
                         ),
                        TreeNode(
@@ -356,10 +360,16 @@ tree_editor = TreeEditor(
                         auto_open=True,
                         label="name",
                         ),
-                       
+                       TreeNode(
+                        node_for=[Face],
+                        children='',
+                        auto_open=False,
+                        label="name",
+                        ),
                        ],
                 orientation='vertical',
-                hide_root=True
+                hide_root=True,
+                on_dclick=on_dclick
                 )
         
     
@@ -370,7 +380,7 @@ ray_tracer_view = View(
                             height=600),
                        #Item('optics@', editor=ListEditor(use_notebook=True),
                        #     width=200),
-                       Item('ShellObj', editor=ShellEditor()),
+                       Item('ShellObj', editor=ShellEditor(share=False)),
                        show_labels=False,
                        dock="vertical"
                        ),
