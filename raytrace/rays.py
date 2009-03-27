@@ -99,7 +99,7 @@ class RayCollection(HasTraits):
         parent_ids = self.parent_ids
         forward_map = numpy.ones(parent.number, numpy.int) * -1
         forward_map[parent_ids] = numpy.arange(self.number)
-        
+
         newcells = forward_map[parent_cells]
         #now remove invalid ones i.e. with id<0
         mask = (newcells>=0).all(axis=1)

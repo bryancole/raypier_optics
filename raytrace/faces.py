@@ -56,6 +56,8 @@ class Face(HasTraits):
         t_points = intersections['point']
         points = transformPoints(t, t_points)
         mask = numpy.ones(rays.number, numpy.bool) #intersections['length'] != numpy.Infinity
+        print self, rays.origin.min(axis=0), rays.origin.max(axis=0)
+        print points.min(axis=0), points.max(axis=0)
         children = self.eval_children(rays, points, mask)
         return children
     

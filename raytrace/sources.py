@@ -324,20 +324,36 @@ class ConfocalRaySource(BaseRaySource):
         
         d1, d2 = self.principle_axes
         
-        slen = self.detail_resolution * 1j
+        det_res = self.detail_resolution
+        slen = det_res * 1j
         newaxis = numpy.newaxis
         
         d1o, d2o = numpy.ogrid[-radius:radius:slen,-radius:radius:slen]
+        
+        index = numpy.arange(det_res*det_res).reshape(det_res,det_res)
+        
+        cells = numpy.dstack([index[:-1,:-1],
+                                    index[1:,:-1],
+                                    index[1:,1:],
+                                    index[:-1,1:]]).reshape(-1,4)
         
         offsets = (d1o[:,:,newaxis]*d1[newaxis,newaxis,:] \
                     + d2o[:,:,newaxis]*d2[newaxis,newaxis,:]).reshape(-1,3)
                     
         in_rad = (offsets**2).sum(axis=-1) < radius**2
         
+        #cull points outside the radius
         offsets = offsets[in_rad,:]
+        
+        #now cull cells with points outside the radius
+        map = numpy.ones(in_rad.shape, numpy.int) * -1
+        map[in_rad] = numpy.arange(in_rad.sum())
+        
+        mask = in_rad[cells].all(axis=-1)
+        cells = map[cells[mask,:]]
 
         origins = origin[newaxis,:] + offsets*working_dist
-        directions = normaliseVector(direction[newaxis,:] - origins)
+        directions = normaliseVector(direction[newaxis,:] - offsets)
         
         rays = RayCollection(origin=origins, direction=directions,
                              max_length=self.max_ray_len)
@@ -346,4 +362,6 @@ class ConfocalRaySource(BaseRaySource):
         rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
         rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
+        rays.cells = cells
+        #print cells.max(), rays.number, "check"
         return rays

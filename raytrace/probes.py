@@ -33,7 +33,6 @@ class PolarisationProbe(Probe):
     size = Float(25.0)
     
     update = Event() #request re-tracing
-    render = Event() #request rerendering
     
     plane_src = Instance(tvtk.PlaneSource, (), 
                     {"x_resolution":1, "y_resolution":1},
@@ -124,6 +123,10 @@ class FaceCenteredPSF(PointSpreadFunction):
     
     target_face = Instance(klass="raytrace.faces.Face")
     
+    rays = Instance(klass="raytrace.rays.RayCollection")
+    
+    source = Instance(tvtk.ProgrammableSource, ())
+    
     traits_view = View(Item('eval_btn', show_label=False),
                        VGroup(
                            Item('point_spacing'),
@@ -134,19 +137,43 @@ class FaceCenteredPSF(PointSpreadFunction):
                            ),
                         resizable=True)
     
+    def _actors_default(self):
+        source = self.source
+        def execute():
+            output = source.poly_data_output
+            if self.rays is None:
+                return
+            points = self.rays.origin
+            cells = self.rays.cells
+            output.points = points
+            output.polys = cells.tolist()
+            #print "PSF", cells, points
+        source.set_execute_method(execute)
+        
+        map = tvtk.PolyDataMapper(input=source.output)
+        act = tvtk.Actor(mapper=map)
+        act.property.representation="wireframe"
+        actors = tvtk.ActorCollection()
+        actors.append(act)
+        return actors
+    
+    def _rays_changed(self):
+        self.source.modified()
+        self.render = True
+    
     def _get_name(self):
         optic = self.target_face.owner
         idx = optic.faces.index(self.target_face)
         return "PSF on %s, face %d"%(optic.name, idx)
                        
-    def _get_centre(self):
-        return numpy.asarray(self.face.owner.centre)
+    def _get_position(self):
+        return numpy.asarray(self.target_face.owner.centre)
     
     def _get_direction(self):
-        return -numpy.asarray(self.face.owner.direction)
+        return -numpy.asarray(self.target_face.owner.direction)
     
     def _get_orientation(self):
-        return numpy.asarray(self.face.owner.x_axis)
+        return numpy.asarray(self.target_face.owner.x_axis)
     
     def _eval_btn_fired(self):
         source = self.ray_source
@@ -155,3 +182,5 @@ class FaceCenteredPSF(PointSpreadFunction):
         input_rays = source.InputDetailRays
         
         result = self.psf.do_trace(input_rays, sequence)
+        
+        self.rays = result

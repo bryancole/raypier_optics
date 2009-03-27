@@ -98,15 +98,16 @@ class PECMirror(BaseMirror):
     
     cyl_trans = Instance(tvtk.Transform, (), transient=True)
     
-    vtkproperty = tvtk.Property(color=(0.8,0.8,0.8),
-                                representation="surface")
-    
     traits_view = View(VGroup(
                        Traceable.uigroup,
                        Item('diameter', editor=NumEditor),
                        Item('thickness', editor=NumEditor),
                         ),
                    )
+    
+    def _vtkproperty_default(self):
+        return tvtk.Property(color=(0.8,0.8,0.8),
+                                representation="surface")
     
     def _faces_default(self):
         return [PECCircularFace(owner=self)]
