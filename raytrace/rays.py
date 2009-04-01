@@ -21,9 +21,15 @@ from enthought.traits.api import HasTraits, Int, Float, Range,\
      Bool, Property, Array, Event, List, cached_property, Str,\
      Instance, Tuple, on_trait_change, Trait
      
-from raytrace.utils import normaliseVector
+from raytrace.utils import normaliseVector, dotprod
 
 VectorArray = Array(shape=(None,3), dtype=numpy.double)
+
+def area_of_triangles(p0,p1,p2):
+    s1 = p1 - p0
+    s2 = p1 - p2
+    vp = numpy.cross(s1,s2)
+    return 0.5 * numpy.sqrt((vp**2).sum(axis=-1))
 
 def shift_cells(rayList):
     total = 0
@@ -38,6 +44,7 @@ def collectRays(*rayList):
     origin = numpy.vstack([r.origin for r in rayList])
     direction = numpy.vstack([r.direction for r in rayList])
     length = numpy.vstack([r.length for r in rayList])
+    cum_length = numpy.vstack([r.cum_length for r in rayList])
     face = numpy.concatenate([r.face for r in rayList])
     refractive_index = numpy.vstack([r.refractive_index for r in rayList])
     E_vector = numpy.vstack([r.E_vector for r in rayList])
@@ -64,6 +71,9 @@ class RayCollection(HasTraits):
     origin = VectorArray
     direction = Property(VectorArray)
     length = Array(shape=(None,1), dtype=numpy.double)
+    offset_length = Array(shape=(None,1), dtype=numpy.double)
+    cum_length = Property(Array(shape=(None,1), dtype=numpy.double),
+                          depends_on="parent, parent_ids")
     termination = Property(depends_on="origin, direction, length")
     
     number = Property(Int, depends_on="origin")
@@ -84,17 +94,57 @@ class RayCollection(HasTraits):
     cells = Array(shape=(None,None), dtype=numpy.uint32,
                   desc="ray topology (optional)")
     
+    ray_areas = Property(Array(shape=(None)), depends_on="cells, origin")
+    
     def __init__(self, *args, **kwds):
         super(RayCollection, self).__init__(*args, **kwds)
         if 'cells' not in kwds:
             self._evaluate_cells()
+            
+    def _get_cum_length(self):
+        parent = self.parent
+        if parent is None:
+            cum_length = - self.offset_length
+        else:
+            pids = self.parent_ids
+            cum_length = parent.cum_length[pids] + parent.length[pids] \
+                         - self.offset_length
+        return cum_length
+            
+    def _get_ray_areas(self):
+        cells = self.cells
+        if (cells==[[0]]).all():
+            return None
+        points = self.origin
+        cl = [cells[:,i] for i in xrange(4)]
+        p0, p1, p2, p3 = [points[c] for c in cl]
+        
+        cell_normal = normaliseVector(numpy.cross(p2-p0,p3-p1))
+        cell_direction = normaliseVector(self.direction[cells].sum(axis=1))
+        aspect = dotprod(cell_normal, cell_direction)
+        
+        area = area_of_triangles(p0, p1, p2)
+        area += area_of_triangles(p2, p3, p0)
+        area *= aspect[:,0]
+        
+        ray_areas = numpy.zeros(self.number, numpy.double)
+        cell_count = numpy.zeros(self.number, numpy.int)
+        
+        for c in cl:
+            ray_areas[c] += area
+            cell_count[c] += 1
+            
+        mask = cell_count!=0
+        ray_areas[mask] /= cell_count[mask]
+        
+        return ray_areas
     
     def _evaluate_cells(self):
         parent = self.parent
         if parent is None:
             return
         parent_cells = parent.cells
-        if parent_cells is None:
+        if (parent_cells == [[0]]).all():
             return
         parent_ids = self.parent_ids
         forward_map = numpy.ones(parent.number, numpy.int) * -1

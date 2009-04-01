@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from enthought.traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Button, Str
+        Property, Button, Str, Array
 
 from enthought.traits.ui.api import View, Item, VGroup, DropEditor
 
@@ -27,6 +27,7 @@ from raytrace.bases import Probe, Traceable, NumEditor, Vector
 from raytrace.sources import RayCollection
 from raytrace.rays import collectRays
 from raytrace.point_spread_func import PSF
+from raytrace.utils import normaliseVector
 
 
 class PolarisationProbe(Probe):
@@ -123,6 +124,9 @@ class FaceCenteredPSF(PointSpreadFunction):
     
     target_face = Instance(klass="raytrace.faces.Face")
     
+    target_points = Property(Array(shape=(None,3)),
+                              depends_on="position, direction, orientation, size, point_spacing")
+    
     rays = Instance(klass="raytrace.rays.RayCollection")
     
     source = Instance(tvtk.ProgrammableSource, ())
@@ -175,6 +179,22 @@ class FaceCenteredPSF(PointSpreadFunction):
     def _get_orientation(self):
         return numpy.asarray(self.target_face.owner.x_axis)
     
+    def _get_target_points(self):
+        length = (self.point_spacing * self.size)/2.
+        size = self.size * 1j
+        U,V = numpy.ogrid[-length:length:size, -length:length:size]
+        
+        axis1 = normaliseVector(numpy.cross(self.direction, self.orientation))
+        axis2 = normaliseVector(numpy.cross(axis1, self.direction))
+        
+        newaxis = numpy.newaxis
+        points = axis2[newaxis, newaxis,:] * U[:,:,newaxis] \
+                + axis1[newaxis, newaxis,:] * V[:,:,newaxis]
+                
+        points += self.position
+        return points
+        
+    
     def _eval_btn_fired(self):
         source = self.ray_source
         
@@ -184,3 +204,9 @@ class FaceCenteredPSF(PointSpreadFunction):
         result = self.psf.do_trace(input_rays, sequence)
         
         self.rays = result
+        
+        target_points = self.target_points
+        
+        spot = self.psf.evaluate_scalar_amp(result, target_points)
+        
+        self.spot = spot

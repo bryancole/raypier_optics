@@ -21,7 +21,7 @@ import itertools
 
 from enthought.traits.api import HasTraits, Int, Float, Range,\
      Bool, Property, Array, Event, List, cached_property, Str,\
-     Instance, Tuple, on_trait_change, Trait
+     Instance, Tuple, on_trait_change, Trait, Enum
 
 from enthought.traits.ui.api import View, Item
 
@@ -29,6 +29,7 @@ from enthought.tvtk.api import tvtk
 
 from raytrace.rays import RayCollection
 from raytrace.utils import normaliseVector
+from raytrace.bases import Renderable
 
 Vector = Array(shape=(3,))
 
@@ -37,6 +38,9 @@ Vector = Array(shape=(3,))
 class BaseRaySource(HasTraits):
     name = Str("Ray Source")
     update = Event()
+    display = Enum("pipes", "wires", "hidden")
+    render = Event()
+    mapper = Instance(tvtk.PolyDataMapper, ())
     
     InputRays = Property(Instance(RayCollection), depends_on="max_ray_len")
     TracedRays = List(RayCollection)
@@ -128,7 +132,7 @@ class BaseRaySource(HasTraits):
         
     def _scale_factor_changed(self, scale):
         self.tube.radius = scale
-        self.update = True
+        self.render = True
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor]
@@ -173,9 +177,30 @@ class BaseRaySource(HasTraits):
         tube.input=self.data_source.output
         tube.number_of_sides = 20
         
-        map = tvtk.PolyDataMapper(input=tube.output)
+        map = self.mapper
         act = tvtk.Actor(mapper=map)
+        act.visibility = True
+        display = self.display
+        if display=="pipes":
+            map.input=tube.output
+        elif display=="wires":
+            map.input = self.data_source.output
+        else:
+            act.visibility = False
         return act
+    
+    def _display_changed(self, vnew):
+        actors = self.actors
+        for act in actors:
+            act.visibility = True
+        if vnew=="pipes":
+            self.mapper.input = self.tube.output
+        elif vnew=="wires":
+            self.mapper.input = self.data_source.output
+        elif vnew=="hidden":
+            for act in actors:
+                act.visibility = False
+        self.render = True
     
     def _start_actor_default(self):
         map = tvtk.PolyDataMapper(input=self.sphere.output)
@@ -255,6 +280,7 @@ class ConfocalRaySource(BaseRaySource):
                          depends_on="focus, direction, number, theta, working_dist, max_ray_len")
     
     traits_view = View(Item('name'),
+                       Item('display'),
                        Item('focus'),
                        Item('direction'),
                        Item('number'),
@@ -310,6 +336,7 @@ class ConfocalRaySource(BaseRaySource):
         rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
         rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
+        rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
         return rays
     
     @cached_property
@@ -363,5 +390,6 @@ class ConfocalRaySource(BaseRaySource):
         rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
         rays.cells = cells
+        rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
         #print cells.max(), rays.number, "check"
         return rays

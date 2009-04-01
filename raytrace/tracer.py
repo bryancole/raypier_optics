@@ -292,6 +292,7 @@ class RayTraceModel(HasQueue):
             for actor in source.actors:
                 scene.add_actor(actor)
             source.on_trait_change(self.trace_all, "update")
+            source.on_trait_change(self.render_vtk, "render")
         self.trace_all()
         
         

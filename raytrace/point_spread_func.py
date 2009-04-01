@@ -2,6 +2,7 @@
 from enthought.traits.api import HasTraits, Instance, Property, Float
 
 from raytrace.bases import normaliseVector, dotprod
+from raytrace.rays import collectRays
 
 from scipy.interpolate import interp2d
 from scikits.delaunay import NNInterpolator, Triangulation
@@ -45,7 +46,38 @@ class PSF(HasTraits):
         new_origin = rays.origin - (height/aspect) * directions
         
         rays.origin = new_origin
+        rays.offset_length = height/aspect
         return
+    
+    def evaluate_scalar_amp(self, rays, target):
+        newaxis = numpy.newaxis
+        direction = rays.direction[newaxis,newaxis,...]
+        origin = rays.origin[newaxis,newaxis,...]
+        optical_path = rays.cum_length[newaxis,newaxis,:,0]
+        target = target[:,:,newaxis,:]
+        
+        delta = target - origin
+        z = dotprod(direction, delta)
+        r_bar = delta - (z*direction)
+        r = numpy.sqrt(dotprod(r_bar,r_bar))[...,0]
+        z = z[...,0]
+        
+        wavelen = self.owner.wavelength / 1000.0 #convert to mm
+        
+        ray_areas = rays.ray_areas[newaxis,newaxis,:]
+        w0 = numpy.sqrt(ray_areas/numpy.pi) #beam waists
+        z_r = ray_areas / wavelen #Rayleigh length
+        w = w0 * numpy.sqrt(1 + (z/z_r)**2)
+        R = z * ( 1 + (z_r/z)**2 )
+        
+        q = 1./( 1/R - (1j*wavelen)/(numpy.pi * w *w) )
+        
+        ik = -2j*numpy.pi/wavelen
+        
+        E = numpy.exp(ik*optical_path + (2*ik*r**2)/q)
+        
+        E_total = E.sum(axis=2)
+        return E_total
     
     def resample_exit_pupil(self):
         sample_spacing = self.sample_spacing #FIXME

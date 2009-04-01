@@ -21,10 +21,9 @@ from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
 
 from enthought.tvtk.api import tvtk
-
-
-from raytrace.tracer import Optic, normaliseVector, RaySegment, NumEditor,\
-     ComplexEditor, Traceable, transformPoints, transformNormals
+     
+from raytrace.bases import Optic, normaliseVector, NumEditor,\
+    ComplexEditor, Traceable, transformPoints, transformNormals
 
 import math, numpy
 

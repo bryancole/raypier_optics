@@ -53,6 +53,7 @@ class Face(HasTraits):
         
         intersections = self.intersect(P1, P2, max_length)
             
+        rays.length = intersections['length'].reshape(-1,1)
         t_points = intersections['point']
         points = transformPoints(t, t_points)
         mask = numpy.ones(rays.number, numpy.bool) #intersections['length'] != numpy.Infinity
@@ -226,8 +227,81 @@ class EllipsoidFace(Face):
         return normals
     
     
+class ParaxialLensFace(CircularFace):
+    name = "paraxial face"
+    diameter = PrototypedFrom('owner')
+    focal_length = PrototypedFrom('owner')
     
+    def compute_normal(self, points):
+        raise NotImplementedError
 
+    def eval_children(self, rays, points, mask=slice(None,None,None)):
+        """
+        actually calculates the new ray-segments. Physics here
+        for Fresnel reflections.
+        
+        rays - a RayCollection object
+        points - a (Nx3) array of intersection coordinates
+        mask - a bool array selecting items for this Optic
+        """
+        points = points[mask]
+        n = rays.refractive_index[mask]
+        #normal = self.compute_normal(points)
+        input_v = rays.direction[mask]
+        parent_ids = numpy.arange(mask.shape[0])[mask]
+
+        t = self.transform
+        inv_t = t.linear_inverse
+        
+        #transform to face reference frame
+        P = transformPoints(inv_t, points)
+        z_f = self.focal_length
+        
+        r_sq = P[:,0]**2 + P[:,1]**2
+        
+        r2z2 = numpy.sqrt(r_sq + z_f**2)
+        
+        input_v_t = transformNormals(inv_t, input_v)
+        
+        dkx = -P[:,0]/r2z2
+        dky = -P[:,1]/r2z2
+        
+        sign = numpy.where(input_v_t[:,2]>=0, 1,-1)
+        
+        output_v_t = numpy.empty_like(input_v_t)
+        output_v_t[:,0] = input_v_t[:,0] + dkx
+        output_v_t[:,1] = input_v_t[:,1] + dky
+        output_v_t[:,2] = numpy.sqrt(1 - dkx**2 - dky**2) * sign
+        
+        output_v = transformNormals(t, output_v_t)
+        
+        S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
+                                                   output_v, 
+                                                   rays.E_vector[mask], 
+                                                   rays.E1_amp[mask], 
+                                                   rays.E2_amp[mask])
+        
+        faces = numpy.array([self,] * points.shape[0])
+        
+        z_axis = numpy.array([[0,0,1]])
+        cosTheta_in = dotprod(input_v_t, z_axis)
+        cosTheta_out = dotprod(output_v_t, z_axis)
+        
+        aspect = numpy.sqrt(cosTheta_in/cosTheta_out)
+        
+        output_rays = RayCollection(origin=points,
+                                   direction = output_v,
+                                   max_length = rays.max_length,
+                                   E_vector = S_vec,
+                                   E1_amp = S_amp*aspect,
+                                   E2_amp = P_amp*aspect,
+                                   parent = rays,
+                                   parent_ids = parent_ids,
+                                   face = faces,
+                                   refractive_index=n)
+        return output_rays
+    
+    
 
 class SphericalFace(Face):
     sphere_centre = Tuple(Float, Float, Float)
