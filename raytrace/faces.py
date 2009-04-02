@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from enthought.traits.api import HasTraits, Instance, Float, Complex,\
-        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str
+        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str, Bool
         
 from enthought.traits.ui.api import View, Item
 
@@ -303,16 +303,148 @@ class ParaxialLensFace(CircularFace):
     
     
 
-class SphericalFace(Face):
-    sphere_centre = Tuple(Float, Float, Float)
-    curvature = Float
-    diameter = Float
+class SphericalFace(Face):    
+    CT = PrototypedFrom("owner")
+    diameter = PrototypedFrom("owner")
+    curvature = PrototypedFrom("owner")
 
     def trace_rays(self, rays):
         raise NotImplementedError
     
     def compute_normal(self, points):
-        return self.normal
+        t = self.transform
+        inv_t = t.linear_inverse
+        P = transformPoints(inv_t, points)
+        vtk_sphere = self.owner.vtk_sphere
+        centre = numpy.array(vtk_sphere.center)
+        radius = vtk_sphere.radius
+        curve = self.curvature
+        grad = (P - centre)*2
+        if curve < 0.0:
+            grad *= -1
+        return transformNormals(t, grad)
+    
+    def intersect(self, p1, p2, max_length):
+        rad = self.curvature
+        dot = lambda a,b: (a*b).sum(axis=-1)
+        r = p1
+        s = p2 - r
+        c = numpy.array([[0,0,self.CT - self.curvature]])
+        d = r - c
+        
+        A = dot(s,s)
+        B = 2*(dot(s,d))
+        C = dot(d,d) - rad**2
+        
+        D = B**2 - 4*A*C
+        
+        mask = D < 0
+
+        E = numpy.sqrt(D)
+        roots = ((-B+E)/(2*A), (-B-E)/(2*A))
+        
+        for R in roots:
+            m = numpy.logical_or(R>1.0, R<0.01)
+            m = numpy.logical_or(m, mask)
+            pt = r + R.reshape(-1,1)*s
+            m = numpy.logical_or(m, (pt[:,0]**2 + pt[:,1]**2) > (self.diameter/2.)**2)
+            m = numpy.logical_or(m, ((pt[:,2]-c[:,2])/rad)<0)
+            R[m] = numpy.Infinity
+        R1,R2 = roots
+        selected = numpy.choose(R2<R1,[R1,R2])
+        
+        pts = r + selected.reshape(-1,1)*s
+    
+        dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
+        result = numpy.empty(p1.shape[0], dtype=dtype)
+        result['length'] = selected*max_length
+        result['face'] = self
+        result['point'] = pts
+        return result
+    
+    
+class OffAxisParabolicFace(Face):
+    name = "OAP Face"
+    EFL = PrototypedFrom("owner")
+    diameter = PrototypedFrom("owner")
+    
+    def compute_normal(self, points):
+        """
+        evaluate normalised Normal vector
+        """
+        n = points.shape[0]
+        t = self.transform
+        inv_t = t.linear_inverse
+        t_points =transformPoints(inv_t, points)
+        
+        twoA = 1/self.EFL
+        
+        x,y,z = t_points.T
+        r_sq = x**2 + y**2
+        
+        n_x = -x*twoA*r_sq
+        n_y = -y*twoA*r_sq
+        n_z = y**2 + x**2
+        
+        t_normal = numpy.column_stack((n_x, n_y, n_z))
+        
+#        coefs = self.owner.vtk_quadric.coefficients
+#        ax = 2*coefs[0]/coefs[8]
+#        ay = 2*coefs[1]/coefs[8]
+#        t_normal = numpy.column_stack((ax*t_points[:,0], 
+#                                       ay*t_points[:,1],
+#                                       -numpy.ones(n)))
+        return transformNormals(t, t_normal)
+    
+    def intersect(self, P1, P2, max_length):
+        """
+        
+        @param p1: a (n,3) array of points, start of each ray
+        @param p2: a (n,3) array of point, ends of the rays
+        """
+        efl = self.EFL #scalar
+        A = 1 / (2*efl)
+        s = P2 - P1
+        r = P1
+        r[:,2] += efl/2.
+        
+        sx, sy, sz = s.T
+        rx, ry, rz = r.T
+        
+        a = A*(sx**2 + sy**2)
+        b = 2*A*(rx*sx + ry*sy) - sz
+        c = A*(rx**2 + ry**2) - rz
+        
+        d = b**2 - 4*a*c
+        
+        e = numpy.sqrt(d)
+        roots = [(-b+e)/(2*a), (-b-e)/(2*a)]
+        
+        for root in roots:
+            root[root<0] = numpy.Infinity
+        
+        root1, root2 = roots
+        shortest = numpy.where(root1<root2, root1, root2)
+        
+        shortest = numpy.where(a<1e-10, -c/b, shortest)
+
+        P = r + shortest[:,numpy.newaxis]*s
+        
+        P[:,2] -= efl/2
+
+        rad = self.diameter/2.
+        mask = (P[:,0]-efl)**2 + P[:,1]**2 > rad**2
+        mask = numpy.logical_or(mask, d<0)
+        mask = numpy.logical_or(mask, shortest<self.tolerance)
+        
+        shortest[mask] = numpy.Infinity
+        
+        dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
+        result = numpy.empty(P1.shape[0], dtype=dtype)
+        result['length'] = shortest*max_length
+        result['face'] = self
+        result['point'] = P
+        return result
 
 
 class PECFace(Face):
@@ -330,7 +462,6 @@ class PECFace(Face):
         normal = self.compute_normal(points)
         input_v = rays.direction[mask]
         parent_ids = numpy.arange(mask.shape[0])[mask]
-        optic = numpy.repeat([self,], points.shape[0] )
 
         S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
                                                    normal, 
@@ -360,21 +491,17 @@ class PECFace(Face):
     
     
 class DielectricFace(Face):
-    n_inside = Complex
-    n_outside = Complex
+    n_inside = PrototypedFrom("owner")
+    n_outside = PrototypedFrom("owner")
     
-    def eval_children(self, rays, points, cells, mask=slice(None,None,None)):
+    all_rays = Bool(False)
+    
+    def eval_children(self, rays, points, mask=slice(None,None,None)):
         points = points[mask]
-        if isinstance(cells, int):
-            normal = self.compute_normal(points, cells)
-            cells = numpy.ones(points.shape[0], numpy.int) * cells
-        else:
-            cells = cells[mask] ###reshape not necessary
-            normal = self.compute_normal(points, cells)
+        normal = self.compute_normal(points)
         input_v = rays.direction[mask]
-        
+        faces = numpy.array([self,] * points.shape[0])
         parent_ids = numpy.arange(mask.shape[0])[mask]
-        optic = numpy.repeat([self,], points.shape[0] )
         
         S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
                                                    normal, 
@@ -387,10 +514,13 @@ class DielectricFace(Face):
         cosTheta = dotprod(normal, input_v)
         
         origin = points
+        
+        n_outside = self.n_outside
+        n_inside = self.n_inside
             
         fromoutside = cosTheta < 0
-        n1 = numpy.where(fromoutside, self.n_outside.real, self.n_inside.real)
-        n2 = numpy.where(fromoutside, self.n_inside.real, self.n_outside.real)
+        n1 = numpy.where(fromoutside, n_outside.real, n_inside.real)
+        n2 = numpy.where(fromoutside, n_inside.real, n_outside.real)
         flip = numpy.where(fromoutside, 1, -1)
             
         abscosTheta = numpy.abs(cosTheta)
@@ -445,8 +575,7 @@ class DielectricFace(Face):
                                        E1_amp = S_amp*R_s,
                                        E2_amp = P_amp*R_p,
                                        parent_ids = parent_ids,
-                                       optic = optic,
-                                       face_id = cells,
+                                       faces=faces,
                                        refractive_index=n1)
             
             trans_rays = RayCollection(origin=origin,
@@ -456,8 +585,7 @@ class DielectricFace(Face):
                                        E1_amp = S_amp*T_s,
                                        E2_amp = P_amp*T_p,
                                        parent_ids = parent_ids,
-                                       optic = optic,
-                                       face_id = cells,
+                                       faces = faces,
                                        refractive_index=n2)
             
             allrays = collectRays(refl_rays, trans_rays)
@@ -477,9 +605,9 @@ class DielectricFace(Face):
                                E_vector = S_vec,
                                E1_amp = E1_amp,
                                E2_amp = E2_amp,
+                               parent=rays,
                                parent_ids = parent_ids,
-                               optic = optic,
-                               face_id = cells,
+                               faces=faces,
                                refractive_index=refractive_index) 
             
 

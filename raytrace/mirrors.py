@@ -37,55 +37,10 @@ class PECCircularFace(CircularFace, PECFace):
 
 
 class BaseMirror(Traceable):
-    pass
-#    def compute_normal(self, points, cells):
-#        t = self.transform
-#        n = numpy.asarray([t.transform_vector(0,0,-1),])
-#        return numpy.ones(points.shape) * n
-#    
-#    def eval_children(self, rays, points, cells, mask=slice(None,None,None)):
-#        """
-#        actually calculates the new ray-segments. Physics here
-#        for Fresnel reflections.
-#        
-#        rays - a RayCollection object
-#        points - a (Nx3) array of intersection coordinates
-#        cells - a length N array of cell ids
-#        mask - a bool array selecting items for this Optic
-#        """
-#        points = points[mask]
-#        n = rays.refractive_index[mask]
-#        cells = cells[mask]
-#        normal = self.compute_normal(points, cells)
-#        input_v = rays.direction[mask]
-#        
-#        parent_ids = numpy.arange(mask.shape[0])[mask]
-#        optic = numpy.repeat([self,], points.shape[0] )
-#        
-#        S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
-#                                                   normal, 
-#                                                   rays.E_vector[mask], 
-#                                                   rays.E1_amp[mask], 
-#                                                   rays.E2_amp[mask])
-#
-#        #this is cos(theta), where theta is the angle between the
-#        #normal and the incident ray
-#        cosTheta = dotprod(normal, input_v)
-#        cosThetaNormal = cosTheta*normal
-#        reflected = input_v - 2*cosThetaNormal
-#        
-#        refl_rays = RayCollection(origin=points,
-#                                   direction = reflected,
-#                                   max_length = rays.max_length,
-#                                   E_vector = S_vec,
-#                                   E1_amp = -S_amp,
-#                                   E2_amp = -P_amp,
-#                                   parent = rays,
-#                                   parent_ids = parent_ids,
-#                                   optic = optic,
-#                                   face_id = cells,
-#                                   refractive_index=n)
-#        return refl_rays
+    def _vtkproperty_default(self):
+        return tvtk.Property(opacity=0.7,
+                             color=(0.8,0.8,0.8),
+                                representation="surface")
 
 
 class PECMirror(BaseMirror):
@@ -104,10 +59,6 @@ class PECMirror(BaseMirror):
                        Item('thickness', editor=NumEditor),
                         ),
                    )
-    
-    def _vtkproperty_default(self):
-        return tvtk.Property(color=(0.8,0.8,0.8),
-                                representation="surface")
     
     def _faces_default(self):
         return [PECCircularFace(owner=self)]

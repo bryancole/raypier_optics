@@ -28,27 +28,30 @@ import numpy
 import math
 from itertools import izip
 
-from raytrace.tracer import Traceable, normaliseVector, RaySegment, NumEditor,\
+from raytrace.bases import Traceable, normaliseVector, NumEditor,\
                 transformNormals, transformPoints
 from raytrace.mirrors import BaseMirror
+from raytrace.faces import OffAxisParabolicFace, PECFace
+
+
+class OAPMirrorFace(OffAxisParabolicFace, PECFace):
+    pass
+
 
 class OffAxisParabloid(BaseMirror):
     """
     An OAP mirror object
     """
     name = "OAP"
-    height = Float(25.4)
-    EFL = Float(50.8)
-    diameter = Float(50.8)
+    height = Float(25.4, desc="distance between cylinder base and focus")
+    EFL = Float(50.8, desc="effective focal length")
+    diameter = Float(50.8, desc="outside diameter")
     
     max_length = Float(100.0)
     
     vtk_grid = Instance(tvtk.ProgrammableSource, ())
     vtk_cylinder = Instance(tvtk.Cylinder, ())
     vtk_quadric = Instance(tvtk.Quadric, ())
-    
-    vtkproperty = tvtk.Property(opacity = 1.0,
-                             color = (0.8,0.8,0))
     
     traits_view = View(VGroup(
                         Traceable.uigroup,
@@ -58,6 +61,13 @@ class OffAxisParabloid(BaseMirror):
                        Item('max_length', editor=NumEditor),
                        ),
                        )
+    
+    def _property_default(self):
+        return tvtk.Property(opacity = 0.7,
+                             color = (0.8,0.8,0))
+    
+    def _faces_default(self):
+        return [OAPMirrorFace(owner=self)]
     
     def create_grid(self):
         EFL = self.EFL
@@ -126,54 +136,6 @@ class OffAxisParabloid(BaseMirror):
         grid.modified()
         return transF
     
-    def intersect_with_line(self, p1, p2):
-        """
-        
-        @param p1: a (n,3) array of points, start of each ray
-        @param p2: a (n,3) array of point, ends of the rays
-        """
-        trans = self.transform
-        inv_t = trans.linear_inverse
-        P1 = transformPoints(inv_t, p1)
-        P2 = transformPoints(inv_t, p2)
-        efl = self.EFL #scalar
-        A = 1 / (2*efl)
-        s = P2 - P1
-        r = P1
-        r[:,2] += self.EFL/2.
-        
-        sx, sy, sz = s.T
-        rx, ry, rz = r.T
-        
-        a = A*(sx**2 + sy**2)
-        b = 2*A*(rx*sx + ry*sy) - sz
-        c = A*(rx**2 + ry**2) - rz
-        
-        d = b**2 - 4*a*c
-        ###FIXME
-        if d<0: #no intersection
-            return None
-        if a < 1e-10: #approximate to zero if we're close to the parabolic axis
-            roots = [-c/b]
-        else:
-            e = math.sqrt(d)
-            roots = [(-b+e)/(2*a), (-b-e)/(2*a)]
-
-        pos_roots = [root for root in roots if 1.0 >= root > 0.01]
-        if pos_roots:
-            alpha = min(pos_roots)
-        else:
-            return None #no intersections in range
-        
-        P = [g+alpha*h for g,h in izip(P1,s)]
-        
-        rad = self.diameter/2.
-        if (P[0]-efl)**2 + P[1]**2 > rad**2:
-            return None
-        
-        return self.transform.transform_point(P)
-        
-    
     def trace_segment(self, seg, last_optic=None, last_cell=None):
         """
         Don't care about last_optic or last_cell. We filter out
@@ -187,41 +149,6 @@ class OffAxisParabloid(BaseMirror):
         i = numpy.array(i)
         dist = numpy.sqrt(((i-p1)**2).sum())
         return dist, i, 0, self
-    
-    def compute_normal(self, points, cell_ids):
-        """
-        evaluate normalised Normal vector
-        """
-        n = points.shape[0]
-        t = self.transform
-        inv_t = t.linear_inverse
-        t_points =transformPoints(inv_t, points)
-        coefs = self.vtk_quadric.coefficients
-        ax = 2*coefs[0]/coefs[8]
-        ay = 2*coefs[1]/coefs[8]
-        t_normal = numpy.column_stack((ax*t_points[:,0], 
-                                       ay*t_points[:,1],
-                                       -numpy.ones(n)))
-        return transformNormals(t, t_normal)
-    
-#    def eval_children(self, seg, point, cell_id):
-#        """
-#        actually calculates the new ray-segments. Physics here.
-#        Easy for a mirror.
-#        """
-#        #return []
-#        normal = self.compute_normal(point)
-#        
-#        proj = numpy.dot(normal, seg.direction)
-#        reflected = seg.direction - 2*proj*normal
-#        
-#        origin = numpy.asarray(point)
-#            
-#        refl_ray = RaySegment(origin=origin,
-#                           direction = reflected,
-#                           parent = seg,
-#                           refractive_index=seg.refractive_index)
-#        return [refl_ray,]
         
     
 if __name__=="__main__":

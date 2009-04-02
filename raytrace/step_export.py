@@ -183,6 +183,17 @@ def make_compound(listOfShapes):
         aBuilder.Add(aRes, item)
     return aRes
 
+def make_OAP(focus, X_axis, Z_axis, B_dist, EFL):
+    """
+    Make a 90-degree off-axis parabolic
+    @param focus: position of the focus
+    @param X_axis: direction centre ray through focal point
+    @param Z_axis: direction of the cylinderical axis (subordinate to X)
+    @param B_dist: distance from focus to cylinder base plane
+    @param EFL: effective focal length
+    """
+    
+
 def make_rays_both(listOfRays, scale):
     wires = make_rays(listOfRays, scale)
     pipes = make_rays_4(listOfRays, scale)
