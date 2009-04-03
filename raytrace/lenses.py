@@ -69,6 +69,11 @@ class PlanoConvexLens(BaseLens):
     def _faces_default(self):
         return [PlanarFace(owner=self), ConvexFace(owner=self)]
     
+    def make_step_shape(self):
+        from step_export import make_spherical_lens
+        return make_spherical_lens(self.CT, self.diameter, self.curvature, 
+                                   self.centre, self.direction, self.x_axis)
+    
     def create_grid(self):        
         ct = self.CT
         r = self.diameter/2

@@ -248,7 +248,7 @@ class RayTraceModel(HasQueue):
         
         face_mask = ((f, faces==f) for f in set(faces))
         
-        children = [f.eval_children(rays, points, m) for f,m in face_mask]
+        children = filter(None,[f.eval_children(rays, points, m) for f,m in face_mask])
         if len(children)==0:
             return None
         new_rays = collectRays(*children)

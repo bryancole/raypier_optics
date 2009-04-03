@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from OCC import BRepPrimAPI, BRep, STEPControl, TopoDS, gp, \
-        BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom
+        BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom, TopAbs, TopExp
 from itertools import izip, tee
 import itertools
 import numpy
@@ -40,6 +40,19 @@ def toshape(builder):
     shape = builder.Shape()
     shape._builder = builder
     return shape
+
+def position_shape(shape, centre, direction, x_axis):
+    print "ell", centre, direction, x_axis
+    ax = gp.gp_Ax3()
+    ax.SetLocation(gp.gp_Pnt(*centre))
+    ax.SetDirection(gp.gp_Dir(*direction))
+    ax.SetXDirection(gp.gp_Dir(*x_axis))
+    
+    tr = gp.gp_Trsf()
+    tr.SetTransformation(ax, gp.gp_Ax3())
+    
+    trans = BRepBuilderAPI.BRepBuilderAPI_Transform(shape, tr)
+    return toshape(trans)
 
 def make_cylinder(position, direction, radius, length):
     cyl = BRepPrimAPI.BRepPrimAPI_MakeCylinder(radius, length)
@@ -148,19 +161,78 @@ def make_ellipsoid_mirror(f1, f2, major_axis,
     
     #cut = BRepAlgoAPI.BRepAlgoAPI_Cut(block.Shape(), ellipsoid)
     cut = make_compound([block.Shape(), ellipsoid])
+    return position_shape(cut, centre, direction, x_axis)
+
+def make_OAP(EFL, diameter, height, centre, direction, x_axis):
+    FL = EFL/2. #focal length
+    ax = gp.gp_Ax2(gp.gp_Pnt(0.,0.,-FL), #origin
+                   gp.gp_Dir(1.,0.,0.), #main direction is Z
+                   gp.gp_Dir(0.,0.,1.)) #X Direction is X
+    para = Geom.Geom_Parabola(ax, FL)
+    h_para = Geom.Handle_Geom_Parabola(para)
+    radius = diameter/2.
     
-    print "ell", centre, direction, x_axis
-    ax = gp.gp_Ax3()
-    ax.SetLocation(gp.gp_Pnt(*centre))
-    ax.SetDirection(gp.gp_Dir(*direction))
-    ax.SetXDirection(gp.gp_Dir(*x_axis))
+    outside = EFL + radius
+    length = (outside**2)/(4.*FL) - FL + height
     
-    tr = gp.gp_Trsf()
-    tr.SetTransformation(ax, gp.gp_Ax3())
+    ax2 = gp.gp_Ax2(gp.gp_Pnt(0,0,0), #origin
+                   gp.gp_Dir(0.,0.,1.), #main direction is Z
+                   gp.gp_Dir(1.,0.,0.)) #X Direction is X
     
-    trans = BRepBuilderAPI.BRepBuilderAPI_Transform(cut, tr)
-    shape = toshape(trans)
-    return shape
+    pbl_shape = BRepPrimAPI.BRepPrimAPI_MakeRevolution(ax2, h_para,
+                                                       5.0, outside+1)
+    
+    ax3 = gp.gp_Ax2(gp.gp_Pnt(EFL,0,-height), #origin
+                   gp.gp_Dir(0.,0.,1.), #main direction is X
+                   gp.gp_Dir(0.,1.,0.)) #X Direction is Y
+    cyl_solid = BRepPrimAPI.BRepPrimAPI_MakeCylinder(ax3, radius, length)
+    
+    
+    cut = BRepAlgoAPI.BRepAlgoAPI_Cut(cyl_solid.Shape(), 
+                                      pbl_shape.Shape())
+        
+    loc= position_shape(toshape(cut), centre, 
+                          direction, x_axis)
+    #nurbs = BRepBuilderAPI.BRepBuilderAPI_NurbsConvert(loc)
+    return loc #toshape(nurbs)
+
+def make_spherical_lens(CT, diameter, curvature, 
+                        centre, direction, x_axis):
+    cax = gp.gp_Ax2(gp.gp_Pnt(0,0,CT-curvature),
+                    gp.gp_Dir(0,1,0),
+                    gp.gp_Dir(1,0,0))
+    circ = Geom.Geom_Circle(cax, curvature)
+    h_circ = Geom.Handle_Geom_Circle(circ)
+    
+    r = diameter/2.
+    h2 = CT - curvature + numpy.sqrt(curvature**2 - r**2)
+    p1 = gp.gp_Pnt(0,0,CT)
+    p2 = gp.gp_Pnt(r,0,h2)
+    p3 = gp.gp_Pnt(r,0,0)
+    p4 = gp.gp_Pnt(0,0,0)
+    
+    #ps = p1,p2,p3,p4
+    #vs = [BRepBuilderAPI.BRepBuilderAPI_MakeVertex(p) for p in ps]
+    
+    e1 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(h_circ, p1,
+                                                p2)    
+    e2 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p2,p3)
+    e3 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p3,p4)
+    e4 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p4,p1)
+    
+    wire = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+    for e in (e1,e2,e3,e4):
+        print e
+        wire.Add(e.Edge())
+    
+    face = BRepBuilderAPI.BRepBuilderAPI_MakeFace(wire.Wire())
+    
+    ax = gp.gp_Ax1(gp.gp_Pnt(0,0,0),
+                   gp.gp_Dir(0,0,1))
+    solid = BRepPrimAPI.BRepPrimAPI_MakeRevol(face.Shape(), ax)
+    
+    return position_shape(toshape(solid), centre, direction, x_axis)
+    
 
 def make_wire(listOfPoints, close=False):
     vertices = [BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp.gp_Pnt(*p))
@@ -181,25 +253,14 @@ def make_compound(listOfShapes):
     aBuilder.MakeCompound(aRes)
     for item in listOfShapes:
         aBuilder.Add(aRes, item)
-    return aRes
-
-def make_OAP(focus, X_axis, Z_axis, B_dist, EFL):
-    """
-    Make a 90-degree off-axis parabolic
-    @param focus: position of the focus
-    @param X_axis: direction centre ray through focal point
-    @param Z_axis: direction of the cylinderical axis (subordinate to X)
-    @param B_dist: distance from focus to cylinder base plane
-    @param EFL: effective focal length
-    """
-    
+    return aRes    
 
 def make_rays_both(listOfRays, scale):
-    wires = make_rays(listOfRays, scale)
-    pipes = make_rays_4(listOfRays, scale)
+    wires = make_rays_wires(listOfRays, scale)
+    pipes = make_rays_pipes(listOfRays, scale)
     return make_compound([wires, pipes])
 
-def make_rays(listOfRays, scale=None):
+def make_rays_wires(listOfRays, scale=None):
     raysItr = iter(listOfRays)
     first = raysItr.next()
     def MakeVertex(pt): 
@@ -227,34 +288,7 @@ def make_rays(listOfRays, scale=None):
             wires[w_id].Add(edge.Edge())
     return make_compound([w.Shape() for w in wires])
 
-def make_rays_2(listOfRays, radius):
-    raysItr = iter(listOfRays)
-    first = raysItr.next()
-    sections = []
-    v_start = list(first.origin)
-    v_end = list(first.termination)
-    sections = zip(v_start, v_end)
-    id_map = range(len(sections))
-    for rays in raysItr:
-        id_map = [id_map[pid] for pid in rays.parent_ids]
-        v_start = [v_end[pid] for pid in rays.parent_ids]
-        v_end = list(rays.termination)
-        sections.extend(zip(v_start, v_end))
-    cylinders = [make_cylinder_2(s, e, radius) for s,e in sections]
-    return make_compound(cylinders)
-
-def make_rays_3(listOfRays):
-    sections = []
-    for rays in listOfRays:
-        section = BRepOffsetAPI.BRepOffsetAPI_ThruSections(True)
-        wire1 = make_wire(list(rays.origin), close=True)._builder
-        wire2 = make_wire(list(rays.termination), close=True)._builder
-        section.AddWire(wire1.Wire())
-        section.AddWire(wire2.Wire())
-        sections.append(toshape(section))
-    return make_compound(sections)
-
-def make_rays_4(listOfRays, radius=0.1):
+def make_rays_pipes(listOfRays, radius=0.1):
     itrRays = iter(listOfRays)
     first = itrRays.next()
     v_lists = [[s,e] for s,e in izip(first.origin, first.termination)]

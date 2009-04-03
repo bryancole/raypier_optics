@@ -19,16 +19,17 @@
 import numpy
 import itertools
 
-from enthought.traits.api import HasTraits, Int, Float, Range,\
+from enthought.traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
-     Instance, Tuple, on_trait_change, Trait, Enum
+     Instance, on_trait_change, Trait, Enum, Title
 
-from enthought.traits.ui.api import View, Item
+from enthought.traits.ui.api import View, Item, Tabbed, VGroup, Include, \
+    Group
 
 from enthought.tvtk.api import tvtk
 
 from raytrace.rays import RayCollection
-from raytrace.utils import normaliseVector
+from raytrace.utils import normaliseVector, Range, TupleVector, Tuple
 from raytrace.bases import Renderable
 
 Vector = Array(shape=(3,))
@@ -36,7 +37,7 @@ Vector = Array(shape=(3,))
 
 
 class BaseRaySource(HasTraits):
-    name = Str("Ray Source")
+    name = Title("Ray Source")
     update = Event()
     display = Enum("pipes", "wires", "hidden")
     render = Event()
@@ -69,9 +70,22 @@ class BaseRaySource(HasTraits):
     start_actor = Instance(tvtk.Actor, transient=True)
     #field_actor = Instance(tvtk.Actor)
     
+    export_pipes = Bool(False, desc="if set, rays are exported to STEP files as pipes")
+    
     actors = Property(List, transient=True)
     
     vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)}, transient=True)
+    
+    display_grp = VGroup(Item('display'),
+                       Item('show_start'),
+                       Item('scale_factor'),
+                       Item('export_pipes',label="export as pipes"),
+                       label="Display")
+    
+    traits_view = View(Item('name', show_label=False),
+                       Tabbed(Include('geom_grp'),
+                              display_grp)
+                       )
     
     def __repr__(self):
         return self.name
@@ -117,9 +131,11 @@ class BaseRaySource(HasTraits):
         return angles.mean()
     
     def make_step_shape(self):
-        from raytrace.step_export import make_rays_both
-        #return make_rays_4(self.TracedRays, self.scale_factor)
-        return make_rays_both(self.TracedRays, self.scale_factor)
+        if self.export_pipes:
+            from raytrace.step_export import make_rays_both as make_rays
+        else:
+            from raytrace.step_export import make_rays_wires as make_rays
+        return make_rays(self.TracedRays, self.scale_factor)
     
     def _TracedRays_changed(self):
         self.data_source.modified()
@@ -266,11 +282,12 @@ class ParallelRaySource(BaseRaySource):
     
 
 class ConfocalRaySource(BaseRaySource):
-    focus = Tuple((0.,0.,0.))
-    direction = Tuple((0.,0.,1.))
-    number = Int(20)
+    focus = TupleVector
+    direction = TupleVector
+    number = Range(1,50,20, editor_traits={'mode':'spinner'})
     theta = Range(0.0,90.0,value=30)
     working_dist = Float(100.0)
+    rings = Range(1,50,3, editor_traits={'mode':'spinner'})
     
     principle_axes = Property(Tuple(Array,Array), depends_on="direction")
     
@@ -279,16 +296,18 @@ class ConfocalRaySource(BaseRaySource):
     InputRays = Property(Instance(RayCollection), 
                          depends_on="focus, direction, number, theta, working_dist, max_ray_len")
     
-    traits_view = View(Item('name'),
-                       Item('display'),
-                       Item('focus'),
-                       Item('direction'),
+    geom_grp = VGroup(Group(Item('focus', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Focus position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
                        Item('number'),
+                       Item('rings', style="simple"),
                        Item('theta', label="angle"),
                        Item('working_dist', label="working dist"),
-                       Item('show_start'),
-                       Item('scale_factor'),
-                       )
+                       label="Geometry")
     
     @cached_property
     def _get_principle_axes(self):
@@ -304,7 +323,7 @@ class ConfocalRaySource(BaseRaySource):
         d2 = normaliseVector(d2)
         return (d1, d2)
     
-    @on_trait_change("focus, direction, number, theta, working_dist, max_ray_len")
+    @on_trait_change("focus, direction, number, theta, working_dist, max_ray_len, rings")
     def on_update(self):
         self.data_source.modified()
         self.update=True
@@ -316,13 +335,17 @@ class ConfocalRaySource(BaseRaySource):
         working_dist = self.working_dist
         origin = focus - direction*working_dist
         count = self.number
+        rings = self.rings
         theta = self.theta
         radius = numpy.tan(numpy.pi * theta/180) * working_dist
         
         d1, d2 = self.principle_axes
         
-        angles = (i*2*numpy.pi/count for i in xrange(count))
-        offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
+        radii = [(i+1)*radius/rings for i in xrange(rings)]
+        angles = [i*2*numpy.pi/count for i in xrange(count)]
+        offsets = [r*(d1*numpy.sin(a) + d2*numpy.cos(a)) 
+                   for a in angles
+                   for r in radii]
         
         origins = numpy.array([origin] + 
                               [origin + offset for offset in offsets])

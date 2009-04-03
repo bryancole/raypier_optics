@@ -62,12 +62,17 @@ class OffAxisParabloid(BaseMirror):
                        ),
                        )
     
-    def _property_default(self):
+    def _vtkproperty_default(self):
         return tvtk.Property(opacity = 0.7,
                              color = (0.8,0.8,0))
     
     def _faces_default(self):
         return [OAPMirrorFace(owner=self)]
+    
+    def make_step_shape(self):
+        from raytrace.step_export import make_OAP
+        return make_OAP(self.EFL, self.diameter, self.height,
+                        self.centre, self.direction, self.x_axis)
     
     def create_grid(self):
         EFL = self.EFL

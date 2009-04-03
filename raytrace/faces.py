@@ -85,7 +85,7 @@ class Face(HasTraits):
         points - a (Nx3) array of intersection coordinates
         mask - a bool array selecting items for this Optic. (optional)
         """
-        raise NotImplementedError
+        return None
     
 
 class CircularFace(Face):
