@@ -270,7 +270,7 @@ class Ellipsoid(BaseMirror):
     
     def make_step_shape(self):
         from raytrace.step_export import make_ellipsoid_mirror
-        return make_ellipsoid_mirror(self.focus1, 
+        ell = make_ellipsoid_mirror(self.focus1, 
                                      self.focus2, 
                                      self.size/2.,
                                      self.X_bounds, 
@@ -279,3 +279,4 @@ class Ellipsoid(BaseMirror):
                                      self.centre, 
                                      self.direction,
                                      self.x_axis)
+        return ell, "yellow"

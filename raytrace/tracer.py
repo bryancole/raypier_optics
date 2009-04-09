@@ -279,12 +279,15 @@ class RayTraceModel(HasQueue):
                 writer.write()
                 
     def write_to_STEP(self, fname):
-        from raytrace.step_export import export_shapes
+        from raytrace.step_export import export_shapes2 as export_shapes
         optics = self.optics
         sources = self.sources
-        shapes = filter(None, (o.make_step_shape() for o in optics))
-        shapes.extend([s.make_step_shape() for s in sources])
-        export_shapes(shapes, fname)
+        shapes_colors = filter(None, (o.make_step_shape() for o in optics))
+        shapes_colors.extend(filter(None,[s.make_step_shape() for s in sources]))
+        
+        shapes = [s for s,c in shapes_colors]
+        colors = [c for s,c in shapes_colors]
+        export_shapes(shapes, fname, colorList=colors)
         
     def _sources_changed(self, source_list):
         scene = self.scene

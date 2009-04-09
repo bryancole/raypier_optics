@@ -38,7 +38,7 @@ class PECCircularFace(CircularFace, PECFace):
 
 class BaseMirror(Traceable):
     def _vtkproperty_default(self):
-        return tvtk.Property(opacity=0.7,
+        return tvtk.Property(opacity=1.0,
                              color=(0.8,0.8,0.8),
                                 representation="surface")
 
@@ -47,6 +47,7 @@ class PECMirror(BaseMirror):
     name = "PEC Mirror"
     diameter = Float(25.4)
     thickness = Float(5.0, desc="purely for visualisation purposes")
+    offset = Float(0.0)
     
     vtk_cylinder = Instance(tvtk.CylinderSource, (),
                             dict(resolution=32), transient=True)
@@ -57,6 +58,7 @@ class PECMirror(BaseMirror):
                        Traceable.uigroup,
                        Item('diameter', editor=NumEditor),
                        Item('thickness', editor=NumEditor),
+                       Item('offset', editor=NumEditor)
                         ),
                    )
     
@@ -65,12 +67,15 @@ class PECMirror(BaseMirror):
     
     def make_step_shape(self):
         from raytrace.step_export import make_cylinder
-        return make_cylinder(self.centre, 
+        cyl = make_cylinder(self.centre, 
                              self.direction, 
                              self.diameter/2, 
-                             self.thickness)
+                             self.thickness,
+                             self.offset,
+                             self.x_axis)
+        return cyl, "green"
     
-    @on_trait_change("diameter, thickness")
+    @on_trait_change("diameter, thickness, offset")
     def config_pipeline(self):
         cyl = self.vtk_cylinder
         cyl.radius = self.diameter/2.
@@ -79,7 +84,7 @@ class PECMirror(BaseMirror):
         
         t = self.cyl_trans
         t.identity()
-        t.translate(0,0,thick/2.)
+        t.translate(self.offset,0,thick/2.)
         t.rotate_x(90.)
         
         self.update = True

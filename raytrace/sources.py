@@ -135,7 +135,7 @@ class BaseRaySource(HasTraits):
             from raytrace.step_export import make_rays_both as make_rays
         else:
             from raytrace.step_export import make_rays_wires as make_rays
-        return make_rays(self.TracedRays, self.scale_factor)
+        return make_rays(self.TracedRays, self.scale_factor), "red"
     
     def _TracedRays_changed(self):
         self.data_source.modified()
@@ -294,7 +294,7 @@ class ConfocalRaySource(BaseRaySource):
     #view_ray_ids = numpy.arange(20)
     
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="focus, direction, number, theta, working_dist, max_ray_len")
+                         depends_on="focus, direction, number, rings, theta, working_dist, max_ray_len")
     
     geom_grp = VGroup(Group(Item('focus', show_label=False,resizable=True), 
                             show_border=True,
@@ -304,7 +304,7 @@ class ConfocalRaySource(BaseRaySource):
                             show_border=True,
                             label="Direction"),
                        Item('number'),
-                       Item('rings', style="simple"),
+                       Item('rings'),
                        Item('theta', label="angle"),
                        Item('working_dist', label="working dist"),
                        label="Geometry")

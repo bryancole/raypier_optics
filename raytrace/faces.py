@@ -91,6 +91,7 @@ class Face(HasTraits):
 class CircularFace(Face):
     name = "circular face"
     diameter = PrototypedFrom('owner')
+    offset = PrototypedFrom('owner')
     
     def intersect(self, P1, P2, max_lenth):
         """
@@ -99,12 +100,13 @@ class CircularFace(Face):
         """
         max_length = numpy.sqrt(((P2 - P1)**2).sum(axis=1))
         r = self.diameter/2
+        offset = self.offset
         
         x1,y1,z1 = P1.T
         x2,y2,z2 = P2.T
         
         h = -z1/(z2-z1)
-        X = x1 + h*(x2-x1)
+        X = x1 + h*(x2-x1) - offset
         Y = y1 + h*(y2-y1)
         
         length = max_length*h
@@ -115,7 +117,7 @@ class CircularFace(Face):
         
         length[mask] = numpy.Infinity
         
-        t_points = numpy.column_stack((X, Y, numpy.zeros_like(X)))
+        t_points = numpy.column_stack((X+offset, Y, numpy.zeros_like(X)))
     
         dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
         result = numpy.empty(P1.shape[0], dtype=dtype)

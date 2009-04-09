@@ -13,7 +13,7 @@ source = ConfocalRaySource(focus=(0,0,0),
                             working_dist = 100.,
                             number=20,
                             detail_resolution=5,
-                            theta=25.00, #fringe ray is at 15.22 deg
+                            theta=15.00, #fringe ray is at 15.22 deg
                             scale_factor=0.2)
 
 model = RayTraceModel(sources=[source],

@@ -16,7 +16,9 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from OCC import BRepPrimAPI, BRep, STEPControl, TopoDS, gp, \
-        BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom, TopAbs, TopExp
+        BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom, TopAbs, TopExp,\
+        XCAFApp, STEPCAFControl, TDocStd, TCollection,\
+        XCAFDoc, Quantity, TopLoc
 from itertools import izip, tee
 import itertools
 import numpy
@@ -54,11 +56,17 @@ def position_shape(shape, centre, direction, x_axis):
     trans = BRepBuilderAPI.BRepBuilderAPI_Transform(shape, tr)
     return toshape(trans)
 
-def make_cylinder(position, direction, radius, length):
-    cyl = BRepPrimAPI.BRepPrimAPI_MakeCylinder(radius, length)
-    ax = gp.gp_Ax3(gp.gp_Pnt(*position), gp.gp_Dir(*direction))
+def make_cylinder(position, direction, radius, length, offset, x_axis):
+    cyl_ax = gp.gp_Ax2(gp.gp_Pnt(offset,0,0), 
+                       gp.gp_Dir(0,0,1), 
+                       gp.gp_Dir(1,0,0))
+    cyl = BRepPrimAPI.BRepPrimAPI_MakeCylinder(cyl_ax, radius, length)
+    ax = gp.gp_Ax2(gp.gp_Pnt(*position), 
+                   gp.gp_Dir(*direction),
+                   gp.gp_Dir(*x_axis))
+    ax3 = gp.gp_Ax3()
     trans = gp.gp_Trsf()
-    trans.SetTransformation(ax, gp.gp_Ax3())
+    trans.SetTransformation(gp.gp_Ax3(ax), ax3)
     t_cyl = BRepBuilderAPI.BRepBuilderAPI_Transform(cyl.Shape(), trans)
     print position, direction, radius, length
     return toshape(t_cyl)
@@ -159,9 +167,12 @@ def make_ellipsoid_mirror(f1, f2, major_axis,
     P2 = gp.gp_Pnt(x_bounds[1], y_bounds[1], z_bounds[1])
     block = BRepPrimAPI.BRepPrimAPI_MakeBox(P1, P2)
     
-    #cut = BRepAlgoAPI.BRepAlgoAPI_Cut(block.Shape(), ellipsoid)
-    cut = make_compound([block.Shape(), ellipsoid])
-    return position_shape(cut, centre, direction, x_axis)
+#    t_block = position_shape(toshape(block), centre, direction, x_axis)
+#    t_ellipse = position_shape(ellipsoid, centre, direction, x_axis)
+#    return make_compound([t_block, t_ellipse])
+    
+    cut = BRepAlgoAPI.BRepAlgoAPI_Cut(toshape(block), ellipsoid)
+    return position_shape(toshape(cut), centre, direction, x_axis)
 
 def make_OAP(EFL, diameter, height, centre, direction, x_axis):
     FL = EFL/2. #focal length
@@ -253,6 +264,8 @@ def make_compound(listOfShapes):
     aBuilder.MakeCompound(aRes)
     for item in listOfShapes:
         aBuilder.Add(aRes, item)
+    aBuilder._InputShapes = listOfShapes
+    aRes._builder = aBuilder
     return aRes    
 
 def make_rays_both(listOfRays, scale):
@@ -322,6 +335,42 @@ def export_shapes(shapeList, filename):
     for shape in shapeList:
         step_export.Transfer(shape,STEPControl.STEPControl_AsIs)
     step_export.Write(str(filename))
+    
+def get_color_map():
+    c = [a for a in dir(Quantity) if a.startswith("Quantity_NOC_")]
+    names = [a.split('_')[-1].lower() for a in c]
+    vals = [getattr(Quantity, n) for n in c]
+    return dict(zip(names,vals))
+    
+def export_shapes2(shapeList, filename, colorList=[]):
+    h_doc = TDocStd.Handle_TDocStd_Document()
+    app = XCAFApp.GetApplication().GetObject()
+    app.NewDocument(TCollection.TCollection_ExtendedString("MDTV-CAF"),h_doc)
+    doc = h_doc.GetObject()
+    h_shape_tool = XCAFDoc.XCAFDoc_DocumentTool().ShapeTool(doc.Main())
+    h_color_tool = XCAFDoc.XCAFDoc_DocumentTool().ColorTool(doc.Main())
+    shape_tool = h_shape_tool.GetObject()
+    color_tool = h_color_tool.GetObject()
+    top_label = shape_tool.NewShape()
+    
+    colorList.extend(["blue"]*(len(shapeList) - len(colorList)))
+    cmap = get_color_map()
+    
+    tr = gp.gp_Trsf()
+    loc = TopLoc.TopLoc_Location(tr)
+    
+    for shape, color in zip(shapeList, colorList):
+        #label = shape_tool.AddComponent(top_label, shape)
+        print color
+        label = shape_tool.AddShape(shape, True)
+        c = Quantity.Quantity_Color(cmap[color])
+        color_tool.SetColor(label, c, XCAFDoc.XCAFDoc_ColorGen)
+        ref_label = shape_tool.AddComponent(top_label, label, loc)
+        
+    mode = STEPControl.STEPControl_AsIs
+    writer = STEPCAFControl.STEPCAFControl_Writer()
+    writer.Transfer(h_doc, mode)
+    writer.Write(str(filename))
     
 if __name__=="__main__":
     cyl = make_cylinder((1,2,3),(7,6,5),5,2)
