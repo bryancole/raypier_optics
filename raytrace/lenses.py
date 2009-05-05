@@ -47,6 +47,7 @@ class PlanoConvexLens(BaseLens):
     
     CT = Float(5.0, desc="centre thickness")
     diameter = Float(15.0)
+    offset = Float(0.0)
     curvature = Float(11.7, desc="radius of curvature for spherical face")
     
     #vtkproperty = tvtk.Property(representation="wireframe")
@@ -71,8 +72,9 @@ class PlanoConvexLens(BaseLens):
     
     def make_step_shape(self):
         from step_export import make_spherical_lens
-        return make_spherical_lens(self.CT, self.diameter, self.curvature, 
+        shape = make_spherical_lens(self.CT, self.diameter, self.curvature, 
                                    self.centre, self.direction, self.x_axis)
+        return shape, "blue1"
     
     def create_grid(self):        
         ct = self.CT

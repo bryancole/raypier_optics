@@ -167,7 +167,7 @@ class ModelObject(Renderable):
         """Creates an OpenCascade BRep Shape
         representation of the object, which can be
         exported to STEP format"""
-        return False
+        return False, None
         
         
 class Probe(Renderable):

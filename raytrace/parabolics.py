@@ -72,7 +72,7 @@ class OffAxisParabloid(BaseMirror):
     def make_step_shape(self):
         from raytrace.step_export import make_OAP
         return make_OAP(self.EFL, self.diameter, self.height,
-                        self.centre, self.direction, self.x_axis)
+                        self.centre, self.direction, self.x_axis), "yellow"
     
     def create_grid(self):
         EFL = self.EFL

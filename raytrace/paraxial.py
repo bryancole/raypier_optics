@@ -12,6 +12,7 @@ class ParaxialLens(Traceable):
     name = "Paraxial Lens"
     diameter = Float(25.4)
     focal_length = Float(25.4)
+    offset = Float(0.0)
     
     vtk_disk = Instance(tvtk.DiskSource, (),
                         dict(circumferential_resolution=32), 
@@ -23,6 +24,16 @@ class ParaxialLens(Traceable):
                        Item('focal_length', editor=NumEditor),
                         ),
                    )
+    
+    def make_step_shape(self):
+        from raytrace.step_export import make_cylinder
+        cyl = make_cylinder(self.centre, 
+                             self.direction, 
+                             self.diameter/2, 
+                             0.1,
+                             self.offset,
+                             self.x_axis)
+        return cyl, "blue2"
     
     def _faces_default(self):
         return [ParaxialLensFace(owner=self)]

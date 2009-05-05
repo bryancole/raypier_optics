@@ -44,7 +44,6 @@ def toshape(builder):
     return shape
 
 def position_shape(shape, centre, direction, x_axis):
-    print "ell", centre, direction, x_axis
     ax = gp.gp_Ax3()
     ax.SetLocation(gp.gp_Pnt(*centre))
     ax.SetDirection(gp.gp_Dir(*direction))
@@ -53,8 +52,12 @@ def position_shape(shape, centre, direction, x_axis):
     tr = gp.gp_Trsf()
     tr.SetTransformation(ax, gp.gp_Ax3())
     
-    trans = BRepBuilderAPI.BRepBuilderAPI_Transform(shape, tr)
-    return toshape(trans)
+    loc = TopLoc.TopLoc_Location(tr)
+    
+    shape.Location(loc)
+    #trans = BRepBuilderAPI.BRepBuilderAPI_Transform(shape, tr)
+    #return toshape(trans)
+    return shape
 
 def make_cylinder(position, direction, radius, length, offset, x_axis):
     cyl_ax = gp.gp_Ax2(gp.gp_Pnt(offset,0,0), 
@@ -174,24 +177,68 @@ def make_ellipsoid_mirror(f1, f2, major_axis,
     cut = BRepAlgoAPI.BRepAlgoAPI_Cut(toshape(block), ellipsoid)
     return position_shape(toshape(cut), centre, direction, x_axis)
 
-def make_OAP(EFL, diameter, height, centre, direction, x_axis):
-    FL = EFL/2. #focal length
+def make_interp_parabola(FL, rmin, rmax, segments=50):
+    A = 1./(4*FL)
+    x = numpy.linspace(rmin, rmax, segments)
+    y = (A * x**2) - FL
+    
+    points = [(X,0,Z) for X,Z in itertools.izip(x,y)]
+    points.append((x[0],0,y[-1]))
+    
+    def pairs(itr):
+        a,b = itertools.tee(itr)
+        b.next()
+        return itertools.izip(a,b)
+    
+    edges = (BRepBuilderAPI.BRepBuilderAPI_MakeEdge(
+                    gp.gp_Pnt(*p1), gp.gp_Pnt(*p2))
+                    for p1, p2 in pairs(points))
+    last_edge = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(
+                    gp.gp_Pnt(*points[-1]), 
+                    gp.gp_Pnt(*points[0]))
+    
+    wire = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+    for e in edges:
+        wire.Add(e.Edge())
+    wire.Add(last_edge.Edge())
+    
+    face = BRepBuilderAPI.BRepBuilderAPI_MakeFace(wire.Wire())
+    
+    ax = gp.gp_Ax1(gp.gp_Pnt(0,0,0),
+                   gp.gp_Dir(0,0,1))
+    
+    revol = BRepPrimAPI.BRepPrimAPI_MakeRevol(face.Shape(), ax)
+    
+    return revol.Shape()
+
+def make_true_para(FL, rmin, rmax):
+    """
+    makes a parabloid, with rotation axis along Z and focus
+    at the origin
+    """
     ax = gp.gp_Ax2(gp.gp_Pnt(0.,0.,-FL), #origin
                    gp.gp_Dir(1.,0.,0.), #main direction is Z
                    gp.gp_Dir(0.,0.,1.)) #X Direction is X
     para = Geom.Geom_Parabola(ax, FL)
     h_para = Geom.Handle_Geom_Parabola(para)
-    radius = diameter/2.
-    
-    outside = EFL + radius
-    length = (outside**2)/(4.*FL) - FL + height
     
     ax2 = gp.gp_Ax2(gp.gp_Pnt(0,0,0), #origin
                    gp.gp_Dir(0.,0.,1.), #main direction is Z
                    gp.gp_Dir(1.,0.,0.)) #X Direction is X
     
     pbl_shape = BRepPrimAPI.BRepPrimAPI_MakeRevolution(ax2, h_para,
-                                                       5.0, outside+1)
+                                                       rmin, rmax)
+    return pbl_shape.Shape()
+
+def make_OAP(EFL, diameter, height, centre, direction, x_axis):
+    FL = EFL/2. #focal length
+    radius = diameter/2.
+    outside = EFL + radius
+    inside = EFL - radius
+    length = (outside**2)/(4.*FL) - FL + height
+    
+    #pbl_shape = make_true_para(FL, 5.0, outside+1)
+    pbl_shape = make_interp_parabola(FL, inside-1, outside+1)
     
     ax3 = gp.gp_Ax2(gp.gp_Pnt(EFL,0,-height), #origin
                    gp.gp_Dir(0.,0.,1.), #main direction is X
@@ -200,7 +247,7 @@ def make_OAP(EFL, diameter, height, centre, direction, x_axis):
     
     
     cut = BRepAlgoAPI.BRepAlgoAPI_Cut(cyl_solid.Shape(), 
-                                      pbl_shape.Shape())
+                                      pbl_shape)
         
     loc= position_shape(toshape(cut), centre, 
                           direction, x_axis)
@@ -353,19 +400,20 @@ def export_shapes2(shapeList, filename, colorList=[]):
     color_tool = h_color_tool.GetObject()
     top_label = shape_tool.NewShape()
     
-    colorList.extend(["blue"]*(len(shapeList) - len(colorList)))
+    colorList.extend(["brown"]*(len(shapeList) - len(colorList)))
     cmap = get_color_map()
     
     tr = gp.gp_Trsf()
     loc = TopLoc.TopLoc_Location(tr)
     
+    colorMap = dict((c, Quantity.Quantity_Color(cmap[c])) for c in colorList)
+    
     for shape, color in zip(shapeList, colorList):
-        #label = shape_tool.AddComponent(top_label, shape)
-        print color
-        label = shape_tool.AddShape(shape, True)
-        c = Quantity.Quantity_Color(cmap[color])
-        color_tool.SetColor(label, c, XCAFDoc.XCAFDoc_ColorGen)
+        print "color:", color
+        label = shape_tool.AddShape(shape, False)
         ref_label = shape_tool.AddComponent(top_label, label, loc)
+        c = colorMap[color]
+        color_tool.SetColor(ref_label, c, XCAFDoc.XCAFDoc_ColorGen)
         
     mode = STEPControl.STEPControl_AsIs
     writer = STEPCAFControl.STEPCAFControl_Writer()

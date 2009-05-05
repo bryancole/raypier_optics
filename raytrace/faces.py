@@ -133,6 +133,12 @@ class CircularFace(Face):
         return numpy.ones(points.shape) * n
     
 
+class PolygonFace(Face):
+    name = "polygon face"
+    diameter = PrototypedFrom('owner')
+    offset = PrototypedFrom('owner')
+
+
 class EllipsoidFace(Face):
     name = "ellipsoid face"
     focus1 = PrototypedFrom('owner')
