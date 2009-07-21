@@ -428,24 +428,40 @@ class OffAxisParabolicFace(Face):
         e = numpy.sqrt(d)
         roots = [(-b+e)/(2*a), (-b-e)/(2*a)]
         
+        singular = numpy.abs(a)<1e-10
+        approx = (-c/b)[singular]
+        
+        mask = d<0
         for root in roots:
-            root[root<0] = numpy.Infinity
+            root[mask] = numpy.Infinity
         
         root1, root2 = roots
-        shortest = numpy.where(root1<root2, root1, root2)
         
-        shortest = numpy.where(a<1e-10, -c/b, shortest)
-
-        P = r + shortest[:,numpy.newaxis]*s
+        root1[singular] = approx
+        root2[singular] = numpy.Infinity
         
-        P[:,2] -= efl/2
-
+        tol = self.tolerance
+        root1[root1<tol] = numpy.Infinity
+        root2[root2<tol] = numpy.Infinity
+        
+        P1 = r + root1[:,numpy.newaxis]*s
+        P1[:,2] -= efl/2.
+        
+        P2 = r + root2[:,numpy.newaxis]*s
+        P2[:,2] -= efl/2.
+        
         rad = self.diameter/2.
-        mask = (P[:,0]-efl)**2 + P[:,1]**2 > rad**2
-        mask = numpy.logical_or(mask, d<0)
-        mask = numpy.logical_or(mask, shortest<self.tolerance)
+        mask1 = (P1[:,0]-efl)**2 + P1[:,1]**2 > rad**2
+        mask2 = (P2[:,0]-efl)**2 + P2[:,1]**2 > rad**2
         
-        shortest[mask] = numpy.Infinity
+        root1[mask1] = numpy.Infinity
+        root2[mask2] = numpy.Infinity
+        
+        select = root1<root2
+        shortest = numpy.where(select, root1, root2)
+
+        select2 = select[:,numpy.newaxis]*numpy.ones(3,'i')
+        P = numpy.choose(select2, [P2, P1])
         
         dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
         result = numpy.empty(P1.shape[0], dtype=dtype)
