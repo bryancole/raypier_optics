@@ -7,6 +7,7 @@ from raytrace.tracer import RayTraceModel
 from raytrace.ellipsoids import Ellipsoid
 from raytrace.mirrors import PECMirror
 from raytrace.probes import PolarisationProbe
+from raytrace.lenses import PlanoConvexLens
 
 import numpy
 
@@ -73,7 +74,10 @@ e2 = Ellipsoid(focus1=(0,40,40),
                 Y_bounds=(-15,15),
                 Z_bounds=(40-15.,40+15.))      
                 
-model = RayTraceModel(optics=[m1,m2,m3,m4,m5,e1,e2],
+l1 = PlanoConvexLens(centre=(0,-40,30),
+                direction=(0,0,1))
+                
+model = RayTraceModel(optics=[m1,m2,m3,m4,m5,e1,e2, l1],
                     sources=[source,],
                     probes=[p1,])
  

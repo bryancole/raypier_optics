@@ -26,8 +26,12 @@ import numpy
 from raytrace.bases import Probe, Traceable, NumEditor, Vector
 from raytrace.sources import RayCollection
 from raytrace.rays import collectRays
-from raytrace.point_spread_func import PSF
 from raytrace.utils import normaliseVector
+
+try:
+    from raytrace.point_spread_func import PSF
+except ImportError:
+    PSF=None
 
 
 class PolarisationProbe(Probe):
@@ -83,130 +87,130 @@ class PolarisationProbe(Probe):
         """
         raise NotImplementedError
       
-      
-class PointSpreadFunction(Probe):
-    position = Vector(desc="centre point of the point grid on which the PSF is evaluated")
-    direction = Vector(desc="normal vector of the grid plane")
-    orientation = Vector(desc="x_axis direction of the grid plane. This is projected onto\
-    the grid plane to get the actual axis direction")
-    
-    point_spacing = Float(0.05) #in mm
-    size = Int(30)
-    
-    psf = Instance(PSF)
-    
-    wavelength = Float(100.0, desc="wavelength, in microns")
-    
-    ray_source = Instance(klass="raytrace.sources.BaseRaySource")
-    
-    exit_pupil_offset = Float(100.0)
-    aperture = Float(1.0)
-    
-    eval_btn = Button("calculate")
-    
-    def _psf_default(self):
-        return PSF(owner=self) 
+if PSF is not None:
+    class PointSpreadFunction(Probe):
+        position = Vector(desc="centre point of the point grid on which the PSF is evaluated")
+        direction = Vector(desc="normal vector of the grid plane")
+        orientation = Vector(desc="x_axis direction of the grid plane. This is projected onto\
+        the grid plane to get the actual axis direction")
         
-    def _eval_btn_fired(self):
-        source = self.ray_source
+        point_spacing = Float(0.05) #in mm
+        size = Int(30)
         
-        pass
+        psf = Instance(PSF)
         
-class FaceCenteredPSF(PointSpreadFunction):
-    name = Property(Str, depends_on="target_face")
-    position = Property(Vector, depends_on="target_face",
-                        desc="centre point of the point grid on which the PSF is evaluated")
-    direction = Property(Vector, depends_on="target_face",
-                      desc="normal vector of the grid plane")
-    orientation = Property(Vector, depends_on="target_face",
-                           desc="x_axis direction of the grid plane. This is projected onto\
-    the grid plane to get the actual axis direction")
-    
-    target_face = Instance(klass="raytrace.faces.Face")
-    
-    target_points = Property(Array(shape=(None,3)),
-                              depends_on="position, direction, orientation, size, point_spacing")
-    
-    rays = Instance(klass="raytrace.rays.RayCollection")
-    
-    source = Instance(tvtk.ProgrammableSource, ())
-    
-    traits_view = View(Item('eval_btn', show_label=False),
-                       VGroup(
-                           Item('point_spacing'),
-                           Item('size'),
-                           Item('exit_pupil_offset'),
-                           Item('ray_source', editor=DropEditor()),
-                           Item('target_face', editor=DropEditor())
-                           ),
-                        resizable=True)
-    
-    def _actors_default(self):
-        source = self.source
-        def execute():
-            output = source.poly_data_output
-            if self.rays is None:
-                return
-            points = self.rays.origin
-            cells = self.rays.cells
-            output.points = points
-            output.polys = cells.tolist()
-            #print "PSF", cells, points
-        source.set_execute_method(execute)
+        wavelength = Float(100.0, desc="wavelength, in microns")
         
-        map = tvtk.PolyDataMapper(input=source.output)
-        act = tvtk.Actor(mapper=map)
-        act.property.representation="wireframe"
-        actors = tvtk.ActorCollection()
-        actors.append(act)
-        return actors
-    
-    def _rays_changed(self):
-        self.source.modified()
-        self.render = True
-    
-    def _get_name(self):
-        optic = self.target_face.owner
-        idx = optic.faces.index(self.target_face)
-        return "PSF on %s, face %d"%(optic.name, idx)
-                       
-    def _get_position(self):
-        return numpy.asarray(self.target_face.owner.centre)
-    
-    def _get_direction(self):
-        return -numpy.asarray(self.target_face.owner.direction)
-    
-    def _get_orientation(self):
-        return numpy.asarray(self.target_face.owner.x_axis)
-    
-    def _get_target_points(self):
-        length = (self.point_spacing * self.size)/2.
-        size = self.size * 1j
-        U,V = numpy.ogrid[-length:length:size, -length:length:size]
+        ray_source = Instance(klass="raytrace.sources.BaseRaySource")
         
-        axis1 = normaliseVector(numpy.cross(self.direction, self.orientation))
-        axis2 = normaliseVector(numpy.cross(axis1, self.direction))
+        exit_pupil_offset = Float(100.0)
+        aperture = Float(1.0)
         
-        newaxis = numpy.newaxis
-        points = axis2[newaxis, newaxis,:] * U[:,:,newaxis] \
-                + axis1[newaxis, newaxis,:] * V[:,:,newaxis]
-                
-        points += self.position
-        return points
+        eval_btn = Button("calculate")
         
-    
-    def _eval_btn_fired(self):
-        source = self.ray_source
+        def _psf_default(self):
+            return PSF(owner=self) 
+            
+        def _eval_btn_fired(self):
+            source = self.ray_source
+            
+            pass
+            
+    class FaceCenteredPSF(PointSpreadFunction):
+        name = Property(Str, depends_on="target_face")
+        position = Property(Vector, depends_on="target_face",
+                            desc="centre point of the point grid on which the PSF is evaluated")
+        direction = Property(Vector, depends_on="target_face",
+                          desc="normal vector of the grid plane")
+        orientation = Property(Vector, depends_on="target_face",
+                               desc="x_axis direction of the grid plane. This is projected onto\
+        the grid plane to get the actual axis direction")
         
-        sequence = source.get_sequence_to_face(self.target_face)
-        input_rays = source.InputDetailRays
+        target_face = Instance(klass="raytrace.faces.Face")
         
-        result = self.psf.do_trace(input_rays, sequence)
+        target_points = Property(Array(shape=(None,3)),
+                                  depends_on="position, direction, orientation, size, point_spacing")
         
-        self.rays = result
+        rays = Instance(klass="raytrace.rays.RayCollection")
         
-        target_points = self.target_points
+        source = Instance(tvtk.ProgrammableSource, ())
         
-        spot = self.psf.evaluate_scalar_amp(result, target_points)
+        traits_view = View(Item('eval_btn', show_label=False),
+                           VGroup(
+                               Item('point_spacing'),
+                               Item('size'),
+                               Item('exit_pupil_offset'),
+                               Item('ray_source', editor=DropEditor()),
+                               Item('target_face', editor=DropEditor())
+                               ),
+                            resizable=True)
         
-        self.spot = spot
+        def _actors_default(self):
+            source = self.source
+            def execute():
+                output = source.poly_data_output
+                if self.rays is None:
+                    return
+                points = self.rays.origin
+                cells = self.rays.cells
+                output.points = points
+                output.polys = cells.tolist()
+                #print "PSF", cells, points
+            source.set_execute_method(execute)
+            
+            map = tvtk.PolyDataMapper(input=source.output)
+            act = tvtk.Actor(mapper=map)
+            act.property.representation="wireframe"
+            actors = tvtk.ActorCollection()
+            actors.append(act)
+            return actors
+        
+        def _rays_changed(self):
+            self.source.modified()
+            self.render = True
+        
+        def _get_name(self):
+            optic = self.target_face.owner
+            idx = optic.faces.index(self.target_face)
+            return "PSF on %s, face %d"%(optic.name, idx)
+                           
+        def _get_position(self):
+            return numpy.asarray(self.target_face.owner.centre)
+        
+        def _get_direction(self):
+            return -numpy.asarray(self.target_face.owner.direction)
+        
+        def _get_orientation(self):
+            return numpy.asarray(self.target_face.owner.x_axis)
+        
+        def _get_target_points(self):
+            length = (self.point_spacing * self.size)/2.
+            size = self.size * 1j
+            U,V = numpy.ogrid[-length:length:size, -length:length:size]
+            
+            axis1 = normaliseVector(numpy.cross(self.direction, self.orientation))
+            axis2 = normaliseVector(numpy.cross(axis1, self.direction))
+            
+            newaxis = numpy.newaxis
+            points = axis2[newaxis, newaxis,:] * U[:,:,newaxis] \
+                    + axis1[newaxis, newaxis,:] * V[:,:,newaxis]
+                    
+            points += self.position
+            return points
+            
+        
+        def _eval_btn_fired(self):
+            source = self.ray_source
+            
+            sequence = source.get_sequence_to_face(self.target_face)
+            input_rays = source.InputDetailRays
+            
+            result = self.psf.do_trace(input_rays, sequence)
+            
+            self.rays = result
+            
+            target_points = self.target_points
+            
+            spot = self.psf.evaluate_scalar_amp(result, target_points)
+            
+            self.spot = spot
