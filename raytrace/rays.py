@@ -96,6 +96,8 @@ class RayCollection(HasTraits):
     
     ray_areas = Property(Array(shape=(None)), depends_on="cells, origin")
     
+    wavelength = Array(shape=(None,1), dtype=numpy.double)
+    
     def __init__(self, *args, **kwds):
         super(RayCollection, self).__init__(*args, **kwds)
         if 'cells' not in kwds:

@@ -539,8 +539,8 @@ class DielectricFace(Face):
         
         origin = points
         
-        n_outside = self.n_outside
-        n_inside = self.n_inside
+        wavelen = rays.wavelength
+        n_inside, n_outside = self.owner.calc_refractive_index(wavelen)
             
         fromoutside = cosTheta < 0
         n1 = numpy.where(fromoutside, n_outside.real, n_inside.real)

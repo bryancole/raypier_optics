@@ -170,12 +170,14 @@ def make_ellipsoid_mirror(f1, f2, major_axis,
     P2 = gp.gp_Pnt(x_bounds[1], y_bounds[1], z_bounds[1])
     block = BRepPrimAPI.BRepPrimAPI_MakeBox(P1, P2)
     
-#    t_block = position_shape(toshape(block), centre, direction, x_axis)
-#    t_ellipse = position_shape(ellipsoid, centre, direction, x_axis)
-#    return make_compound([t_block, t_ellipse])
+    ##comment these out to reinstate the cut
+    #t_block = position_shape(toshape(block), centre, direction, x_axis)
+    #t_ellipse = position_shape(ellipsoid, centre, direction, x_axis)
+    #return make_compound([toshape(block), ellipsoid])
     
-    cut = BRepAlgoAPI.BRepAlgoAPI_Cut(toshape(block), ellipsoid)
-    return position_shape(toshape(cut), centre, direction, x_axis)
+    #cut = toshape(BRepAlgoAPI.BRepAlgoAPI_Cut(toshape(block), ellipsoid))
+    cut = make_compound([toshape(block), ellipsoid])
+    return position_shape(cut, centre, direction, x_axis)
 
 def make_interp_parabola(FL, rmin, rmax, segments=50):
     A = 1./(4*FL)

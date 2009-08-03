@@ -259,17 +259,22 @@ class PlanoConvexLens(BaseLens):
 
         
 if __name__=="__main__":
-    from ray_tracer import RayTraceModel, BuildRaySet
+    from raytrace.tracer import RayTraceModel
+    from raytrace.sources import ConfocalRaySource
     
     lens = PlanoConvexLens(orientation=0.0,
                            elevation=0.0,
                            CT=5.,
                            curvature=12.)
     
-    input_rays = BuildRaySet(origin = (0,0,-20),
-                         direction = (0,0,1),
-                         radius=5.0,
-                         count=20)
+    source = ConfocalRaySource(focus=(0,0,-30),
+                            direction=(0,0,1),
+                            working_dist = 0.1,
+                            number=20,
+                            detail_resolution=5,
+                            theta=10.,
+                            scale_factor=0.1)
     
-    model = RayTraceModel(optics=[lens], rays=input_rays)
+    model = RayTraceModel(optics=[lens], 
+                          sources=[source,])
     model.configure_traits()
