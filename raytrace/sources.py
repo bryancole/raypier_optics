@@ -235,14 +235,18 @@ class ParallelRaySource(BaseRaySource):
     InputRays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, number, radius, max_ray_len")
     
-    traits_view = View(Item('name'),
-                       Item('focus'),
-                       Item('direction'),
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
                        Item('number'),
+                       #Item('rings'),
                        Item('radius'),
-                       Item('show_start'),
-                       Item('scale_factor'),
-                       )
+                       label="Geometry")
+    
     
     @on_trait_change("focus, direction, number, radius, max_ray_len")
     def on_update(self):
