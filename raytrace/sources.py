@@ -277,6 +277,7 @@ class ParallelRaySource(BaseRaySource):
         rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
         rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
+        rays.offset_length = numpy.zeros_like(rays.length)
         return rays
     
     
