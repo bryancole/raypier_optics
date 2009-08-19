@@ -281,9 +281,9 @@ class TroughFace(Face):
         #print actual
         return result
     
-    ### FIXME: tempory, to allow testing of intersections only
-    def eval_children(self, rays, points, mask=slice(None,None,None)):
-        return None
+#    ### FIXME: tempory, to allow testing of intersections only
+#    def eval_children(self, rays, points, mask=slice(None,None,None)):
+#        return None
 
 
 class TroughMirrorFace(TroughFace, PECFace):

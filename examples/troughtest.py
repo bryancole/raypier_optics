@@ -24,7 +24,7 @@ m1 = TroughParabloid(width = 20,
 model = RayTraceModel(optics=[m1,],
                     sources=[source,],
                     probes=[],
-                    recursion_limit=3)
+                    recursion_limit=2)
  
 #model.trace_detail_async()
 #import time
