@@ -44,8 +44,8 @@ TupleVector = Tuple((0.,0.,0.), editor_traits={'cols':3,
 def normaliseVector(a):
     """normalise a (3,) vector or a (n,3) array of vectors"""
     a= numpy.asarray(a)
-    mag = numpy.sqrt((a**2).sum(axis=-1))
-    return (a.T/mag).T
+    mag = numpy.sqrt((a**2).sum(axis=-1))[...,numpy.newaxis]
+    return a/mag
 
 def transformPoints(t, pts):
     """Apply a vtkTransform to a numpy array of points"""

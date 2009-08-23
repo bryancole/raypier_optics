@@ -42,6 +42,7 @@ def shift_cells(rayList):
 def collectRays(*rayList):
     """Combines a sequence of RayCollections into a single larger one"""
     origin = numpy.vstack([r.origin for r in rayList])
+    normals = numpy.vstack([r.normals for r in rayList])
     direction = numpy.vstack([r.direction for r in rayList])
     length = numpy.vstack([r.length for r in rayList])
     cum_length = numpy.vstack([r.cum_length for r in rayList])
@@ -63,7 +64,8 @@ def collectRays(*rayList):
                             E_vector=E_vector, E1_amp=E1_amp,
                             E2_amp = E2_amp, parent_ids=parent_ids,
                             max_length=max_length,
-                            cells = cells)
+                            cells = cells,
+                            normals=normals)
     return newRays
 
 
@@ -79,6 +81,8 @@ class RayCollection(HasTraits):
     number = Property(Int, depends_on="origin")
     
     face = Array(shape=(None,), dtype=numpy.object)
+    
+    normals = VectorArray(desc="the normal vectors to the intersecting surface at the ray origin")
     
     refractive_index = Array(shape=(None,1), dtype=numpy.complex128)
     

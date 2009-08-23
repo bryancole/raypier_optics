@@ -58,6 +58,7 @@ class BaseRaySource(HasTraits):
     show_start = Bool(True)
     show_polarisation = Bool(False)
     show_direction = Bool(False)
+    show_normals = Bool(False)
     
     #idx selector for the input ways which should be visualised
     view_ray_ids = Trait(None, Array(dtype=numpy.int))
@@ -65,6 +66,9 @@ class BaseRaySource(HasTraits):
     tube = Instance(tvtk.TubeFilter, (), transient=True)
     sphere = Instance(tvtk.SphereSource, (), transient=True)
     data_source = Instance(tvtk.ProgrammableSource, transient=True)
+    
+    normals_source = Instance(tvtk.ProgrammableSource, transient=True)
+    normals_actor = Instance(tvtk.Actor, transient=True)
     
     ray_actor = Instance(tvtk.Actor, transient=True)
     start_actor = Instance(tvtk.Actor, transient=True)
@@ -78,6 +82,7 @@ class BaseRaySource(HasTraits):
     
     display_grp = VGroup(Item('display'),
                        Item('show_start'),
+                       Item('show_normals'),
                        Item('scale_factor'),
                        Item('export_pipes',label="export as pipes"),
                        label="Display")
@@ -139,6 +144,7 @@ class BaseRaySource(HasTraits):
     
     def _TracedRays_changed(self):
         self.data_source.modified()
+        self.normals_source.modified()
         
     def _get_InputRays(self):
         return None
@@ -151,12 +157,33 @@ class BaseRaySource(HasTraits):
         self.render = True
     
     def _get_actors(self):
-        actors = [self.ray_actor, self.start_actor]
-        prop = self.vtkproperty
-        if prop:
-            for actor in actors:
-                actor.property = prop
+        actors = [self.ray_actor, self.start_actor, self.normals_actor]
         return actors
+    
+    def _normals_source_default(self):
+        source = tvtk.ProgrammableSource()
+        def execute():
+            output = source.poly_data_output
+            points = numpy.vstack([p.origin for p in self.TracedRays])
+            normals = numpy.vstack([p.normals for p in self.TracedRays])
+            output.points = points
+            output.point_data.normals = normals
+            print "calc normals GLYPH"
+        source.set_execute_method(execute)
+        return source
+    
+    def _normals_actor_default(self):
+        source = self.normals_source
+        glyph = tvtk.ArrowSource()
+        glyph_filter = tvtk.Glyph3D(source=glyph.output,
+                                    input = source.output,
+                                    scale_factor=10.0,
+                                    vector_mode='use_normal'
+                                    )
+        map = tvtk.PolyDataMapper(input=glyph_filter.output)
+        act = tvtk.Actor(mapper=map)
+        act.property.color = (0.0,1.0,0.0)
+        return act
     
     def _data_source_default(self):
         source = tvtk.ProgrammableSource()
@@ -203,6 +230,9 @@ class BaseRaySource(HasTraits):
             map.input = self.data_source.output
         else:
             act.visibility = False
+        prop = self.vtkproperty
+        if prop:
+            act.property = prop
         return act
     
     def _display_changed(self, vnew):
@@ -282,6 +312,8 @@ class ParallelRaySource(BaseRaySource):
         rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
         rays.offset_length = numpy.zeros_like(rays.length)
+        rays.normals = numpy.zeros_like(origins)
+        rays.normals[:,1]=1.0
         return rays
     
     
@@ -365,6 +397,8 @@ class ConfocalRaySource(BaseRaySource):
         rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
         rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
         rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
+        rays.normals = numpy.zeros_like(origins)
+        rays.normals[:,1]=1.0
         return rays
     
     @cached_property

@@ -402,7 +402,8 @@ class OffAxisParabolicFace(Face):
 #        t_normal = numpy.column_stack((ax*t_points[:,0], 
 #                                       ay*t_points[:,1],
 #                                       -numpy.ones(n)))
-        return transformNormals(t, t_normal)
+        transformed = transformNormals(t, t_normal)
+        return transformed
     
     def intersect(self, P1, P2, max_length):
         """
@@ -498,9 +499,7 @@ class PECFace(Face):
         cosTheta = dotprod(normal, input_v)
         cosThetaNormal = cosTheta*normal
         reflected = input_v - 2*cosThetaNormal
-        
         faces = numpy.array([self,] * points.shape[0])
-        
         refl_rays = RayCollection(origin=points,
                                    direction = reflected,
                                    max_length = rays.max_length,
@@ -510,7 +509,8 @@ class PECFace(Face):
                                    parent = rays,
                                    parent_ids = parent_ids,
                                    face = faces,
-                                   refractive_index=n)
+                                   refractive_index=n,
+                                   normals = normal)
         return refl_rays
     
     
@@ -600,7 +600,8 @@ class DielectricFace(Face):
                                        E2_amp = P_amp*R_p,
                                        parent_ids = parent_ids,
                                        faces=faces,
-                                       refractive_index=n1)
+                                       refractive_index=n1,
+                                       normals=normal)
             
             trans_rays = RayCollection(origin=origin,
                                        direction = transmitted,
@@ -610,7 +611,8 @@ class DielectricFace(Face):
                                        E2_amp = P_amp*T_p,
                                        parent_ids = parent_ids,
                                        faces = faces,
-                                       refractive_index=n2)
+                                       refractive_index=n2,
+                                       normals=normal)
             
             allrays = collectRays(refl_rays, trans_rays)
             allrays.parent = rays

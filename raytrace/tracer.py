@@ -231,12 +231,13 @@ class RayTraceModel(HasQueue):
         intersections = intersections[ar,shortest] #reduce 2D to 1D
         lengths = intersections['length']
         
-        #now remove infinite rays
+        #now find the infinite rays, to be filtered out later
         mask = lengths!=numpy.Infinity
-        intersections = intersections[mask]
+        and_finite = lambda x: numpy.logical_and(mask, x)
         
         faces = intersections['face']
         
+        ###why?
         if intersections.size==1:
             points = intersections['point']
         else:
@@ -246,7 +247,8 @@ class RayTraceModel(HasQueue):
         #print "shape", lengthsT.shape, lengthsT.dtype, lengthsT[:5]
         rays.length = lengthsT
         
-        face_mask = ((f, faces==f) for f in set(faces))
+        face_mask = ((f, and_finite(faces==f)) for f in set(faces))
+        face_mask = (a for a in face_mask if a[1].any())
         
         children = filter(None,[f.eval_children(rays, points, m) for f,m in face_mask])
         if len(children)==0:
