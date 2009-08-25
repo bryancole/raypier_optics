@@ -34,12 +34,16 @@ from raytrace.mirrors import BaseMirror
 from raytrace.faces import PECFace, Face
 
 
+
+
 class TroughFace(Face):
     name = "Parabolic Trough Face"
-    
     EFL = PrototypedFrom("owner")
-    width = PrototypedFrom("owner")
+    #EFL = 5.
     length = PrototypedFrom("owner")
+    #length = 100
+    X_bounds = PrototypedFrom("owner")
+    #width = 20
     
     #takes [n,3] vectors and returns [1,n] array of distances
     def compute_length(self, start, end):
@@ -50,8 +54,11 @@ class TroughFace(Face):
         
         mask = distance < self.tolerance
         distance[mask]=numpy.Infinity
+
+        return distance      
         
-        return distance         
+    #def eval_children(self, rays, points, mask=slice(None,None,None)):
+     #   return None
         
     def interpolate_z(self, first, threeD, twoD):
         # takes an 3d origin, a 3d point on the line, and intrpolates the third
@@ -73,7 +80,7 @@ class TroughFace(Face):
         
     def compute_normal(self, points):
         """
-        evaluate normalised Normal vector
+        evaluate surface normal vector
         """
         n = points.shape[0]         #returns how many points there are
         t = self.transform
@@ -81,7 +88,7 @@ class TroughFace(Face):
         t_points =transformPoints(inv_t, points)
         h = 1/ (4 * self.EFL)
         
-        # y = hx^2
+        # y = hx^2 - efl
         # dy/dx = 2hx
         
         surface_slope = 2*h*t_points[:,0]
@@ -96,8 +103,11 @@ class TroughFace(Face):
         r_sq =  1 + perp_slope**2
         L = numpy.sqrt(r_sq)
         
-        n_x = 1 / L
-        n_y = perp_slope / L
+        #to keep normals pointing inward, points with pos x will have neg x normals
+        x_sign = -1 * t_points[:,0] / numpy.abs(t_points[:,0])
+        
+        n_x = x_sign / L
+        n_y = numpy.abs(perp_slope) / L
         n_z = numpy.zeros(n_x.shape)                 #surface doesn't point into Z at all
         
         #fix where shape was flat and normal has slope = inf
@@ -106,7 +116,9 @@ class TroughFace(Face):
         n_y[oops] = 1.
         
         t_normal = numpy.column_stack((n_x, n_y, n_z))
-        print "normals", t_normal
+        
+        
+        #print t_normal
 #        coefs = self.owner.vtk_quadric.coefficients
 #        ax = 2*coefs[0]/coefs[8]
 #        ay = 2*coefs[1]/coefs[8]
@@ -115,6 +127,9 @@ class TroughFace(Face):
 #                                       -numpy.ones(n)))
         return transformNormals(t, t_normal)
     
+
+
+        
     def intersect(self, P1, P2, max_length):
         """
         
@@ -125,22 +140,19 @@ class TroughFace(Face):
         efl = self.EFL #scalar
         h = 1 / (4 * efl)
         
+
         
         #turn array of points into y = mx + q
         m = (P1[:,1]-P2[:,1])/(P1[:,0]-P2[:,0]) # m = y1-y2 / x1-x2
         q = P1[:,1]-m*P1[:,0]                   #q = y - mx
-        
-        #print P1[:,1],P2[:,1]
-        #print P1[:,1]-P2[:,1]
-        #print P1[:,0],P2[:,0]
-        #print (P1[:,0]-P2[:,0])
-        #solve intersection of y = mx + b and y = h x^2
-        # 0 = hx^2 - mx -b
+
+        #solve intersection of y = mx + b and y = h x^2 - EFL
+        # 0 = hx^2 - mx - (b + EFL)
         # h = 1/(4*EFL)
         
         a = h
         b = -m
-        c = -q
+        c = - q - efl
         
         d = b**2 - 4*a*c
         
@@ -149,15 +161,21 @@ class TroughFace(Face):
         
         root1, root2 = roots
         
+        print "p1:"
+        print P1
+        print "p2:"
+        print P2
+        print ""        
+
         
         #put these roots into a list of intersection points using y = mx + q
         #I make these 3d with z=0, Which i'll fix later
-        inter1 = numpy.array([root1,m*root1 + q,numpy.zeros(n)]).T
-        inter2 = numpy.array([root2,m*root2 + q,numpy.zeros(n)]).T
+        inter1 = numpy.array([root1,h*(root1**2) - efl, numpy.zeros(n)]).T
+        inter2 = numpy.array([root2,h*(root2**2) - efl, numpy.zeros(n)]).T
         
         #Where the slope was infinite these values are wrong:
         
-        perp_result = numpy.array([P1[:,0],h * P1[:,0]**2,numpy.zeros(n)]).T
+        perp_result = numpy.array([P1[:,0],h * P1[:,0]**2 - efl ,numpy.zeros(n)]).T
         perp_fix = numpy.array([P1[:,0] == P2[:,0]]*3).T
         
         inter1 = numpy.where(perp_fix,perp_result, inter1)
@@ -171,7 +189,6 @@ class TroughFace(Face):
         for i,z in enumerate(parallel_cond):
             parallel_fix[i] = z
             
-        
         inter1[parallel_fix] = numpy.inf
         inter2[parallel_fix] = numpy.inf
 
@@ -182,7 +199,6 @@ class TroughFace(Face):
         
         inter1[miss_fix] = numpy.inf
         inter2[miss_fix] = numpy.inf
-                
         
         # Now, are the intersections along the direction of travel?
         
@@ -240,7 +256,7 @@ class TroughFace(Face):
             
         inter1[backwards1]=numpy.inf
         inter2[backwards2]=numpy.inf
-
+        
         #print inter1
         #print inter2
         
@@ -254,8 +270,35 @@ class TroughFace(Face):
         inter1[:,2]=z1
         inter2[:,2]=z2
         
-        #now only intersections between the begin and end are represented
-        #the others are inf.
+        #Some of these supposed intersections dont actually hit the shape
+        #within the given bounds
+        
+        X_bounds = self.X_bounds
+        # Y_bounds, determined by x bounds: y = x^2
+        Z_bounds = numpy.array([0,self.length])
+    
+        xmin, xmax = min(X_bounds), max(X_bounds)
+        zmin, zmax = min(Z_bounds), max(Z_bounds)
+        
+        bounds_mask1 = numpy.zeros(inter1[:,0].shape,dtype=bool)
+        bounds_mask2 = numpy.zeros(inter2[:,0].shape,dtype=bool)
+        
+        bounds_mask1 = inter1[:,0] < xmin
+        bounds_mask1 = numpy.logical_or(bounds_mask1, inter1[:,0]>xmax)
+        bounds_mask1 = numpy.logical_or(bounds_mask1, inter1[:,2]<zmin)
+        bounds_mask1 = numpy.logical_or(bounds_mask1, inter1[:,2]>zmax)
+        bounds_mask1 = numpy.array([bounds_mask1]*3).T
+        inter1[bounds_mask1] = numpy.inf
+        
+        bounds_mask2 = inter2[:,0] < xmin
+        bounds_mask2 = numpy.logical_or(bounds_mask2, inter2[:,0]>xmax)
+        bounds_mask2 = numpy.logical_or(bounds_mask2, inter2[:,2]<zmin)
+        bounds_mask2 = numpy.logical_or(bounds_mask2, inter2[:,2]>zmax)
+        
+        
+        bounds_mask2 = numpy.array([bounds_mask2]*3).T
+        inter2[bounds_mask2] = numpy.inf
+        
         # next, use the distance from start to intersection to select the first 
         # intersections if there are multiple
         
@@ -271,20 +314,21 @@ class TroughFace(Face):
                 actual[i] = inter2[i,:]
             else:
                 actual[i] = inter1[i,:]
+                
+        #finally, be sure the ray length to intersection is longer than the tolerance
+        
+        #tol_mask = self.compute_length(P1, actual) < self.tolerance
+        
+        #tol_mask = numpy.array([tol_mask]*3).T
+        #actual[tol_mask] = numpy.inf
+        
         
         dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
         result = numpy.empty(P1.shape[0], dtype=dtype)
         result['length'] = self.compute_length(P1,actual)
         result['face'] = self
         result['point'] = actual
-        #print "points:"
-        #print actual
         return result
-    
-#    ### FIXME: tempory, to allow testing of intersections only
-#    def eval_children(self, rays, points, mask=slice(None,None,None)):
-#        return None
-
 
 class TroughMirrorFace(TroughFace, PECFace):
     pass
@@ -296,13 +340,12 @@ class TroughParabloid(BaseMirror):
     """
     name = "trough"
     length = Float(100.0, desc="length of trough")
-    width = Float(25.4, desc="width of parabolic profile")
+    X_bounds = Tuple((-25.5, 25.5), desc="width of parabolic profile")
     EFL = Float(50.8, desc="effective focal length")
     
-    max_length = Float(100.0)
+    max_length = Float(1000.0)
     
-    extrude = Instance(tvtk.LinearExtrusionFilter, ())
-    body = Instance(tvtk.ProgrammableSource, ()) 
+    body = tvtk.ProgrammableSource() 
     
     traits_view = View(VGroup(
                         Traceable.uigroup,
@@ -316,13 +359,13 @@ class TroughParabloid(BaseMirror):
     
     def calc_profile(self):
         output = self.body.poly_data_output
-        x_bounds = self.width/2
+        xmin, xmax = min(self.X_bounds), max(self.X_bounds)
         a = 1 / (4 * self.EFL)
         
         #create the 2d profile of parabolic trough
         size = 20
-        x = numpy.linspace(-x_bounds,x_bounds,size)
-        y = a * (x**2)
+        x = numpy.linspace(xmin, xmax, size)
+        y = a * (x**2) - self.EFL
         z = numpy.zeros_like(x)         #this is a 2d profile.  so, no Z
     
         points = numpy.array([x,y,z]).T #why are dimensions in this order?
@@ -330,6 +373,10 @@ class TroughParabloid(BaseMirror):
         output.points = points
         output.lines = cells
         return output
+    
+    def _vtkproperty_default(self):
+        return tvtk.Property(opacity = 0.7,
+                             color = (0.8,0.8,0))
     
     def _faces_default(self):
         return [TroughMirrorFace(owner=self)]
@@ -340,17 +387,13 @@ class TroughParabloid(BaseMirror):
 #        return make_OAP(self.EFL, self.diameter, self.height,
 #                        self.centre, self.direction, self.x_axis), "yellow"
     
-    @on_trait_change("length, width, EFL")
-    def config_shape(self):
-        self.body.modified()
-        self.extrude.scale_factor = self.length
-        self.update=True
                                          
     def _pipeline_default(self):
+
+        
         self.body.set_execute_method(self.calc_profile)
 
-        extrude = self.extrude
-        extrude.input=self.body.output
+        extrude = tvtk.LinearExtrusionFilter(input=self.body.output)
         extrude.extrusion_type = "vector"
         extrude.vector = (0,0,1)
         extrude.scale_factor = self.length
@@ -358,8 +401,23 @@ class TroughParabloid(BaseMirror):
         # cut parabolics.py here and inserted from prisms.py
         t = self.transform
         transF = tvtk.TransformFilter(input=extrude.output, transform=t)
-        self.config_shape()
+
+
         return transF
+    
+    def trace_segment(self, seg, last_optic=None, last_cell=None):
+        """
+        Don't care about last_optic or last_cell. We filter out
+        intersections too close to the segment origin
+        """
+        p1 = seg.origin
+        p2 = p1 + seg.MAX_RAY_LENGTH*seg.direction
+        i = self.intersect_with_line(p1, p2)
+        if i is None:
+            return None
+        i = numpy.array(i)
+        dist = numpy.sqrt(((i-p1)**2).sum())
+        return dist, i, 0, self
         
     
 if __name__=="__main__":
