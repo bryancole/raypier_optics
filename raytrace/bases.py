@@ -228,6 +228,9 @@ class Traceable(ModelObject):
         max_length = rays.max_length
         p1 = rays.origin
         p2 = p1 + max_length*rays.direction
+        return self.intersect(p1, p2, max_length)
+        
+    def intersect(self, p1, p2, max_length):
         t = self.transform
         inv_t = t.linear_inverse
         P1 = transformPoints(inv_t, p1)
@@ -246,6 +249,20 @@ class Traceable(ModelObject):
         points = transformPoints(t, t_points)
         shortest['point'] = points
         return shortest
+    
+    def intersect_line(self, p1, p2):
+        """Find the nearest intersection of a single line defined by two points
+        p1 and p2
+        
+        returns a tuple (L, F, P), where L is the scalar length from p1 to the
+        intersection point, F is the intersecting face and P is the intersection
+        point (a 3-vector).
+        """
+        p1 = numpy.asarray(p1).reshape(-1,1)
+        p2 = numpy.asarray(p2).reshape(-1,1)
+        max_length = ((p1-p2)**2).sum(axis=0)[0]
+        nearest = self.intersect(p1, p2, max_length)[0]
+        return nearest['length'], nearest['cell'], nearest['point']
     
     def update_complete(self):
         pass
