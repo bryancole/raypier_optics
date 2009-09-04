@@ -88,6 +88,9 @@ class TroughFace(Face):
         t_points =transformPoints(inv_t, points)
         h = 1/ (4 * self.EFL)
         
+        #y and z are flipped so that y axis is the long axis
+        t_points[:,1:] = numpy.fliplr(t_points[:,1:]).copy()
+        
         # y = hx^2 - efl
         # dy/dx = 2hx
         
@@ -115,7 +118,8 @@ class TroughFace(Face):
         n_x[oops] = 0.
         n_y[oops] = 1.
         
-        t_normal = numpy.column_stack((n_x, n_y, n_z))
+        #notice, y and z are flipped back.
+        t_normal = numpy.column_stack((n_x, n_z, n_y))
         
         
         #print t_normal
@@ -140,7 +144,14 @@ class TroughFace(Face):
         efl = self.EFL #scalar
         h = 1 / (4 * efl)
         
-
+        #This was originally written with the Z axis as the long axis of the trough,
+        #but inorder for the direction parameter to be useful and point from
+        #vertex to focus, the y axis must be the long axis.  So, y and z are
+        #here switched for all the following calculations and then switched back
+        # right before the function returns its points
+        
+        P1[:,1:] = numpy.fliplr(P1[:,1:]).copy()
+        P2[:,1:] = numpy.fliplr(P2[:,1:]).copy()
         
         #turn array of points into y = mx + q
         m = (P1[:,1]-P2[:,1])/(P1[:,0]-P2[:,0]) # m = y1-y2 / x1-x2
@@ -160,13 +171,6 @@ class TroughFace(Face):
         roots = [(-b+e)/(2*a), (-b-e)/(2*a)]
         
         root1, root2 = roots
-        
-        print "p1:"
-        print P1
-        print "p2:"
-        print P2
-        print ""        
-
         
         #put these roots into a list of intersection points using y = mx + q
         #I make these 3d with z=0, Which i'll fix later
@@ -322,10 +326,12 @@ class TroughFace(Face):
         #tol_mask = numpy.array([tol_mask]*3).T
         #actual[tol_mask] = numpy.inf
         
-        
         dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
         result = numpy.empty(P1.shape[0], dtype=dtype)
         result['length'] = self.compute_length(P1,actual)
+        
+        #flip y and z back to the standard order
+        actual[:,1:] = numpy.fliplr(actual[:,1:]).copy()
         result['face'] = self
         result['point'] = actual
         return result
@@ -365,10 +371,10 @@ class TroughParabloid(BaseMirror):
         #create the 2d profile of parabolic trough
         size = 20
         x = numpy.linspace(xmin, xmax, size)
-        y = a * (x**2) - self.EFL
-        z = numpy.zeros_like(x)         #this is a 2d profile.  so, no Z
+        z = a * (x**2) -self.EFL
+        y = numpy.zeros_like(x)         #this is a 2d profile.  so, no Y
     
-        points = numpy.array([x,y,z]).T #why are dimensions in this order?
+        points = numpy.array([x,y,z]).T 
         cells = [[i,i+1] for i in xrange(size-1)]
         output.points = points
         output.lines = cells
@@ -395,7 +401,7 @@ class TroughParabloid(BaseMirror):
 
         extrude = tvtk.LinearExtrusionFilter(input=self.body.output)
         extrude.extrusion_type = "vector"
-        extrude.vector = (0,0,1)
+        extrude.vector = (0,1,0)
         extrude.scale_factor = self.length
         
         # cut parabolics.py here and inserted from prisms.py
