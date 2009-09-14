@@ -527,3 +527,13 @@ class VTKOptic(Optic):
         short = min(data, key=lambda a: a[0])
         return short[0], short[1], short[2], self
     
+    
+class Result(HasTraits):
+    def calc_result(self, tracer):
+        """
+        Called at the end of a tracing operation, so the result can 
+        be evaluated
+        
+        @param tracer: the RayTraceModel instance
+        """
+        raise NotImplementedError

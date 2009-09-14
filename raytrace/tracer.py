@@ -39,7 +39,7 @@ from raytrace.rays import RayCollection, collectRays
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
 from raytrace.faces import Face
-from raytrace.bases import Traceable, Probe
+from raytrace.bases import Traceable, Probe, Result
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
 
@@ -54,11 +54,13 @@ class RayTraceModel(HasQueue):
     sources = List(BaseRaySource)
     probes = List(Probe)
     constraints = List(BaseConstraint)
+    results = List(Result)
     
     optical_path = Float(0.0, transient=True)
     
     update = Event()
     _updating = Bool(False)
+    update_complete = Event()
     
     Self = self
     ShellObj = PythonValue({}, transient=True)
@@ -104,6 +106,9 @@ class RayTraceModel(HasQueue):
             constraint.on_trait_change(self.trace_all, "update")
         self.trace_all()
         
+    def _results_changed(self, resultsList):
+        pass #not yet sure what we need to do here
+        
     def update_probes(self):
         if self.scene is not None:
             self.render_vtk()
@@ -124,6 +129,8 @@ class RayTraceModel(HasQueue):
                 self.trace_ray_source(ray_source, optics)
             for o in optics:
                 o.update_complete()
+            for r in self.results:
+                r.calc_result(self)
         self.render_vtk()
         self._updating = False
         
@@ -358,6 +365,13 @@ tree_editor = TreeEditor(
                         children='constraints',
                         auto_open=True,
                         label="=Constraints",
+                        view = View()
+                        ),
+                       TreeNode(
+                        node_for=[RayTraceModel],
+                        children='results',
+                        auto_open=True,
+                        label="=Results",
                         view = View()
                         ),
                        TreeNode(
