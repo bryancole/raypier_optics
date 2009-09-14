@@ -158,7 +158,8 @@ class BaseRaySource(HasTraits):
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
-        return actors
+        #return actors
+        return actors[:2]  #makeshift turning off of normal glyphs
     
     def _normals_source_default(self):
         source = tvtk.ProgrammableSource()
@@ -171,7 +172,8 @@ class BaseRaySource(HasTraits):
             print "calc normals GLYPH"
         source.set_execute_method(execute)
         return source
-    
+        
+        
     def _normals_actor_default(self):
         source = self.normals_source
         glyph = tvtk.ArrowSource()
