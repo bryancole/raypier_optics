@@ -5,3 +5,9 @@ syntax: glob
 *~
 
 
+syntax: regexp
+^build$
+syntax: regexp
+^raytrace\.egg-info$
+syntax: glob
+teraview*.py
