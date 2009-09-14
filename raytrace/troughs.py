@@ -22,7 +22,7 @@ from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, PrototypedFrom
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
-            RangeEditor, ScrubberEditor, HSplit, VGroup
+            RangeEditor, ScrubberEditor, HSplit, VGroup, TupleEditor
 from enthought.tvtk.api import tvtk
 import numpy
 import math
@@ -352,17 +352,28 @@ class TroughParabloid(BaseMirror):
     max_length = Float(1000.0)
     
     body = Instance(tvtk.ProgrammableSource, ())
+    extrude = Instance(tvtk.LinearExtrusionFilter, ())
     
     traits_view = View(VGroup(
                         Traceable.uigroup,
                        Item('length', editor=NumEditor),
                        Item('width', editor=NumEditor),
                        Item('EFL', editor=NumEditor),
-                       Item('X_bounds'),
+                       Item('X_bounds', editor=TupleEditor(cols=2, auto_set=False,
+                                                           editors=[NumEditor, NumEditor],
+                                                           labels=['min','max'])),
                        Item('max_length', editor=NumEditor),
                        ),
                        )
     
+    @on_trait_change("X_bounds, EFL")
+    def change_params(self):
+        self.body.modified()
+        self.update=True
+        
+    def _length_changed(self, l):
+        self.extrude.scale_factor = l
+        self.update=True
     
     def calc_profile(self):
         output = self.body.poly_data_output
@@ -396,11 +407,10 @@ class TroughParabloid(BaseMirror):
     
                                          
     def _pipeline_default(self):
-
-        
         self.body.set_execute_method(self.calc_profile)
 
-        extrude = tvtk.LinearExtrusionFilter(input=self.body.output)
+        extrude = self.extrude
+        extrude.input=self.body.output
         extrude.extrusion_type = "vector"
         extrude.vector = (0,1,0)
         extrude.scale_factor = self.length
