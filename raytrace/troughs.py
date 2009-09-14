@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Sandbox for phutzing with parabolic troughs
+Parabolic troughs and also rectangular mirrors
 """
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
@@ -31,7 +31,7 @@ from itertools import izip
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
                 transformNormals, transformPoints
 from raytrace.mirrors import BaseMirror
-from raytrace.faces import PECFace, Face
+from raytrace.faces import PECFace, RectangularFace, Face
 
 
 
@@ -425,6 +425,95 @@ class TroughParabloid(BaseMirror):
         dist = numpy.sqrt(((i-p1)**2).sum())
         return dist, i, 0, self
         
+#
+# ---------------------------------------------------
+#
+
+class RectMirrorFace(RectangularFace, PECFace):
+    pass
+
+
+class RectMirror(BaseMirror):
+    """
+    A rectangular mirror object
+    """
+    name = "rectangular mirror"
+    length = Float(100.0, desc="length of trough")
+    width = Float(-25.5, desc="width of parabolic profile")
+    
+    max_length = Float(1000.0)
+    
+    body = tvtk.ProgrammableSource() 
+    
+    traits_view = View(VGroup(
+                        Traceable.uigroup,
+                       Item('length', editor=NumEditor),
+                       Item('width', editor=NumEditor),
+                       Item('max_length', editor=NumEditor),
+                       ),
+                       )
+    
+    
+    def calc_profile(self):
+        output = self.body.poly_data_output
+        xmin, xmax = -self.width/2, self.width/2
+        size = 2
+        #create the 2d profile, just a line.
+        x = numpy.array([xmin, xmax])
+        z = numpy.zeros_like(x)
+        y = numpy.zeros_like(x)         #this is a 2d profile.  so, no Y
+    
+        points = numpy.array([x,y,z]).T 
+        print points
+        cells = [[i,i+1] for i in xrange(size-1)]
+        output.points = points
+        output.lines = cells
+        return output
+    
+    def _vtkproperty_default(self):
+        return tvtk.Property(opacity = 0.7,
+                             color = (0.8,0.8,0))
+    
+    def _faces_default(self):
+        return [RectMirrorFace(owner=self)]
+
+# This is not necessary unless you want to export STEP files    
+#    def make_step_shape(self):
+#        from raytrace.step_export import make_OAP
+#        return make_OAP(self.EFL, self.diameter, self.height,
+#                        self.centre, self.direction, self.x_axis), "yellow"
+    
+                                         
+    def _pipeline_default(self):
+
+        
+        self.body.set_execute_method(self.calc_profile)
+
+        extrude = tvtk.LinearExtrusionFilter(input=self.body.output)
+        extrude.extrusion_type = "vector"
+        extrude.vector = (0,1,0)
+        extrude.scale_factor = self.length
+        
+        # cut parabolics.py here and inserted from prisms.py
+        t = self.transform
+        transF = tvtk.TransformFilter(input=extrude.output, transform=t)
+
+
+        return transF
+    
+    def trace_segment(self, seg, last_optic=None, last_cell=None):
+        """
+        Don't care about last_optic or last_cell. We filter out
+        intersections too close to the segment origin
+        """
+        p1 = seg.origin
+        p2 = p1 + seg.MAX_RAY_LENGTH*seg.direction
+        i = self.intersect_with_line(p1, p2)
+        if i is None:
+            return None
+        i = numpy.array(i)
+        dist = numpy.sqrt(((i-p1)**2).sum())
+        return dist, i, 0, self
     
 if __name__=="__main__":
     oap = TroughParabloid()
