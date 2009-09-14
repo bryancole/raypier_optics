@@ -315,8 +315,6 @@ class InvoluteFace(Face):
         # next, use the distance from start to intersection to select the first 
         # intersections if there are multiple
         
-        print "pts:",intersection_points.shape
-        print "guess:",intel_guess.shape
         
         actual = intersection_points[0]*numpy.inf
         best_guess = intel_guess[0].copy()
