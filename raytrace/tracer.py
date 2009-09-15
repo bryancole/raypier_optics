@@ -257,6 +257,11 @@ class RayTraceModel(HasQueue):
         face_mask = ((f, and_finite(faces==f)) for f in set(faces))
         face_mask = (a for a in face_mask if a[1].any())
         
+        #tell the input rays which faces terminate each ray
+        #If a ray has no intersection, the end_face is None
+        faces[numpy.logical_not(mask)] = None
+        rays.end_face = faces
+        
         children = filter(None,[f.eval_children(rays, points, m) for f,m in face_mask])
         if len(children)==0:
             return None
@@ -382,6 +387,12 @@ tree_editor = TreeEditor(
                         ),
                        TreeNode(
                         node_for=[Face],
+                        children='',
+                        auto_open=False,
+                        label="name",
+                        ),
+                       TreeNode(
+                        node_for=[Result],
                         children='',
                         auto_open=False,
                         label="name",

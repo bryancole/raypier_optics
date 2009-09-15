@@ -47,6 +47,7 @@ def collectRays(*rayList):
     length = numpy.vstack([r.length for r in rayList])
     cum_length = numpy.vstack([r.cum_length for r in rayList])
     face = numpy.concatenate([r.face for r in rayList])
+    end_face = numpy.concatenate([r.end_face for r in rayList])
     refractive_index = numpy.vstack([r.refractive_index for r in rayList])
     E_vector = numpy.vstack([r.E_vector for r in rayList])
     E1_amp = numpy.vstack([r.E1_amp for r in rayList])
@@ -80,7 +81,11 @@ class RayCollection(HasTraits):
     
     number = Property(Int, depends_on="origin")
     
-    face = Array(shape=(None,), dtype=numpy.object)
+    face = Array(shape=(None,), dtype=numpy.object,
+                 desc="The face which _generates_ the ray")
+    
+    end_face = Array(shape=(None,), dtype=numpy.object,
+                             desc="The face which terminates the ray (by intersection)")
     
     normals = VectorArray(desc="the normal vectors to the intersecting surface at the ray origin")
     

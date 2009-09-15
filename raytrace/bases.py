@@ -529,6 +529,8 @@ class VTKOptic(Optic):
     
     
 class Result(HasTraits):
+    name = Str("a result")
+    
     def calc_result(self, tracer):
         """
         Called at the end of a tracing operation, so the result can 
