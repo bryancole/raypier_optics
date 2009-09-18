@@ -563,7 +563,44 @@ class PECFace(Face):
                                    normals = normal)
         return refl_rays
     
-    
+class ApertureFace(Face):
+    def eval_children(self, rays, points, mask=slice(None,None,None)):
+        """
+        rays continue on from here unmodified, but are noted as having been
+        here for staistical measurements.  This is just a copy of the PEC
+        face but with change in direction removed.
+        
+        rays - a RayCollection object
+        points - a (Nx3) array of intersection coordinates
+        mask - a bool array selecting items for this Optic
+        """
+        points = points[mask]
+        n = rays.refractive_index[mask]
+        normal = self.compute_normal(points)
+        input_v = rays.direction[mask]
+        parent_ids = numpy.arange(mask.shape[0])[mask]
+
+        S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
+                                                   normal, 
+                                                   rays.E_vector[mask], 
+                                                   rays.E1_amp[mask], 
+                                                   rays.E2_amp[mask])
+
+        new_direction = input_v         #same as the old
+        faces = numpy.array([self,] * points.shape[0])
+        passed_rays = RayCollection(origin=points,
+                                   direction = new_direction,
+                                   max_length = rays.max_length,
+                                   E_vector = S_vec,
+                                   E1_amp = -S_amp,
+                                   E2_amp = -P_amp,
+                                   parent = rays,
+                                   parent_ids = parent_ids,
+                                   face = faces,
+                                   refractive_index=n,
+                                   normals = normal)
+        return passed_rays
+        
 class DielectricFace(Face):
     n_inside = PrototypedFrom("owner")
     n_outside = PrototypedFrom("owner")
@@ -684,7 +721,8 @@ class DielectricFace(Face):
                                parent=rays,
                                parent_ids = parent_ids,
                                faces=faces,
-                               refractive_index=refractive_index) 
+                               refractive_index=refractive_index,
+                               normals=normal) 
             
 
     
