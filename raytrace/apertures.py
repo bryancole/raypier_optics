@@ -34,7 +34,7 @@ import math, numpy
 class BaseAperture(Traceable):
     def _vtkproperty_default(self):
         return tvtk.Property(opacity=.35,
-                             color=(0.8,0.8,0.8),
+                             color=(0.,0.,0.),
                                 representation="surface")
                                 
 class RectApertureFace(RectangularFace, ApertureFace):
@@ -77,8 +77,8 @@ class RectAperture(BaseAperture):
         return output
     
     def _vtkproperty_default(self):
-        return tvtk.Property(opacity = 0.7,
-                             color = (0.8,0.8,0))
+        return tvtk.Property(opacity = 0.35,
+                             color = (0.,0.,0.))
     
     def _faces_default(self):
         return [RectApertureFace(owner=self)]
