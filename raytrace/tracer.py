@@ -224,7 +224,7 @@ class RayTraceModel(HasQueue):
                 ar = ar[mask]
                 
             rays = children
-            traces_rays.append(rays)
+            traces_rays.append(rays)   # !!! is this supposed to be traced_rays?
         return traced_rays
         
     def trace_segment(self, rays, optics):
