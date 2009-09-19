@@ -337,7 +337,8 @@ class Cylinder(BaseMirror):
     resolution = Int(20, desc="domain of angle is broken into this many values")
     max_length = Float(1000.0)
     
-    body = tvtk.ProgrammableSource() 
+    body = Instance(tvtk.ProgrammableSource, ())
+    extruder = Instance(tvtk.LinearExtrusionFilter, ())
     
     traits_view = View(VGroup(
                         Traceable.uigroup,
@@ -397,7 +398,8 @@ class Cylinder(BaseMirror):
         
         self.body.set_execute_method(self.calc_profile)
 
-        extrude = tvtk.LinearExtrusionFilter(input=self.body.output)
+        extrude = self.extruder
+        extrude.input = self.body.output
         extrude.extrusion_type = "vector"
         extrude.vector = (0,1,0)
         extrude.scale_factor = self.length
@@ -754,7 +756,8 @@ class CylindricalInvolute(BaseMirror):
     resolution = Int(20, desc="domain of angle is broken into this many values")
     max_length = Float(1000.0)
     
-    body = tvtk.ProgrammableSource() 
+    body = Instance(tvtk.ProgrammableSource, ())
+    extruder = Instance(tvtk.LinearExtrusionFilter, ())    
     
     traits_view = View(VGroup(
                         Traceable.uigroup,
@@ -822,7 +825,8 @@ class CylindricalInvolute(BaseMirror):
         
         self.body.set_execute_method(self.calc_profile)
 
-        extrude = tvtk.LinearExtrusionFilter(input=self.body.output)
+        extrude = self.extrude
+        extrude.input=self.body.output
         extrude.extrusion_type = "vector"
         extrude.vector = (0,0,1)
         extrude.scale_factor = self.length
