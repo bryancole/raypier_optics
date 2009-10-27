@@ -145,7 +145,7 @@ class RectangularFace(Face):
         P1 and P2, in the local coordinate system.
         """
         max_length = numpy.sqrt(((P2 - P1)**2).sum(axis=1))
-        len = self.length
+        len = self.length/2.
         wid = self.width
         #offset = self.offset
         
@@ -159,7 +159,7 @@ class RectangularFace(Face):
         length = max_length*h
         
         mask = Y > len
-        mask = numpy.logical_or(mask, Y < 0)
+        mask = numpy.logical_or(mask, Y < -len)
         mask = numpy.logical_or(mask, X > wid/2)
         mask = numpy.logical_or(mask, X < -wid/2)
         mask = numpy.logical_or(mask, h < self.tolerance)
