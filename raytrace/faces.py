@@ -183,11 +183,40 @@ class RectangularFace(Face):
         n = numpy.asarray([t.transform_vector(0,0,-1),])
         return numpy.ones(points.shape) * n
         
+        
 class PolygonFace(Face):
     name = "polygon face"
-    diameter = PrototypedFrom('owner')
-    offset = PrototypedFrom('owner')
+    #diameter = PrototypedFrom('owner') ###what were these two for???
+    #offset = PrototypedFrom('owner')
 
+    xy_points = PrototypedFrom('owner', desc="a list of (x,y) tuples describing"
+                               " the 2D profile of this face")
+    z_height = Float(0.0)
+    z_polarity = Enum("positive", "negative",
+                      desc="direction of the surface normal. 'positive' means"
+                      " the z-axis points out of the solid, 'negative' means"
+                      " it points inwards")
+    
+    def compute_normal(self, points):
+        """computes the surface normal in the global coordinate system"""
+        t = self.transform
+        p = 1 if self.z_polarity=="positive" else -1
+        n = numpy.asarray([t.transform_vector(0,0,p),])
+        return numpy.ones(points.shape) * n
+    
+    def intersect(self, P1, P2, max_length):
+        
+        dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
+        result = numpy.empty(P1.shape[0], dtype=dtype)
+        result['length'] = h_nearest*max_length
+        result['face'] = self
+        result['point'] = nearest
+        return result
+    
+    
+class ExtrusionFace(Face):
+    pass
+    
 
 class EllipsoidFace(Face):
     name = "ellipsoid face"
