@@ -175,7 +175,9 @@ class RectAbsorber(BaseAbsorber):
         #create the 2d profile, just a line.
         x = numpy.array([xmin, xmax])
         z = numpy.zeros_like(x)
-        y = numpy.zeros_like(x)         #this is a 2d profile.  so, no Y
+        #this is a 2d profile but Y-coord sets the starting plane from 
+        #which the extrusion extends from
+        y = numpy.ones_like(x) * (-self.length/2.)
     
         points = numpy.array([x,y,z]).T 
         print points
