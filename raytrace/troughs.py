@@ -282,7 +282,8 @@ class TroughFace(Face):
         
         X_bounds = self.X_bounds
         # Y_bounds, determined by x bounds: y = x^2
-        Z_bounds = numpy.array([0,self.length])
+        half_len = self.length/2.
+        Z_bounds = numpy.array([-half_len,half_len])
     
         xmin, xmax = min(X_bounds), max(X_bounds)
         zmin, zmax = min(Z_bounds), max(Z_bounds)
@@ -388,7 +389,9 @@ class TroughParabloid(BaseMirror):
         size = 20
         x = numpy.linspace(xmin, xmax, size)
         z = a * (x**2) -self.EFL*self.EFL_centre
-        y = numpy.zeros_like(x)         #this is a 2d profile.  so, no Y
+        #this is a 2d profile but Y-coord sets the starting plane from 
+        #which the extrusion extends from
+        y = numpy.ones_like(x) * (self.length/2.)
     
         points = numpy.array([x,y,z]).T 
         cells = [[i,i+1] for i in xrange(size-1)]
@@ -476,7 +479,7 @@ class RectMirror(BaseMirror):
         #create the 2d profile, just a line.
         x = numpy.array([xmin, xmax])
         z = numpy.zeros_like(x)
-        y = numpy.zeros_like(x)         #this is a 2d profile.  so, no Y
+        y = numpy.ones_like(x)*(self.length/2.)         #this is a 2d profile.  so, no Y
     
         points = numpy.array([x,y,z]).T 
         print points
