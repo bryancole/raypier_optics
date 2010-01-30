@@ -86,19 +86,4 @@ cdef class Intersection:
         self.point = point
     
     
-cdef class FaceList(list):
-    """A group of faces which share a transform"""
-    cdef public object transform
-    
-    cpdef Vector transform(self, Vector v):
-        return v
-    
-#    cpdef Vector inv_transform(self, Vector v):
-#        return v
-#    
-#    cpdef Intersection intersect(self, Point P1, Point P2):
-#        """Finds the face with the nearest intersection
-#        point, for the ray defined by the two input points,
-#        P1 and P2 (in global coords).
-#        """
-#        return Intersection(self[0], P1)
+
