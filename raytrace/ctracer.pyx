@@ -20,7 +20,7 @@ cdef struct complex_t:
     double real
     double imag
     
-cdef struct ray:
+cdef struct ray_t:
     #vectors
     vector origin, direction, normals, E_vector
     #complex attribs
@@ -32,11 +32,21 @@ cdef struct ray:
     ##objects
     #object face, end_face, child_refl, child_trans
     
+cdef struct transform_t:
+    double m00, m01, m02, m10, m11, m12, m20, m21, m22
+    double tx, ty, tz
+    
+    
+cdef struct intersection_t:
+    unsigned int face_idx #the intersecting face
+    vector point #position of intersection
+    double dist #fractional of ray between origin and intersection
+
 
 cdef class Ray:
-    cdef ray ray
+    cdef ray_t ray
     
-    def __init__(self, **kwds):
+    def __cinit__(self, **kwds):
         for k in kwds:
             setattr(self, k, kwds[k])
             
@@ -142,23 +152,22 @@ cdef class Ray:
         
         def __set__(self, int v):
             self.ray.end_face_idx = v
-            
 
 
 cdef class RayCollection:
-    cdef ray *rays
+    cdef ray_t *rays
     cdef readonly unsigned long n_rays, max_size
     cdef public RayCollection parent
     
     def __cinit__(self, size_t max_size):
-        self.rays = <ray*>malloc(max_size*sizeof(ray))
+        self.rays = <ray*>malloc(max_size*sizeof(ray_t))
         self.n_rays = 0
         self.max_size = max_size
         
     def __dealloc__(self):
         free(self.rays)
         
-    cdef add_ray_c(self, ray r):
+    cdef add_ray_c(self, ray_t r):
         self.rays[self.n_rays] = r
         self.n_rays += 1
         
@@ -225,108 +234,80 @@ cdef class Face(object):
 #    cdef vector compute_normal_c(self, vector p):
 #        return Vector(p.z,p.y,p.x)
     
-#    cdef Ray eval_child_ray_c(self, Ray ray, vector p):
-#        return ray
+    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
+                                vector p):
+        return ray
 
 
-cdef struct Intersection:
-    unsigned int face_idx #the intersecting face
-    vector point #position of intersection
-    double dist #fractional of ray between origin and intersection
-
-
-#cdef class FaceList(object):
-#    """A group of faces which share a transform"""
-#    cdef public object transform
-#    cdef public object inverse_transform
-#    cdef public list faces
+cdef class FaceList(object):
+    """A group of faces which share a transform"""
+    cdef transform_t transform
+    cdef transform_t inverse_transform
+    cdef public list faces
      
-#    cdef Intersection intersect_c(self, vector P1, vector P2, double max_length):
-#        """Finds the face with the nearest intersection
-#        point, for the ray defined by the two input points,
-#        P1 and P2 (in global coords).
-#        """
-#        cdef vector p1, p2, point
-#        cdef list faces
-#        cdef double d, dist=INFINITY
-#        cdef Face nearest=None
-#        cdef Intersection inter
+    cdef intersection_t intersect_c(self, vector P1, vector P2, double max_length):
+        """Finds the face with the nearest intersection
+        point, for the ray defined by the two input points,
+        P1 and P2 (in global coords).
+        """
+        cdef vector p1, p2, point
+        cdef list faces
+        cdef double d, dist=INFINITY
+        cdef Face nearest=None
+        cdef Intersection inter
         
-#        p1 = transform(self.transform, P1)
-#        p2 = transform(self.transform, P2)
+        p1 = transform(self.transform, P1)
+        p2 = transform(self.transform, P2)
         
-#        faces = self.faces
+        faces = self.faces
         
-#        for i in xrange(len(faces)):
-#            point = (<Face>(faces[i])).intersect_c(p1, p2)
-#            d = sep(p1, point)
-#            if 0.0 < d < dist:
-#                dist = d
-#                nearest = <Face>(faces[i])
+        for i in xrange(len(faces)):
+            point = (<Face>(faces[i])).intersect_c(p1, p2)
+            d = sep(p1, point)
+            if 0.0 < d < dist:
+                dist = d
+                nearest = <Face>(faces[i])
         
-#        inter.face = nearest
-#        inter.point = transform(self.inverse_transform, point)
-#        inter.dist = dist/sep(p1,p2)
-#        return inter
+        inter.face = nearest
+        inter.point = transform(self.inverse_transform, point)
+        inter.dist = dist/sep(p1,p2)
+        return inter
 
 
-#cdef Ray trace_ray(Ray ray, list face_sets, double max_length):
-#    cdef vector P1, P2, direction, normal
-#    cdef double dist=INFINITY
-#    cdef Intersection inter, nearest
-#    cdef unsigned int i, n_face_sets=len(face_sets)
-
-#    P1 = ray.origin
-#    direction = ray.direction
-#    for i in xrange(3):
-#        P2[i] = P1[i] + (direction[i]*max_length)
-
-#    for i in xrange(n_face_sets): #need to make this a C array
-#        inter = (<FaceList>face_sets[i]).intersect_c(P1, P2, max_length)
-#        if 0.0 < inter.dist < dist:
-#            nearest = inter
-    
-#    #evaluate new ray
-#    return (<Face>(inter.face)).eval_new_ray_c(ray, nearest.point)
-
-
-
-
-
-
-#cdef object trace_segment(object rays, list optics):
-#    cdef:
-#        FaceList face_set #a FaceList
-#        int size, i
-#        vector P1, P2
-#        float max_length
-#        Intersection inter, inter2
-    
-#    face_sets = [o.faces for o in optics]
-#    size = rays.number
-#    origin = rays.origin
-#    direction = rays.direction
-#    max_length = rays.max_length
-    
-#    #need to allocate the output rays here
-    
-#    for i in range(size):
-#        P1 = origin[i]
-#        P2 = P1 + (direction[i] * max_length)
-#        inter = (<FaceList>(face_sets[0])).intersect_c(P1, P2)
-#        dist = sep(inter.point, P1)
-#        for face_set in face_sets[1:]: #need to make this a C array
-#            inter2 = (<FaceList>face_set).intersect_c(P1, P2)
-#            dist2 = sep(inter2.point, P1)
-#            if dist2 < dist:
-#                dist = dist2
-#                inter = inter2
-        
-#        #now compute normal
-#        normal = inter.face.compute_normal(inter.point)
-        
-#        #evaluate new ray
-        
+cdef RayCollection trace_segment_c(RayCollection rays, 
+                                    list face_sets, 
+                                    list all_faces):
+    cdef:
+        FaceList face_set #a FaceList
+        int size, i
+        vector P1, P2, normal
+        float max_length
+        intersection_t inter, inter2
+        int n_sets=len(face_sets)
+        ray_t ray
+   
+    #need to allocate the output rays here
+    new_rays = RayCollection(rays.n_rays)
+   
+    for i in range(size):
+        ray = rays.rays[i]
+        P1 = ray.origin
+        P2 = P1 + (ray.direction * max_length)
+        inter = (<FaceList>(face_sets[0])).intersect_c(P1, P2)
+        dist = sep(inter.point, P1)
+        for j in xrange(n_optics-1):
+            face_set = face_sets[j+1]
+            inter2 = (<FaceList>face_set).intersect_c(P1, P2)
+            dist2 = sep(inter2.point, P1)
+            if dist2 < dist:
+                dist = dist2
+                inter = inter2
                 
-        
+        if dist <= INFINITY:
+            face = all_faces[inter.face_idx]
+            #evaluate new ray
+            new_rays.add_ray_c(face.eval_child_ray_c(ray, i, 
+                                                    inter.point))
+    return new_rays
+
         
