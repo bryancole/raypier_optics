@@ -467,7 +467,7 @@ cdef class FaceList(object):
         cdef vector_t p1, p2, point
         cdef list faces
         cdef double d, dist=INFINITY
-        cdef Face nearest=None
+        cdef unsigned int i, nearest
         cdef intersection_t inter
         
         p1 = transform_c(self.trans, P1)
@@ -480,9 +480,9 @@ cdef class FaceList(object):
             d = sep(p1, point)
             if 0.0 < d < dist:
                 dist = d
-                nearest = <Face>(faces[i])
+                nearest = i
         
-        inter.face_idx = nearest.idx
+        inter.face_idx = <Face>(faces[nearest]).idx
         inter.point = transform_c(self.inv_trans, point)
         inter.dist = dist/sep(p1,p2)
         return inter
