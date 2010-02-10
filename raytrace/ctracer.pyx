@@ -57,37 +57,108 @@ cdef inline vector_t set_v(vector_t v, object O):
     v.z = O[2]
     return v
 
-cdef inline double sep(vector_t p1, vector_t p2):
+def py_set_v(O):
+    cdef vector_t v_
+    print "before", (v_.x, v_.y, v_.z)
+    v_ = set_v(v_, O)
+    print "after", (v_.x, v_.y, v_.z)
+    return (v_.x, v_.y, v_.z)
+
+cdef inline double sep_(vector_t p1, vector_t p2):
     return sqrt((p2.x-p1.x)**2 + (p2.y-p1.y)**2 + (p2.z-p1.z)**2)
 
-cdef inline vector_t multvv(vector_t a, vector_t b):
+def sep(a, b):
+    cdef vector_t a_, b_
+    a_ = set_v(a_, a)
+    b_ = set_v(b_, b)
+    return sep_(a_, b_)
+
+cdef inline vector_t multvv_(vector_t a, vector_t b):
     cdef vector_t out
     out.x = a.x*b.x
     out.y = a.y*b.y
     out.z = a.z*b.z
     return out
 
-cdef inline vector_t multvs(vector_t a, double b):
+def multvv(a, b):
+    cdef vector_t a_, b_, c_
+    a_ = set_v(a_, a)
+    b_ = set_v(b_, b)
+    c_ = multvv_(a_, b_)
+    return (c_.x, c_.y, c_.z)
+
+cdef inline vector_t multvs_(vector_t a, double b):
     cdef vector_t out
     out.x = a.x*b
     out.y = a.y*b
     out.z = a.z*b
     return out
 
-cdef inline vector_t addvv(vector_t a, vector_t b):
+def multvs(a, b):
+    cdef vector_t a_, c_
+    a_ = set_v(a_, a)
+    c_ = multvs_(a_, b)
+    return (c_.x, c_.y, c_.z)
+
+cdef inline vector_t addvv_(vector_t a, vector_t b):
     cdef vector_t out
     out.x = a.x+b.x
     out.y = a.y+b.y
     out.z = a.z+b.z
     return out
 
+def addvv(a, b):
+    cdef vector_t a_, b_, c_
+    a_ = set_v(a_, a)
+    b_ = set_v(b_, b)
+    c_ = addvv_(a_, b_)
+    return (c_.x, c_.y, c_.z)
+
+cdef inline vector_t addvs_(vector_t a, double b):
+    cdef vector_t out
+    out.x = a.x+b
+    out.y = a.y+b
+    out.z = a.z+b
+    return out
+
+def addvs(a, b):
+    cdef vector_t a_, c_
+    a_ = set_v(a_, a)
+    c_ = addvs_(a_, b)
+    return (c_.x, c_.y, c_.z)
+
+cdef inline vector_t subvv_(vector_t a, vector_t b):
+    cdef vector_t out
+    out.x = a.x-b.x
+    out.y = a.y-b.y
+    out.z = a.z-b.z
+    return out
+
+def subvv(a, b):
+    cdef vector_t a_, b_, c_
+    a_ = set_v(a_, a)
+    b_ = set_v(b_, b)
+    c_ = subvv_(a_, b_)
+    return (c_.x, c_.y, c_.z)
+
+cdef inline vector_t subvs_(vector_t a, double b):
+    cdef vector_t out
+    out.x = a.x-b
+    out.y = a.y-b
+    out.z = a.z-b
+    return out
+
+def subvs(a, b):
+    cdef vector_t a_, c_
+    a_ = set_v(a_, a)
+    c_ = subvs_(a_, b)
+    return (c_.x, c_.y, c_.z)
 
 ##################################
 ### Python extension types
 ##################################
 
 cdef class Transform:
-    cdef transform_t trans
     
     def __init__(self, rotation=[[1,0,0],[0,1,0],[0,0,1]], 
                         translation=[0,0,0]):
@@ -118,7 +189,6 @@ cdef class Transform:
 
 
 cdef class Intersection:
-    cdef intersection_t inter
     
     property face_idx:
         def __get__(self):
@@ -145,7 +215,6 @@ cdef class Intersection:
 
 
 cdef class Ray:
-    cdef ray_t ray
     
     def __cinit__(self, **kwds):
         for k in kwds:
@@ -256,9 +325,6 @@ cdef class Ray:
 
 
 cdef class RayCollection:
-    cdef ray_t *rays
-    cdef readonly unsigned long n_rays, max_size
-    cdef public RayCollection parent
     
     def __cinit__(self, size_t max_size):
         self.rays = <ray_t*>malloc(max_size*sizeof(ray_t))
@@ -316,14 +382,13 @@ cdef class RayCollection:
     
     
 cdef class Face(object):
-    cdef public object owner
-    cdef public char *name
-    cdef public double tolerance
-    cdef public int idx #index in the global face list
     
-    def __cinit__(self):
+    params = []
+    
+    def __cinit__(self, owner=None, tolerance=0.0001):
         self.name = "base Face class"
-        self.tolerance = 0.0001
+        self.tolerance = tolerance
+        self.owner = owner
     
     cdef vector_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
@@ -332,12 +397,20 @@ cdef class Face(object):
         """
         return p1
     
+    def update(self):
+        """Called to update the parameters from the owner
+        to the Face
+        """
+        for name in self.params:
+            v = getattr(self.owner, name)
+            setattr(self, name, v)
+    
     def intersect(self, p1, p2):
         cdef:
             vector_t p1_, p2_, p_i
         
-        set_v(p1_, p1)
-        set_v(p2_, p2)
+        p1_ = set_v(p1_, p1)
+        p2_ = set_v(p2_, p2)
         p_i = self.intersect_c(p1_, p2_)
         return (p_i.x, p_i.y, p_i.z)
 
@@ -359,7 +432,7 @@ cdef class Face(object):
             Ray out=Ray()
             unsigned int idx
         
-        set_v(p, point)
+        p = set_v(p, point)
         out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, p)
         return out
         
@@ -367,10 +440,6 @@ cdef class Face(object):
 
 cdef class FaceList(object):
     """A group of faces which share a transform"""
-    cdef transform_t trans
-    cdef transform_t inv_trans
-    cdef public list faces
-    
     property transform:
         def __set__(self, Transform t):
             self.trans = t.trans
@@ -423,8 +492,8 @@ cdef class FaceList(object):
         cdef intersection_t inter
         cdef Intersection i2=Intersection()
         
-        set_v(P1_, P1)
-        set_v(P2_, P2)
+        P1_ = set_v(P1_, P1)
+        P2_ = set_v(P2_, P2)
         inter = self.intersect_c(P1_, P2_, max_length)
         i2.inter = inter
         return i2
@@ -451,13 +520,13 @@ cdef RayCollection trace_segment_c(RayCollection rays,
     for i in range(size):
         ray = rays.rays[i]
         P1 = ray.origin
-        P2 = addvv(P1, multvs(ray.direction, max_length))
+        P2 = addvv_(P1, multvs_(ray.direction, max_length))
         inter = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
         dist = sep(inter.point, P1)
         for j in xrange(n_sets-1):
             face_set = face_sets[j+1]
             inter2 = (<FaceList>face_set).intersect_c(P1, P2, max_length)
-            dist2 = sep(inter2.point, P1)
+            dist2 = sep_(inter2.point, P1)
             if dist2 < dist:
                 dist = dist2
                 inter = inter2

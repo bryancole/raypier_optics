@@ -1,89 +1,56 @@
 """
 Cython module for Face definitions
 """
-cdef extern from "listobject.h":
-    ctypedef class __builtin__.list [object PyListObject]:
-        pass
 
+from ctracer cimport Face
 
-#cdef class Matrix(object):
-
-cdef struct t_vector:
-    float x
-    float y
-    float z
+cdef class CircularFace(Face):
+    cdef public double diameter, offset
     
-cdef struct Complex:
-    float real
-    float imag
+    params = ['diameter', 'offset']
     
-    
-cdef class Ray:
-    cdef t_vector origin, direction, E_vector
-    cdef public float length, offset_length, E1_amp, E2_amp
-    cdef Complex refractive_index
-    
-    def __cinit__(self, origin=[0.0,0.0,0.0], 
-                    direction=[0.0,0.0,0.0], 
-                    e_vec=[0.0,0.0,0.0]):
-        self.origin.x = origin[0]
-        self.origin.y = origin[1]
-        self.origin.z = origin[2]
-        self.direction.x = direction[0]
-        self.direction.y = direction[1]
-        self.direction.z = direction[2]
-        self.e_vec.x = e_vec[0]
-        self.e_vec.y = e_vec[1]
-        self.e_vec.z = e_vec[2]
-    
-    
-cdef class Vector(object):
-    cdef public float x, y, z
-    
-    def __cinit__(self, x,y,z):
-        self.x = x
-        self.y = y
-        self.z = z
-    
-    def __repr__(self):
-        return "%s(%g, %g, %g)"%(self.__class__.__name__,
-                                self.x, self.y, self.z)
-    
-    
-cdef class Point(Vector):
-    pass
-    
-
-cdef class Face(object):
-    cdef public object owner
-    cdef public char *name
-    cdef public float tolerance
-    
-    def __cinit__(self):
-        self.name = "base Face class"
-        self.tolerance = 0.0001
-    
-    cpdef float intersect(self, Point p1, Point p2):
+    cdef vector_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
         fractional distance between p1 and p2.
         p1 and p2 are in the local coordinate system
         """
-        return 0.5
-
-    cpdef Vector compute_normal(self, Point p):
-        return Vector(p.z,p.y,p.x)
+        return p1
     
-    cpdef Ray eval_child_ray(self, Ray ray, Point p):
-        return ray
+#    def intersect(self, P1, P2, max_lenth):
+#        """
+#        Calculate intersection point for a ray segment between two points
+#        P1 and P2, in the local coordinate system.
+#        """
+#        max_length = numpy.sqrt(((P2 - P1)**2).sum(axis=1))
+#        r = self.diameter/2
+#        offset = self.offset
+        
+#        x1,y1,z1 = P1.T
+#        x2,y2,z2 = P2.T
+        
+#        h = -z1/(z2-z1)
+#        X = x1 + h*(x2-x1) - offset
+#        Y = y1 + h*(y2-y1)
+        
+#        length = max_length*h
+        
+#        mask = (X**2 + Y**2) > r**2
+#        mask = numpy.logical_or(mask, h < self.tolerance)
+#        mask = numpy.logical_or(mask, h > 1.0)
+        
+#        length[mask] = numpy.Infinity
+        
+#        t_points = numpy.column_stack((X+offset, Y, numpy.zeros_like(X)))
     
+#        dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
+#        result = numpy.empty(P1.shape[0], dtype=dtype)
+#        result['length'] = length
+#        result['face'] = self
+#        result['point'] = t_points
+#        return result
     
-cdef class Intersection:
-    cdef Face face
-    cdef Point point
-    
-    def __cinit__(self, face, point):
-        self.face = face
-        self.point = point
-    
-    
-
+#    def compute_normal(self, points):
+#        """computes the surface normal in the global coordinate system"""
+#        t = self.transform
+#        n = numpy.asarray([t.transform_vector(0,0,-1),])
+#        return numpy.ones(points.shape) * n
