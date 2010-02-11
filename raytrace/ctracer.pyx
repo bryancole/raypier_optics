@@ -51,6 +51,14 @@ cdef inline vector_t transform_c(transform_t t, vector_t p):
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22 + t.tz
     return out
 
+cdef inline vector_t rotate_c(transform_t t, vector_t p):
+    cdef vector_t out
+    out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02
+    out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12
+    out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22
+    return out
+
+
 cdef inline vector_t set_v(vector_t v, object O):
     v.x = O[0]
     v.y = O[1]
@@ -153,6 +161,98 @@ def subvs(a, b):
     a_ = set_v(a_, a)
     c_ = subvs_(a_, b)
     return (c_.x, c_.y, c_.z)
+
+cdef inline double mag_(vector_t a):
+    return sqrt(a.x**2 + a.y**2 + a.z**2)
+
+def mag(a):
+    cdef vector_t a_
+    a_ = set_v(a_, a)
+    return mag_(a_)
+
+cdef inline double dotprod_(vector_t a, vector_t b):
+    return a.x*b.x + a.y*b.y + a.z*b.z
+
+def dotprod(a, b):
+    cdef vector_t a_, b_
+    a_ = set_v(a_, a)
+    b_ = set_v(b_, b)
+    return dotprod_(a_,b_)
+
+cdef inline vector_t cross_(vector_t a, vector_t b):
+    cdef vector_t c
+    c.x = a.y*b.z - a.z*b.y
+    c.y = a.z*b.x - a.x*b.z
+    c.z = a.x*b.y - a.y*b.x
+    return c
+
+def cross(a, b):
+    cdef vector_t a_, b_, c_
+    a_ = set_v(a_, a)
+    b_ = set_v(b_, b)
+    c_ = cross_(a_, b_)
+    return (c_.x, c_.y, c_.z)
+
+cdef vector_t norm_(vector_t a):
+    cdef double mag=sqrt(a.x**2 + a.y**2 + a.z**2)
+    a.x /= mag
+    a.y /= mag
+    a.z /= mag
+    return a
+
+def norm(a):
+    cdef vector_t a_
+    a_ = set_v(a_, a)
+    a_ = norm_(a_)
+    return (a_.x, a_.y, a_.z)
+
+cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
+    """Project the E-field components of a given ray
+    onto the S- and P-polarisations defined by the 
+    surface normal
+    """
+    cdef:
+        vector_t E2_vector, E1_vector, v, S_vector, P_vector
+        complex_t S_amp, P_amp, E1_amp, E2_amp
+        double A, B
+    
+    E1_amp = ray.E1_amp
+    E2_amp = ray.E2_amp
+    E1_vector = ray.E_vector
+    E2_vector = cross_(ray.direction, E1_vector)
+    v = cross_(ray.direction, normal)
+    if v.x==0. and v.y==0. and v.z==0:
+        S_vector = norm_(E1_vector)
+    else:
+        S_vector = norm_(v)
+    v = cross_(ray.direction, S_vector)
+    P_vector = norm_(v)
+    
+    A = dotprod_(E1_vector,S_vector)
+    B = dotprod_(E2_vector, S_vector)
+    
+    S_amp.real = E1_amp.real*A + E2_amp.real*B
+    S_amp.imag = E1_amp.imag*A + E2_amp.imag*B
+    
+    A = dotprod_(E1_vector, P_vector)
+    B = dotprod_(E2_vector, P_vector)
+    
+    P_amp.real = E1_amp.real*A + E2_amp.real*B
+    P_amp.imag = E1_amp.imag*A + E2_amp.imag*B
+    
+    ray.E_vector = S_vector
+    ray.E1_amp = S_amp
+    ray.E2_amp = P_amp
+    return ray
+
+def Convert_to_SP(Ray ray, normal):
+    cdef vector_t n
+    cdef ray_t r
+    n = set_v(n, normal)
+    r = convert_to_sp(ray.ray, n)
+    out = Ray()
+    out.ray = r
+    return out
 
 ##################################
 ### Python extension types
@@ -390,12 +490,13 @@ cdef class Face(object):
         self.tolerance = tolerance
         self.owner = owner
     
-    cdef vector_t intersect_c(self, vector_t p1, vector_t p2):
+    cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
         fractional distance between p1 and p2.
         p1 and p2 are in the local coordinate system
         """
-        return p1
+        cdef intersection_t inter
+        return inter
     
     def update(self):
         """Called to update the parameters from the owner
@@ -407,12 +508,15 @@ cdef class Face(object):
     
     def intersect(self, p1, p2):
         cdef:
-            vector_t p1_, p2_, p_i
+            vector_t p1_, p2_
+            intersection_t inter
         
         p1_ = set_v(p1_, p1)
         p2_ = set_v(p2_, p2)
-        p_i = self.intersect_c(p1_, p2_)
-        return (p_i.x, p_i.y, p_i.z)
+        inter = self.intersect_c(p1_, p2_)
+        py_inter = Intersection()
+        py_inter.inter = inter
+        return py_inter
 
     cdef vector_t compute_normal_c(self, vector_t p):
         return p
@@ -466,26 +570,23 @@ cdef class FaceList(object):
         """
         cdef vector_t p1, p2, point
         cdef list faces
-        cdef double d, dist=INFINITY
-        cdef unsigned int i, nearest
-        cdef intersection_t inter
+        cdef unsigned int i
+        cdef intersection_t inter, nearest
         
         p1 = transform_c(self.trans, P1)
         p2 = transform_c(self.trans, P2)
         
         faces = self.faces
         
-        for i in xrange(len(faces)):
-            point = (<Face>(faces[i])).intersect_c(p1, p2)
-            d = sep(p1, point)
-            if 0.0 < d < dist:
-                dist = d
-                nearest = i
+        nearest.dist = INFINITY
         
-        inter.face_idx = <Face>(faces[nearest]).idx
-        inter.point = transform_c(self.inv_trans, point)
-        inter.dist = dist/sep(p1,p2)
-        return inter
+        for i in xrange(len(faces)):
+            inter = (<Face>(faces[i])).intersect_c(p1, p2)
+            if 0.0 < inter.dist < nearest.dist:
+                nearest = inter
+        
+        nearest.point = transform_c(self.inv_trans, nearest.point)
+        return nearest
     
     def intersect(self, P1, P2, double max_length):
         cdef vector_t P1_, P2_
@@ -510,7 +611,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         int size, i
         vector_t P1, P2, normal
         float max_length
-        intersection_t inter, inter2
+        intersection_t inter, nearest
         int n_sets=len(face_sets)
         ray_t ray
    
@@ -521,21 +622,18 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         ray = rays.rays[i]
         P1 = ray.origin
         P2 = addvv_(P1, multvs_(ray.direction, max_length))
-        inter = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
-        dist = sep(inter.point, P1)
+        nearest = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
         for j in xrange(n_sets-1):
             face_set = face_sets[j+1]
-            inter2 = (<FaceList>face_set).intersect_c(P1, P2, max_length)
-            dist2 = sep_(inter2.point, P1)
-            if dist2 < dist:
-                dist = dist2
-                inter = inter2
+            inter = (<FaceList>face_set).intersect_c(P1, P2, max_length)
+            if inter.dist < nearest.dist:
+                nearest = inter
                 
-        if dist <= INFINITY:
+        if nearest.dist <= INFINITY:
             face = all_faces[inter.face_idx]
             #evaluate new ray
             new_rays.add_ray_c(face.eval_child_ray_c(ray, i, 
-                                                    inter.point))
+                                                    nearest.point))
     return new_rays
 
 

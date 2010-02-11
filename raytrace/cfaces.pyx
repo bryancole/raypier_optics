@@ -2,19 +2,40 @@
 Cython module for Face definitions
 """
 
-from ctracer cimport Face
+from ctracer cimport Face, sep_
 
 cdef class CircularFace(Face):
     cdef public double diameter, offset
     
     params = ['diameter', 'offset']
     
-    cdef vector_t intersect_c(self, vector_t p1, vector_t p2):
+    cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
         fractional distance between p1 and p2.
         p1 and p2 are in the local coordinate system
         """
-        return p1
+        cdef:
+            double max_length, h, X, Y
+            intersection_t inter
+            vector_t point
+            
+        max_length = sep_(p1, p2)
+        h = -p1.z/(p2.z-p1.z)
+        if (h<self.tolerance) or (h>1.0):
+            inter.dist = INFINITY
+            return inter
+        X = p1.x + h*(p2.x-p1.x) - self.offset
+        Y = p1.y + h*(p2.y-p1.y)
+        if (X**2 + Y**2) > (self.diameter/2.)**2:
+            inter.dist = INFINITY
+            return inter
+        inter.dist = max_length * h
+        point.x = X + self.offset
+        point.y = Y
+        point.z = 0.0
+        inter.point = point
+        inter.face_idx = self.idx
+        return inter
     
 #    def intersect(self, P1, P2, max_lenth):
 #        """
@@ -48,6 +69,10 @@ cdef class CircularFace(Face):
 #        result['face'] = self
 #        result['point'] = t_points
 #        return result
+
+    cdef vector_t compute_normal_c(self, vector_t p):
+        cdef vector_t normal
+        return rotate_c(self.trans
     
 #    def compute_normal(self, points):
 #        """computes the surface normal in the global coordinate system"""

@@ -45,6 +45,7 @@ cdef struct intersection_t:
 ##############################
 
 cdef inline vector_t transform_c(transform_t t, vector_t p)
+cdef inline vector_t rotate_c(transform_t t, vector_t p)
 cdef inline vector_t set_v(vector_t v, object O)
 cdef inline double sep_(vector_t p1, vector_t p2)
 cdef inline vector_t multvv_(vector_t a, vector_t b)
@@ -53,6 +54,11 @@ cdef inline vector_t addvv_(vector_t a, vector_t b)
 cdef inline vector_t addvs_(vector_t a, double b)
 cdef inline vector_t subvv_(vector_t a, vector_t b)
 cdef inline vector_t subvs_(vector_t a, double b)
+cdef inline double dotprod_(vector_t a, vector_t b)
+cdef inline vector_t cross_(vector_t a, vector_t b)
+cdef inline vector_t norm_(vector_t a)
+cdef ray_t convert_to_sp(ray_t ray, vector_t normal)
+cdef inline double mag_(vector_t a)
 
 ##################################
 ### Python extension types
@@ -79,9 +85,9 @@ cdef class Face(object):
     cdef public object owner
     cdef public char *name
     cdef public double tolerance
-    cdef public int idx #index in the global face list
+    cdef public unsigned int idx #index in the global face list
     
-    cdef vector_t intersect_c(self, vector_t p1, vector_t p2)
+    cdef intersection_t intersect_c(self, vector_t p1, vector_t p2)
 
     cdef vector_t compute_normal_c(self, vector_t p)
     
