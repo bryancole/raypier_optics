@@ -347,12 +347,12 @@ cdef class Ray:
     property normals:
         """normal vector for the face which created this ray"""
         def __get__(self):
-            return (self.ray.normals.x,self.ray.normals.y,self.ray.normals.z)
+            return (self.ray.normal.x,self.ray.normal.y,self.ray.normal.z)
         
         def __set__(self, v):
-            self.ray.normals.x = v[0]
-            self.ray.normals.y = v[1]
-            self.ray.normals.z = v[2]
+            self.ray.normal.x = v[0]
+            self.ray.normal.y = v[1]
+            self.ray.normal.z = v[2]
             
     property E_vector:
         """Unit vector, perpendicular to the ray direction,
@@ -485,10 +485,13 @@ cdef class Face(object):
     
     params = []
     
-    def __cinit__(self, owner=None, tolerance=0.0001):
+    def __cinit__(self, owner=None, tolerance=0.0001, 
+                        max_length=100):
         self.name = "base Face class"
         self.tolerance = tolerance
         self.owner = owner
+        self.max_length = max_length
+        
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
@@ -510,6 +513,7 @@ cdef class Face(object):
         cdef:
             vector_t p1_, p2_
             intersection_t inter
+            Intersection py_inter
         
         p1_ = set_v(p1_, p1)
         p2_ = set_v(p2_, p2)
@@ -522,28 +526,36 @@ cdef class Face(object):
         return p
     
     def compute_normal(self, p):
+        """Compute normal vector at a given point, in local
+        face coordinates
+        """
         cdef vector_t p_, n
         n = self.compute_normal_c(p_)
         return (n.x, n.y, n.z)
     
     cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
-                                vector_t p):
+                                vector_t p, FaceList face_set):
         return old_ray
     
-    def eval_child_ray(self, Ray old_ray, ray_idx, point):
+    def eval_child_ray(self, Ray old_ray, ray_idx, point, 
+                        FaceList face_set):
         cdef:
             vector_t p
             Ray out=Ray()
             unsigned int idx
         
         p = set_v(p, point)
-        out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, p)
+        out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, p, face_set)
         return out
         
 
 
 cdef class FaceList(object):
     """A group of faces which share a transform"""
+    def __cinit__(self):
+        self.transform = Transform()
+        self.inverse_transform = Transform()
+        
     property transform:
         def __set__(self, Transform t):
             self.trans = t.trans
@@ -608,7 +620,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list all_faces):
     cdef:
         FaceList face_set #a FaceList
-        int size, i
+        unsigned int size, i, j, nearest_set
         vector_t P1, P2, normal
         float max_length
         intersection_t inter, nearest
@@ -628,12 +640,15 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             inter = (<FaceList>face_set).intersect_c(P1, P2, max_length)
             if inter.dist < nearest.dist:
                 nearest = inter
+                nearest_set = j
                 
         if nearest.dist <= INFINITY:
             face = all_faces[inter.face_idx]
             #evaluate new ray
+            face.end_face_idx = inter.face_idx
             new_rays.add_ray_c(face.eval_child_ray_c(ray, i, 
-                                                    nearest.point))
+                                                    nearest.point,
+                                                    face_sets[nearest_set]))
     return new_rays
 
 
@@ -647,4 +662,41 @@ def transform(Transform t, p):
     p2 = transform_c(t.trans, p1)
     return (p2.x, p2.y, p2.z)
     
-
+cdef ray_t eval_PEC_children(Face face, 
+                                ray_t in_ray, 
+                                unsigned int idx, 
+                                vector_t point,
+                                FaceList face_set):
+    """face - the intersecting face
+       ray - the ingoing ray
+       idx - the index of ray in it's RayCollection
+       point - the position of the intersection (in global coords)
+       face_set - the FaceList to which the face belongs
+    """
+    cdef:
+        vector_t normal, cosThetaNormal, reflected
+        ray_t sp_ray, out_ray
+        complex_t cpx
+        double cosTheta
+        
+    point = transform_c(face_set.inv_trans, point)
+    normal = face.compute_normal_c(point)
+    normal = rotate_c(face_set.trans, normal)
+    
+    sp_ray = convert_to_sp(in_ray, normal)
+    cosTheta = dotprod_(normal, in_ray.direction)
+    cosThetaNormal = multvs_(normal, cosTheta)
+    reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+    out_ray.origin = point
+    out_ray.normal = normal
+    out_ray.direction = reflected
+    out_ray.E_vector = sp_ray.E_vector
+    out_ray.E1_amp.real = -sp_ray.E1_amp.real
+    out_ray.E1_amp.imag = -sp_ray.E1_amp.imag
+    out_ray.E2_amp.real = -sp_ray.E2_amp.real
+    out_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+    out_ray.parent_idx = idx
+    out_ray.refractive_index = in_ray.refractive_index
+    out_ray.length = face.max_length
+    out_ray.wavelength = in_ray.wavelength
+    return out_ray

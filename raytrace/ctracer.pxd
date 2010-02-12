@@ -19,7 +19,7 @@ cdef struct complex_t:
     
 cdef struct ray_t:
     #vectors
-    vector_t origin, direction, normals, E_vector
+    vector_t origin, direction, normal, E_vector
     #complex attribs
     complex_t refractive_index, E1_amp, E2_amp
     #simple attribs
@@ -39,6 +39,8 @@ cdef struct intersection_t:
     vector_t point #position of intersection
     double dist #fractional of ray between origin and intersection
 
+cdef struct ray_pair_t:
+    ray_t trans, refln
 
 ##############################
 ### Vector maths functions ###
@@ -79,20 +81,6 @@ cdef class RayCollection:
     cdef public RayCollection parent
         
     cdef add_ray_c(self, ray_t r)
-    
-    
-cdef class Face(object):
-    cdef public object owner
-    cdef public char *name
-    cdef public double tolerance
-    cdef public unsigned int idx #index in the global face list
-    
-    cdef intersection_t intersect_c(self, vector_t p1, vector_t p2)
-
-    cdef vector_t compute_normal_c(self, vector_t p)
-    
-    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
-                                vector_t p)
 
 
 cdef class FaceList(object):
@@ -103,6 +91,21 @@ cdef class FaceList(object):
      
     cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length)
 
+
+cdef class Face(object):
+    cdef public object owner
+    cdef public char *name
+    cdef public double tolerance
+    cdef public unsigned int idx #index in the global face list
+    cdef public double max_length
+    
+    cdef intersection_t intersect_c(self, vector_t p1, vector_t p2)
+
+    cdef vector_t compute_normal_c(self, vector_t p)
+    
+    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
+                                vector_t p, FaceList face_set)
+
 ##################################
 ### Python module functions
 ##################################
@@ -110,3 +113,10 @@ cdef class FaceList(object):
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 
                                     list all_faces)
+
+cdef ray_t eval_PEC_children(Face face, 
+                                ray_t in_ray, 
+                                unsigned int idx, 
+                                vector_t point,
+                                FaceList face_set)
+                                
