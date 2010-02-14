@@ -83,14 +83,14 @@ cdef class RayCollection:
     cdef add_ray_c(self, ray_t r)
 
 
-cdef class FaceList(object):
-    """A group of faces which share a transform"""
-    cdef transform_t trans
-    cdef transform_t inv_trans
-    cdef public list faces
-     
-    cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length)
-
+cdef class InterfaceMaterial(object):
+    """Abstract base class for objects describing
+    the materials characterics of a Face
+    """
+    cdef ray_t eval_child_ray_c(self, ray_t old_ray, 
+                                unsigned int ray_idx, 
+                                vector_t point, vector_t normal)
+                                
 
 cdef class Face(object):
     cdef public object owner
@@ -98,13 +98,22 @@ cdef class Face(object):
     cdef public double tolerance
     cdef public unsigned int idx #index in the global face list
     cdef public double max_length
+    cdef public InterfaceMaterial material
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2)
 
     cdef vector_t compute_normal_c(self, vector_t p)
     
-    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
-                                vector_t p, FaceList face_set)
+    
+cdef class FaceList(object):
+    """A group of faces which share a transform"""
+    cdef transform_t trans
+    cdef transform_t inv_trans
+    cdef public list faces
+     
+    cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length)
+    cdef vector_t compute_normal_c(self, Face face, vector_t point)
+
 
 ##################################
 ### Python module functions
@@ -114,9 +123,4 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list face_sets, 
                                     list all_faces)
 
-cdef ray_t eval_PEC_children(Face face, 
-                                ray_t in_ray, 
-                                unsigned int idx, 
-                                vector_t point,
-                                FaceList face_set)
                                 

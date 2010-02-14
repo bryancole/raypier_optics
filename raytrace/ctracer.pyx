@@ -481,6 +481,30 @@ cdef class RayCollection:
         self.rays[idx] = r.ray
     
     
+cdef class InterfaceMaterial(object):
+    """Abstract base class for objects describing
+    the materials characterics of a Face
+    """
+    
+    cdef ray_t eval_child_ray_c(self, ray_t old_ray, 
+                                unsigned int ray_idx, 
+                                vector_t p, vector_t normal):
+        return old_ray
+    
+    def eval_child_ray(self, Ray old_ray, ray_idx, point, 
+                        normal):
+        cdef:
+            vector_t p, n
+            Ray out=Ray()
+            unsigned int idx
+        
+        p = set_v(p, point)
+        n = set_v(n, normal)
+        out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, 
+                                        p, n)
+        return out
+    
+    
 cdef class Face(object):
     
     params = []
@@ -532,21 +556,6 @@ cdef class Face(object):
         cdef vector_t p_, n
         n = self.compute_normal_c(p_)
         return (n.x, n.y, n.z)
-    
-    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
-                                vector_t p, FaceList face_set):
-        return old_ray
-    
-    def eval_child_ray(self, Ray old_ray, ray_idx, point, 
-                        FaceList face_set):
-        cdef:
-            vector_t p
-            Ray out=Ray()
-            unsigned int idx
-        
-        p = set_v(p, point)
-        out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, p, face_set)
-        return out
         
 
 
@@ -610,6 +619,20 @@ cdef class FaceList(object):
         inter = self.intersect_c(P1_, P2_, max_length)
         i2.inter = inter
         return i2
+    
+    cdef vector_t compute_normal_c(self, Face face, vector_t point):
+        cdef vector_t out
+        
+        out = transform_c(self.trans, point)
+        out = face.compute_normal_c(out)
+        out = transform_c(self.inv_trans, out)
+        return out
+    
+    def compute_normal(self, Face face, point):
+        cdef vector_t p
+        p = set_v(p, point)
+        p = self.compute_normal_c(face, p)
+        return (p.x, p.y, p.z)
 
 ##################################
 ### Python module functions
@@ -621,11 +644,11 @@ cdef RayCollection trace_segment_c(RayCollection rays,
     cdef:
         FaceList face_set #a FaceList
         unsigned int size, i, j, nearest_set
-        vector_t P1, P2, normal
+        vector_t P1, P2, normal, point
         float max_length
         intersection_t inter, nearest
         int n_sets=len(face_sets)
-        ray_t ray
+        ray_t ray, new_ray
    
     #need to allocate the output rays here 
     new_rays = RayCollection(rays.n_rays)
@@ -646,9 +669,14 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             face = all_faces[inter.face_idx]
             #evaluate new ray
             face.end_face_idx = inter.face_idx
-            new_rays.add_ray_c(face.eval_child_ray_c(ray, i, 
-                                                    nearest.point,
-                                                    face_sets[nearest_set]))
+            point = nearest.point
+            normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
+            new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                    point,
+                                                    normal
+                                                    )
+            new_ray.length = max_length
+            new_rays.add_ray_c(new_ray)
     return new_rays
 
 
@@ -662,41 +690,41 @@ def transform(Transform t, p):
     p2 = transform_c(t.trans, p1)
     return (p2.x, p2.y, p2.z)
     
-cdef ray_t eval_PEC_children(Face face, 
+    
+    
+cdef class PECMaterial(InterfaceMaterial):
+    """Simulates a Perfect Electrical Conductor
+    """
+    cdef ray_t eval_child_ray_c(self,
                                 ray_t in_ray, 
                                 unsigned int idx, 
                                 vector_t point,
-                                FaceList face_set):
-    """face - the intersecting face
-       ray - the ingoing ray
-       idx - the index of ray in it's RayCollection
-       point - the position of the intersection (in global coords)
-       face_set - the FaceList to which the face belongs
-    """
-    cdef:
-        vector_t normal, cosThetaNormal, reflected
-        ray_t sp_ray, out_ray
-        complex_t cpx
-        double cosTheta
+                                vector_t normal):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected
+            ray_t sp_ray, out_ray
+            complex_t cpx
+            double cosTheta
         
-    point = transform_c(face_set.inv_trans, point)
-    normal = face.compute_normal_c(point)
-    normal = rotate_c(face_set.trans, normal)
-    
-    sp_ray = convert_to_sp(in_ray, normal)
-    cosTheta = dotprod_(normal, in_ray.direction)
-    cosThetaNormal = multvs_(normal, cosTheta)
-    reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
-    out_ray.origin = point
-    out_ray.normal = normal
-    out_ray.direction = reflected
-    out_ray.E_vector = sp_ray.E_vector
-    out_ray.E1_amp.real = -sp_ray.E1_amp.real
-    out_ray.E1_amp.imag = -sp_ray.E1_amp.imag
-    out_ray.E2_amp.real = -sp_ray.E2_amp.real
-    out_ray.E2_amp.imag = -sp_ray.E2_amp.imag
-    out_ray.parent_idx = idx
-    out_ray.refractive_index = in_ray.refractive_index
-    out_ray.length = face.max_length
-    out_ray.wavelength = in_ray.wavelength
-    return out_ray
+        sp_ray = convert_to_sp(in_ray, normal)
+        cosTheta = dotprod_(normal, in_ray.direction)
+        cosThetaNormal = multvs_(normal, cosTheta)
+        reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+        out_ray.origin = point
+        out_ray.normal = normal
+        out_ray.direction = reflected
+        out_ray.E_vector = sp_ray.E_vector
+        out_ray.E1_amp.real = -sp_ray.E1_amp.real
+        out_ray.E1_amp.imag = -sp_ray.E1_amp.imag
+        out_ray.E2_amp.real = -sp_ray.E2_amp.real
+        out_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+        out_ray.parent_idx = idx
+        out_ray.refractive_index = in_ray.refractive_index
+        out_ray.wavelength = in_ray.wavelength
+        return out_ray
