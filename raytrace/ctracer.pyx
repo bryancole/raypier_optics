@@ -510,11 +510,15 @@ cdef class Face(object):
     params = []
     
     def __cinit__(self, owner=None, tolerance=0.0001, 
-                        max_length=100):
+                        max_length=100, material=None):
         self.name = "base Face class"
         self.tolerance = tolerance
         self.owner = owner
         self.max_length = max_length
+        if isinstance(material, InterfaceMaterial):
+            self.material = material
+        else:
+            self.material = PECMaterial()
         
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
@@ -678,6 +682,12 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             new_ray.length = max_length
             new_rays.add_ray_c(new_ray)
     return new_rays
+
+
+def trace_segment(RayCollection rays, 
+                    list face_sets, 
+                    list all_faces):
+    return trace_segment_c(rays, face_sets, all_faces)
 
 
 def transform(Transform t, p):

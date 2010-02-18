@@ -9,6 +9,7 @@ from raytrace import cfaces
 import unittest
 from math import sqrt
 
+
 class AnOwner(object):
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
@@ -38,14 +39,14 @@ class TestCircularFace(unittest.TestCase):
         import numpy
         self.assertEquals(inter.dist, numpy.Infinity)
         
-    def test_eval_child(self):
-        o = AnOwner(diameter=5.5, offset=6.6)
-        c = cfaces.CircularFace(owner=o)
-        from raytrace import ctracer
-        in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
-        fl = ctracer.FaceList()
-        out_ray = c.eval_child_ray(in_ray, 1, (0,0,0), fl)
-        self.assertEquals(out_ray.direction, (1,0,-1))
+#    def test_eval_child(self):
+#        o = AnOwner(diameter=5.5, offset=6.6)
+#        c = cfaces.CircularFace(owner=o)
+#        from raytrace import ctracer
+#        in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
+#        fl = ctracer.FaceList()
+#        out_ray = c.eval_child_ray(in_ray, 1, (0,0,0), fl)
+#        self.assertEquals(out_ray.direction, (1,0,-1))
     
 if __name__=="__main__":
     unittest.main()

@@ -4,7 +4,7 @@ Cython module for Face definitions
 cdef extern from "math.h":
     double INFINITY
 
-from ctracer cimport Face, sep_, eval_PEC_children, intersection_t,\
+from ctracer cimport Face, sep_, intersection_t,\
         vector_t, ray_t, FaceList
 
 
@@ -51,7 +51,3 @@ cdef class CircularFace(Face):
         normal.z=-1
         return normal
     
-    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
-                                vector_t p, FaceList face_set):
-        return eval_PEC_children(<Face>self, old_ray, ray_idx,
-                                p, face_set)

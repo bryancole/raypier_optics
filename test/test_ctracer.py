@@ -86,6 +86,22 @@ class TestVectorMathsFunctions(unittest.TestCase):
         self.assertAlmostEqual(0.0, ctracer.mag(ctracer.cross(a,b)))
         
         
+class TestPECMaterial(unittest.TestCase):
+    def test_eval_child(self):
+        m = ctracer.PECMaterial()
+        in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
+        out_ray = m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1))
+        self.assertEquals(out_ray.direction, (1,0,-1))
+        
+        
+class TestTraceSegment(unittest.TestCase):
+    def test_trace_segment(self):
+        rays = ctracer.RayCollection(10)
+        in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
+        rays.add_ray(in_ray)
+        #ToDo
+        self.assertEquals(out_ray.direction, (1,0,-1))
+        
 if __name__=="__main__":
     unittest.main()
     
