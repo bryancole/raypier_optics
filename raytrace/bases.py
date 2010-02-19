@@ -38,6 +38,7 @@ from raytrace.has_queue import HasQueue, on_trait_change
 from raytrace.faces import Face
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
+from raytrace import ctracer
 
 Vector = Array(shape=(3,))
 
@@ -181,17 +182,14 @@ class Traceable(ModelObject):
     
     intersections = List([])
     
-    faces = List(Face, desc="list of traceable faces (Face instances)",
+    faces = Instance(ctracer.FaceList, 
+                desc="Container of traceable faces (Face instances)",
                  transient = True)
     
     #all Traceables have a pipeline to generate a VTK visualisation of themselves
     pipeline = Any(transient=True) #a tvtk.DataSetAlgorithm ?
     
     polydata = Property(depends_on=['update', ])
-    
-    def _faces_changed(self, vnew):
-        for face in vnew:
-            face.transform = self.tranform
     
     def _actors_default(self):
         pipeline = self.pipeline

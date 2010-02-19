@@ -27,13 +27,10 @@ from raytrace.bases import Traceable, normaliseVector, NumEditor,\
      
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
-from faces import CircularFace, PECFace
+from cfaces import CircularFace
 
 import math, numpy
 
-
-class PECCircularFace(CircularFace, PECFace):
-    pass
 
 
 class BaseMirror(Traceable):
@@ -63,7 +60,9 @@ class PECMirror(BaseMirror):
                    )
     
     def _faces_default(self):
-        return [PECCircularFace(owner=self)]
+        fl = ctracer.FaceList(owner=self)
+        fl.faces = [PECCircularFace(owner=self)]
+        return fl
     
     def make_step_shape(self):
         from raytrace.step_export import make_cylinder

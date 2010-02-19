@@ -373,6 +373,20 @@ cdef class Ray:
         
         def __set__(self, double v):
             self.ray.length = v
+            
+    property termination:
+        """the end-point of the ray (read only)
+        """
+        def __get__(self):
+            cdef vector_t end
+            cdef float length
+            if self.ray.length > 100.0:
+                length = 100.0
+            else:
+                length = self.ray.length
+            end = addvv_(self.ray.origin, multvs_(self.ray.direction, 
+                                    length))
+            return (end.x, end.y, end.z)
         
     property refractive_index:
         """complex refractive index through which
@@ -439,7 +453,7 @@ cdef class RayCollection:
         self.n_rays += 1
         
     def add_ray(self, Ray r):
-        if self.n_rays == self.max_size-1:
+        if self.n_rays == self.max_size:
             raise ValueError("RayCollection is full up")
         self.rays[self.n_rays] = r.ray
         self.n_rays += 1
@@ -569,6 +583,23 @@ cdef class FaceList(object):
         self.transform = Transform()
         self.inverse_transform = Transform()
         
+    def sync_transforms(self):
+        """sets the transforms from the owner's VTKTransform
+        """
+        try:
+            trans = self.owner.transform
+        except AttributeError:
+            return
+        m = trans.matrix
+        rot = [[m.get_element(i,j) for i in xrange(3)] for j in xrange(3)]
+        dt = [m.get_element(3,i) for i in xrange(3)]
+        self.transform = Transform(rotation=rot, translation=dt)
+        inv_trans = trans.inverse
+        m = inv_trans.matrix
+        rot = [[m.get_element(i,j) for i in xrange(3)] for j in xrange(3)]
+        dt = [m.get_element(3,i) for i in xrange(3)]
+        self.inverse_transform = Transform(rotation=rot, translation=dt)
+        
     property transform:
         def __set__(self, Transform t):
             self.trans = t.trans
@@ -611,6 +642,8 @@ cdef class FaceList(object):
                 nearest = inter
         
         nearest.point = transform_c(self.inv_trans, nearest.point)
+        
+        print "INTER", nearest.point, nearest.dist, nearest.face_idx
         return nearest
     
     def intersect(self, P1, P2, double max_length):
@@ -644,35 +677,38 @@ cdef class FaceList(object):
 
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 
-                                    list all_faces):
+                                    list all_faces,
+                                    float max_length):
     cdef:
         FaceList face_set #a FaceList
-        unsigned int size, i, j, nearest_set
+        unsigned int size, i, j, nearest_set=0
         vector_t P1, P2, normal, point
-        float max_length
         intersection_t inter, nearest
         int n_sets=len(face_sets)
         ray_t ray, new_ray
+        RayCollection new_rays
    
     #need to allocate the output rays here 
     new_rays = RayCollection(rays.n_rays)
-   
-    for i in range(size):
+    
+    for i in range(rays.n_rays):
         ray = rays.rays[i]
         P1 = ray.origin
         P2 = addvv_(P1, multvs_(ray.direction, max_length))
+        print "points", P1, P2
         nearest = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
         for j in xrange(n_sets-1):
             face_set = face_sets[j+1]
             inter = (<FaceList>face_set).intersect_c(P1, P2, max_length)
             if inter.dist < nearest.dist:
                 nearest = inter
-                nearest_set = j
+                nearest_set = j+1
                 
         if nearest.dist <= INFINITY:
-            face = all_faces[inter.face_idx]
+            print "GET FACE", nearest.face_idx, len(all_faces)
+            face = all_faces[nearest.face_idx]
             #evaluate new ray
-            face.end_face_idx = inter.face_idx
+            ray.end_face_idx = nearest.face_idx
             point = nearest.point
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
             new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
@@ -686,8 +722,11 @@ cdef RayCollection trace_segment_c(RayCollection rays,
 
 def trace_segment(RayCollection rays, 
                     list face_sets, 
-                    list all_faces):
-    return trace_segment_c(rays, face_sets, all_faces)
+                    list all_faces,
+                    max_length=100):
+    for fs in face_sets:
+        fs.sync_transforms()
+    return trace_segment_c(rays, face_sets, all_faces, max_length)
 
 
 def transform(Transform t, p):

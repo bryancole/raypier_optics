@@ -110,6 +110,7 @@ cdef class FaceList(object):
     cdef transform_t trans
     cdef transform_t inv_trans
     cdef public list faces
+    cdef public object owner
      
     cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length)
     cdef vector_t compute_normal_c(self, Face face, vector_t point)
@@ -121,6 +122,7 @@ cdef class FaceList(object):
 
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 
-                                    list all_faces)
+                                    list all_faces,
+                                    float max_length)
 
                                 

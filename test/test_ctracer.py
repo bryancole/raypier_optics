@@ -94,12 +94,55 @@ class TestPECMaterial(unittest.TestCase):
         self.assertEquals(out_ray.direction, (1,0,-1))
         
         
+class TestRay(unittest.TestCase):
+    def test_termination(self):
+        a = (1,2,3)
+        b = (4,5,6)
+        c = 2.3
+        ray = ctracer.Ray(origin=a, direction=b)
+        ray.length = c
+        self.assertEquals(tuple(A+c*B for A,B in zip(a,b)), ray.termination)
+        
+        
+class TestRayCollection(unittest.TestCase):
+    def test_iteration(self):
+        ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
+        rc = ctracer.RayCollection(10)
+        for i in xrange(6):
+            rc.add_ray(ray)
+        self.assertEquals(rc.n_rays, 6)
+        rays = [r for r in rc]
+        self.assertEquals(len(rays), 6)
+        
+        
+class AnOwner(object):
+    def __init__(self, **kwds):
+        self.__dict__.update(kwds)
+        
+        
 class TestTraceSegment(unittest.TestCase):
     def test_trace_segment(self):
+        from raytrace import cfaces
+        
+        o = AnOwner(diameter=5.5, offset=6.6)
+        c = cfaces.CircularFace(owner=o)
+        
         rays = ctracer.RayCollection(10)
         in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
         rays.add_ray(in_ray)
-        #ToDo
+        
+        self.assertEquals(rays.n_rays, 1)
+        
+        face_set = ctracer.FaceList()
+        face_set.faces = [c]
+        all_faces = [c]
+        
+        out_rays = ctracer.trace_segment(rays, [face_set], all_faces)
+        
+        self.assertEquals(out_rays.n_rays, 1)
+        
+        out_ray = out_rays[0]
+        
         self.assertEquals(out_ray.direction, (1,0,-1))
         
 if __name__=="__main__":

@@ -28,7 +28,7 @@ from enthought.traits.ui.api import View, Item, Tabbed, VGroup, Include, \
 
 from enthought.tvtk.api import tvtk
 
-from raytrace.rays import RayCollection
+from raytrace.ctracer import RayCollection, Ray
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple
 from raytrace.bases import Renderable
 
@@ -191,22 +191,12 @@ class BaseRaySource(HasTraits):
         source = tvtk.ProgrammableSource()
         def execute():
             output = source.poly_data_output
-            
             pointArrayList = []
-            for rays in self.TracedRays:
-                try:
-                    id_mask = numpy.setmember1d(rays.parent_ids, ids)
-                except (NameError, AttributeError):
-                    id_mask = numpy.zeros(rays.length.shape[0], dtype=numpy.bool)
-                    view_ray_ids = self.view_ray_ids
-                    if view_ray_ids is not None:
-                        id_mask[self.view_ray_ids] = True
-                    else:
-                        id_mask[:] = True
-                
-                start_pos = rays.origin[id_mask]
-                end_pos = rays.termination[id_mask]
-                ids = numpy.argwhere(id_mask)[:,0]
+            for rays in self.TracedRays:                
+                start_pos = [r.origin for r in rays]
+                end_pos = [r.termination for r in rays]
+                print "start", start_pos
+                print "end", end_pos
                 interleaved = numpy.array([start_pos, end_pos]).swapaxes(0,1).reshape(-1,3)
                 pointArrayList.append(interleaved)
             if pointArrayList:
@@ -386,21 +376,24 @@ class ConfocalRaySource(BaseRaySource):
                    for a in angles
                    for r in radii]
         
-        origins = numpy.array([origin] + 
-                              [origin + offset for offset in offsets])
+        origins = [origin] + [origin + offset for offset in offsets]
         directions = normaliseVector([direction] + 
                                      [direction*working_dist - offset 
                                       for offset in offsets])
-        rays = RayCollection(origin=origins, direction=directions,
-                             max_length=self.max_ray_len)
-        rays.set_polarisation(1, 0, 0)
-        size = origins.shape[0],1
-        rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
-        rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
-        rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
-        rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
-        rays.normals = numpy.zeros_like(origins)
-        rays.normals[:,1]=1.0
+        rays = RayCollection(len(origins))
+        for i in xrange(len(origins)):
+            ray = Ray(origin=origins[i], direction=directions[i],
+                        length=numpy.Inf)
+            rays.add_ray(ray)
+
+#        rays.set_polarisation(1, 0, 0)
+#        size = origins.shape[0],1
+#        rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
+#        rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
+#        rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
+#        rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
+#        rays.normals = numpy.zeros_like(origins)
+#        rays.normals[:,1]=1.0
         return rays
     
     @cached_property

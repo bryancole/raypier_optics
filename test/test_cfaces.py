@@ -5,7 +5,7 @@ pyximport.install()
 
 import sys
 sys.path.append('..')
-from raytrace import cfaces
+from raytrace import cfaces, ctracer
 import unittest
 from math import sqrt
 
@@ -31,6 +31,22 @@ class TestCircularFace(unittest.TestCase):
         c = cfaces.CircularFace(owner=o)
         inter = c.intersect((0,0,-2),(0,0,2))
         self.assertEquals(inter.dist, 2.0)
+        
+    def test_intersection2(self):
+        o = AnOwner(diameter=5.5, offset=6.6)
+        c = cfaces.CircularFace(owner=o)
+        inter = c.intersect((-1,0,-1), (1,0,1))
+        self.assertEquals(inter.dist, sqrt(2.0))
+        
+    def test_face_set_intersection(self):
+        o = AnOwner(diameter=5.5, offset=6.6)
+        c = cfaces.CircularFace(owner=o)
+        fl = ctracer.FaceList()
+        fl.faces = [c]
+        inter = fl.intersect((-1,0,-1), (1,0,1), 20)
+        print inter.face_idx
+        self.assertEquals(inter.point, (0.0,0.0,0.0))
+        self.assertEquals(inter.dist, sqrt(2.0))
         
     def test_miss(self):
         o = AnOwner(diameter=5.5, offset=6.6)
