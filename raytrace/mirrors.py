@@ -27,7 +27,8 @@ from raytrace.bases import Traceable, normaliseVector, NumEditor,\
      
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
-from cfaces import CircularFace
+from raytrace.cfaces import CircularFace
+from raytrace.ctracer import FaceList
 
 import math, numpy
 
@@ -60,8 +61,8 @@ class PECMirror(BaseMirror):
                    )
     
     def _faces_default(self):
-        fl = ctracer.FaceList(owner=self)
-        fl.faces = [PECCircularFace(owner=self)]
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self)]
         return fl
     
     def make_step_shape(self):

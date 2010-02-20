@@ -35,7 +35,7 @@ cdef struct transform_t:
     
     
 cdef struct intersection_t:
-    unsigned int face_idx #the intersecting face
+    int face_idx #the intersecting face
     vector_t point #position of intersection
     double dist #fractional of ray between origin and intersection
 
@@ -96,7 +96,7 @@ cdef class Face(object):
     cdef public object owner
     cdef public char *name
     cdef public double tolerance
-    cdef public unsigned int idx #index in the global face list
+    cdef public int idx #index in the global face list
     cdef public double max_length
     cdef public InterfaceMaterial material
     

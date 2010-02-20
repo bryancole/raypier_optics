@@ -42,7 +42,7 @@ from raytrace.faces import Face
 from raytrace.bases import Traceable, Probe, Result
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
-
+from raytrace import ctracer
 
 counter = count()
     
@@ -185,10 +185,18 @@ class RayTraceModel(HasQueue):
         traced_rays = []
         limit = self.recursion_limit
         count = 0
-        while (rays is not None) and count<limit:
+        face_sets = [o.faces for o in optics]
+        all_faces = list(itertools.chain(*(fs.faces for fs in face_sets)))
+        for i, f in enumerate(all_faces):
+            f.idx = i
+            f.update()
+        for fs in face_sets:
+            fs.sync_transforms()
+        
+        while rays.n_rays>0 and count<limit:
             print "count", count
             traced_rays.append(rays)
-            rays = self.trace_segment(rays, optics)
+            rays = ctracer.trace_segment(rays, face_sets, all_faces)
             count += 1
         ray_source.TracedRays = traced_rays
         ray_source.data_source.modified()
@@ -359,7 +367,7 @@ tree_editor = TreeEditor(
                         ),
                        TreeNode(
                         node_for=[Traceable],
-                        children='faces',
+                        children='',
                         auto_open=False,
                         label="name",
                         ),

@@ -22,15 +22,17 @@ cdef class CircularFace(Face):
             double max_length, h, X, Y
             intersection_t inter
             vector_t point
-            
+        print "CFACE", p1, p2
         max_length = sep_(p1, p2)
         h = -p1.z/(p2.z-p1.z)
         if (h<self.tolerance) or (h>1.0):
+            print "H", h
             inter.dist = INFINITY
             return inter
         X = p1.x + h*(p2.x-p1.x) - self.offset
         Y = p1.y + h*(p2.y-p1.y)
         if (X**2 + Y**2) > (self.diameter/2.)**2:
+            print "X", X, "Y", Y
             inter.dist = INFINITY
             return inter
         inter.dist = max_length * h
@@ -39,6 +41,7 @@ cdef class CircularFace(Face):
         point.z = 0.0
         inter.point = point
         inter.face_idx = self.idx
+        print "CF_INTER", inter.point, inter.dist, inter.face_idx
         return inter
 
     cdef vector_t compute_normal_c(self, vector_t p):

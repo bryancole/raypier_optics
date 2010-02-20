@@ -101,7 +101,9 @@ class TestRay(unittest.TestCase):
         c = 2.3
         ray = ctracer.Ray(origin=a, direction=b)
         ray.length = c
-        self.assertEquals(tuple(A+c*B for A,B in zip(a,b)), ray.termination)
+        result = tuple(A+c*B for A,B in zip(a,b))
+        shift = sum((a-b)**2 for a,b in zip(result, ray.termination))
+        self.assertAlmostEquals(shift, 0.0)
         
         
 class TestRayCollection(unittest.TestCase):
@@ -118,6 +120,32 @@ class TestRayCollection(unittest.TestCase):
 class AnOwner(object):
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
+        
+        
+def sep(a,b):
+    return sum((A-B)**2 for A,B in zip(a,b))
+        
+        
+class TestTransform(unittest.TestCase):
+    def test_trans(self):
+        from enthought.tvtk.api import tvtk
+        t = tvtk.Transform()
+        t.rotate_x(10)
+        t.rotate_y(15)
+        t.rotate_z(20)
+        t.translate(3,4,5)
+        print t.matrix
+        o = AnOwner(transform=t)
+        fl = ctracer.FaceList(owner=o)
+        fl.sync_transforms()
+        print fl.transform.rotation
+        print fl.transform.translation
+        pt = (0.2, 0.4, 0.6)
+        pt2 = t.transform_double_point(*pt)
+        pt3 = ctracer.transform(fl.transform, pt)
+        print pt, pt2, pt3
+        self.assertEquals(sep(pt2,pt3), 0.0)
+        
         
         
 class TestTraceSegment(unittest.TestCase):

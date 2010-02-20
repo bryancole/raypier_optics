@@ -579,9 +579,10 @@ cdef class Face(object):
 
 cdef class FaceList(object):
     """A group of faces which share a transform"""
-    def __cinit__(self):
+    def __cinit__(self, owner=None):
         self.transform = Transform()
         self.inverse_transform = Transform()
+        self.owner = owner
         
     def sync_transforms(self):
         """sets the transforms from the owner's VTKTransform
@@ -589,15 +590,17 @@ cdef class FaceList(object):
         try:
             trans = self.owner.transform
         except AttributeError:
+            print "NO OWNER", self.owner
             return
         m = trans.matrix
-        rot = [[m.get_element(i,j) for i in xrange(3)] for j in xrange(3)]
-        dt = [m.get_element(3,i) for i in xrange(3)]
+        rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
+        dt = [m.get_element(i,3) for i in xrange(3)]
+        print "TRANS", rot, dt
         self.transform = Transform(rotation=rot, translation=dt)
-        inv_trans = trans.inverse
+        inv_trans = trans.linear_inverse
         m = inv_trans.matrix
-        rot = [[m.get_element(i,j) for i in xrange(3)] for j in xrange(3)]
-        dt = [m.get_element(3,i) for i in xrange(3)]
+        rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
+        dt = [m.get_element(i,3) for i in xrange(3)]
         self.inverse_transform = Transform(rotation=rot, translation=dt)
         
     property transform:
@@ -629,9 +632,9 @@ cdef class FaceList(object):
         cdef unsigned int i
         cdef intersection_t inter, nearest
         
-        p1 = transform_c(self.trans, P1)
-        p2 = transform_c(self.trans, P2)
-        
+        p1 = transform_c(self.inv_trans, P1)
+        p2 = transform_c(self.inv_trans, P2)
+        print "LOCAL", p1, p2
         faces = self.faces
         
         nearest.dist = INFINITY
@@ -641,9 +644,9 @@ cdef class FaceList(object):
             if 0.0 < inter.dist < nearest.dist:
                 nearest = inter
         
-        nearest.point = transform_c(self.inv_trans, nearest.point)
+        nearest.point = transform_c(self.trans, nearest.point)
         
-        print "INTER", nearest.point, nearest.dist, nearest.face_idx
+        #print "INTER", nearest.point, nearest.dist, nearest.face_idx
         return nearest
     
     def intersect(self, P1, P2, double max_length):
@@ -704,11 +707,13 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                 nearest = inter
                 nearest_set = j+1
                 
-        if nearest.dist <= INFINITY:
-            print "GET FACE", nearest.face_idx, len(all_faces)
+        if nearest.dist < INFINITY:
+            #print "GET FACE", nearest.face_idx, len(all_faces)
             face = all_faces[nearest.face_idx]
             #evaluate new ray
             ray.end_face_idx = nearest.face_idx
+            rays.rays[i].length = nearest.dist
+            print "ray length", ray.length
             point = nearest.point
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
             new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
