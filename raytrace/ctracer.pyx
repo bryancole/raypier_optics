@@ -2,6 +2,7 @@
 
 cdef extern from "math.h":
     double sqrt(double arg)
+    double abs(double arg)
     double INFINITY
     
 from stdlib cimport malloc, free
@@ -169,6 +170,14 @@ def mag(a):
     cdef vector_t a_
     a_ = set_v(a_, a)
     return mag_(a_)
+
+cdef inline double mag_sq_(vector_t a):
+    return a.x**2 + a.y**2 + a.z**2
+
+def mag_sq(a):
+    cdef vector_t a_
+    a_ = set_v(a_, a)
+    return mag_sq_(a_)
 
 cdef inline double dotprod_(vector_t a, vector_t b):
     return a.x*b.x + a.y*b.y + a.z*b.z
@@ -663,9 +672,9 @@ cdef class FaceList(object):
     cdef vector_t compute_normal_c(self, Face face, vector_t point):
         cdef vector_t out
         
-        out = transform_c(self.trans, point)
+        out = transform_c(self.inv_trans, point)
         out = face.compute_normal_c(out)
-        out = transform_c(self.inv_trans, out)
+        out = rotate_c(self.trans, out)
         return out
     
     def compute_normal(self, Face face, point):
@@ -716,6 +725,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             print "ray length", ray.length
             point = nearest.point
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
+            print "s normal", normal
             new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
                                                     point,
                                                     normal
@@ -766,6 +776,7 @@ cdef class PECMaterial(InterfaceMaterial):
             complex_t cpx
             double cosTheta
         
+        normal = norm_(normal)
         sp_ray = convert_to_sp(in_ray, normal)
         cosTheta = dotprod_(normal, in_ray.direction)
         cosThetaNormal = multvs_(normal, cosTheta)
@@ -782,3 +793,94 @@ cdef class PECMaterial(InterfaceMaterial):
         out_ray.refractive_index = in_ray.refractive_index
         out_ray.wavelength = in_ray.wavelength
         return out_ray
+    
+    
+cdef class DielectricMaterial(InterfaceMaterial):
+    """Simulates Fresnel reflection and refraction at a
+    normal dielectric interface
+    """
+    property n_inside:
+        def __get__(self):
+            return complex(self.n_inside_.real, self.n_inside_.imag)
+        
+        def __set__(self, v):
+            assert isinstance(v, complex)
+            self.n_inside_.real = v.real
+            self.n_inside_.imag = v.imag
+            
+    property n_outside:
+        def __get__(self):
+            return complex(self.n_outside_.real, self.n_outside_.imag)
+        
+        def __set__(self, v):
+            assert isinstance(v, complex)
+            self.n_outside_.real = v.real
+            self.n_outside_.imag = v.imag
+            
+    cdef ray_t eval_child_ray_c(self,
+                                ray_t in_ray, 
+                                unsigned int idx, 
+                                vector_t point,
+                                vector_t normal):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected, transmitted
+            vector_t tangent, tg2
+            ray_t sp_ray, out_ray
+            complex_t cpx
+            double cosTheta, n1, n2, N2, abscosTheta
+            double N2cosTheta, N2_sin2, tan_mag_sq, c2
+            int flip
+            
+        normal = norm_(normal)
+        sp_ray = convert_to_sp(in_ray, normal)
+        cosTheta = dotprod_(normal, in_ray.direction)
+        abscosTheta = abs(cosTheta)
+        
+        if cosTheta < 0.0: 
+            #ray incident from outside going inwards
+            n1 = self.n_outside_.real
+            n2 = self.n_inside_.real
+            flip = 1
+        else:
+            n1 = self.n_inside_.real
+            n2 = self.n_outside.real
+            flip = -1
+            
+        N2 = (n2/n1)**2
+        N2cosTheta = N2*abscosTheta
+        
+        N2_sin2 = abscosTheta**2 + (N2 - 1)
+        
+        if N2_sin2 < 0.0:
+            #total internal reflection
+            cosThetaNormal = multvs_(normal, cosTheta)
+            reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+            out_ray.origin = point
+            out_ray.normal = normal
+            out_ray.direction = reflected
+            out_ray.E_vector = sp_ray.E_vector
+            out_ray.E1_amp.real = -sp_ray.E1_amp.real
+            out_ray.E1_amp.imag = -sp_ray.E1_amp.imag
+            out_ray.E2_amp.real = -sp_ray.E2_amp.real
+            out_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+            out_ray.parent_idx = idx
+            out_ray.refractive_index = in_ray.refractive_index
+            out_ray.wavelength = in_ray.wavelength
+            return out_ray
+        else:
+            #normal transmission            
+            tangent = subvv_(in_ray.direction, cosThetaNormal)
+            tg2 = multvs_(tangent, n1/n2)
+            tan_mag_sq = mag_sq_(tg2)
+            c2 = sqrt(1-tan_mag_sq)
+            transmitted = subvv_(tg2, multvs_(normal, c2*flip))
+            
+            out_ray.origin = point
+            out_ray.normal = normal
+            out_ray.direction = transmitted

@@ -91,6 +91,15 @@ cdef class InterfaceMaterial(object):
                                 unsigned int ray_idx, 
                                 vector_t point, vector_t normal)
                                 
+                                
+cdef class PECMaterial(InterfaceMaterial):
+    pass
+
+
+cdef class DielectricMaterial(InterfaceMaterial):
+   cdef complex_t n_inside_
+   cdef complex_t n_outside_
+                                
 
 cdef class Face(object):
     cdef public object owner
