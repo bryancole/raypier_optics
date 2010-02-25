@@ -534,7 +534,7 @@ cdef class Face(object):
     params = []
     
     def __cinit__(self, owner=None, tolerance=0.0001, 
-                        max_length=100, material=None):
+                        max_length=100, material=None, **kwds):
         self.name = "base Face class"
         self.tolerance = tolerance
         self.owner = owner
@@ -773,7 +773,7 @@ cdef class PECMaterial(InterfaceMaterial):
         """
         cdef:
             vector_t cosThetaNormal, reflected
-            ray_t sp_ray, out_ray
+            ray_t sp_ray
             complex_t cpx
             double cosTheta
         
@@ -782,18 +782,15 @@ cdef class PECMaterial(InterfaceMaterial):
         cosTheta = dotprod_(normal, in_ray.direction)
         cosThetaNormal = multvs_(normal, cosTheta)
         reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
-        out_ray.origin = point
-        out_ray.normal = normal
-        out_ray.direction = reflected
-        out_ray.E_vector = sp_ray.E_vector
-        out_ray.E1_amp.real = -sp_ray.E1_amp.real
-        out_ray.E1_amp.imag = -sp_ray.E1_amp.imag
-        out_ray.E2_amp.real = -sp_ray.E2_amp.real
-        out_ray.E2_amp.imag = -sp_ray.E2_amp.imag
-        out_ray.parent_idx = idx
-        out_ray.refractive_index = in_ray.refractive_index
-        out_ray.wavelength = in_ray.wavelength
-        return out_ray
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.direction = reflected
+        sp_ray.E1_amp.real = -sp_ray.E1_amp.real
+        sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag
+        sp_ray.E2_amp.real = -sp_ray.E2_amp.real
+        sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+        sp_ray.parent_idx = idx
+        return sp_ray
     
     
 cdef class DielectricMaterial(InterfaceMaterial):
@@ -832,48 +829,48 @@ cdef class DielectricMaterial(InterfaceMaterial):
         cdef:
             vector_t cosThetaNormal, reflected, transmitted
             vector_t tangent, tg2
-            ray_t sp_ray, out_ray
+            ray_t sp_ray
             complex_t cpx
-            double cosTheta, n1, n2, N2, abscosTheta
+            double cosTheta, n1, n2, N2, cos1
             double N2cosTheta, N2_sin2, tan_mag_sq, c2
+            double cos2, Two_n1_cos1, aspect, T_p, T_s
             int flip
             
         normal = norm_(normal)
         sp_ray = convert_to_sp(in_ray, normal)
         cosTheta = dotprod_(normal, in_ray.direction)
-        abscosTheta = abs(cosTheta)
+        cos1 = abs(cosTheta)
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
             n1 = self.n_outside_.real
             n2 = self.n_inside_.real
+            sp_ray.refractive_index = self.n_inside_
             flip = 1
         else:
             n1 = self.n_inside_.real
-            n2 = self.n_outside.real
+            n2 = self.n_outside_.real
+            sp_ray.refractive_index = self.n_outside_
             flip = -1
             
         N2 = (n2/n1)**2
-        N2cosTheta = N2*abscosTheta
+        N2cosTheta = N2*cos1
         
-        N2_sin2 = abscosTheta**2 + (N2 - 1)
+        N2_sin2 = cos1**2 + (N2 - 1)
         
         if N2_sin2 < 0.0:
             #total internal reflection
             cosThetaNormal = multvs_(normal, cosTheta)
             reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
-            out_ray.origin = point
-            out_ray.normal = normal
-            out_ray.direction = reflected
-            out_ray.E_vector = sp_ray.E_vector
-            out_ray.E1_amp.real = -sp_ray.E1_amp.real
-            out_ray.E1_amp.imag = -sp_ray.E1_amp.imag
-            out_ray.E2_amp.real = -sp_ray.E2_amp.real
-            out_ray.E2_amp.imag = -sp_ray.E2_amp.imag
-            out_ray.parent_idx = idx
-            out_ray.refractive_index = in_ray.refractive_index
-            out_ray.wavelength = in_ray.wavelength
-            return out_ray
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = reflected
+            sp_ray.E1_amp.real *= -1
+            sp_ray.E1_amp.imag *= -1
+            sp_ray.E2_amp.real *= -1
+            sp_ray.E2_amp.imag *= -1
+            sp_ray.parent_idx = idx
+            return sp_ray
         else:
             #normal transmission            
             tangent = subvv_(in_ray.direction, cosThetaNormal)
@@ -882,6 +879,21 @@ cdef class DielectricMaterial(InterfaceMaterial):
             c2 = sqrt(1-tan_mag_sq)
             transmitted = subvv_(tg2, multvs_(normal, c2*flip))
             
-            out_ray.origin = point
-            out_ray.normal = normal
-            out_ray.direction = transmitted
+            cos2 = abs(dotprod_(transmitted, normal))
+            Two_n1_cos1 = (2*n1)*cos1
+            aspect = sqrt(cos2/cos1) * Two_n1_cos1
+            
+            #Fresnel equations for transmission
+            T_p = aspect / ( n2*cos1 + n1*cos2 )
+            T_s = aspect / ( n2*cos2 + n1*cos1 )
+            #print "T_s", T_s, "T_p", T_p
+            
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = transmitted
+            sp_ray.E1_amp.real *= T_s
+            sp_ray.E1_amp.imag *= T_s
+            sp_ray.E2_amp.real *= T_p
+            sp_ray.E2_amp.imag *= T_p
+            sp_ray.parent_idx = idx
+            return sp_ray

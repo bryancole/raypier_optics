@@ -125,7 +125,8 @@ class RayTraceModel(HasQueue):
     @on_trait_change("update", dispatch="queued")
     def do_update(self):
         optics = self.optics
-        print "trace", counter.next()
+        #print "trace", 
+        counter.next()
         if optics is not None:
             for o in optics:
                 o.intersections = []
@@ -194,7 +195,7 @@ class RayTraceModel(HasQueue):
             fs.sync_transforms()
         
         while rays.n_rays>0 and count<limit:
-            print "count", count
+            #print "count", count
             traced_rays.append(rays)
             rays = ctracer.trace_segment(rays, face_sets, all_faces)
             count += 1

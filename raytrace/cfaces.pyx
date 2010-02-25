@@ -12,9 +12,12 @@ from ctracer cimport Face, sep_, intersection_t,\
 
 
 cdef class CircularFace(Face):
-    cdef public double diameter, offset
+    cdef public double diameter, offset, z_plane
     
     params = ['diameter', 'offset']
+    
+    def __cinit__(self, **kwds):
+        self.z_plane = kwds.get('z_plane', 0.0)
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
@@ -27,7 +30,7 @@ cdef class CircularFace(Face):
             vector_t point
         #print "CFACE", p1, p2
         max_length = sep_(p1, p2)
-        h = -p1.z/(p2.z-p1.z)
+        h = (self.z_plane-p1.z)/(p2.z-p1.z)
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
             inter.dist = INFINITY
@@ -41,7 +44,7 @@ cdef class CircularFace(Face):
         inter.dist = max_length * h
         point.x = X + self.offset
         point.y = Y
-        point.z = 0.0
+        point.z = self.z_plane
         inter.point = point
         inter.face_idx = self.idx
         #print "CF_INTER", inter.point, inter.dist, inter.face_idx
