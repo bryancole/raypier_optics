@@ -20,6 +20,8 @@ m1 = TroughParabloid(width = 20,
                        length = 100,
                        EFL = 5,
                        centre = (0,0,0))
+                       
+print m1.intersect
                 
 model = RayTraceModel(optics=[m1,],
                     sources=[source,],

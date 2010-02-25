@@ -15,16 +15,23 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import ez_setup
-ez_setup.use_setuptools()
-from setuptools import setup, find_packages
+import distribute_setup
+distribute_setup.use_setuptools()
+from setuptools import find_packages, setup
+#from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
+#from setuptools import find_packages
+
+ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"])]
 
 setup(
     name="raytrace",
     version="0.1dev",
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
-    
+    cmdclass = {'build_ext': build_ext},
+    ext_modules = ext_modules,
     zip_safe = True, #why not!
     
     install_requires = ["numpy >= 1.1",
