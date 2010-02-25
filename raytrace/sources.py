@@ -195,8 +195,8 @@ class BaseRaySource(HasTraits):
             for rays in self.TracedRays:                
                 start_pos = [r.origin for r in rays]
                 end_pos = [r.termination for r in rays]
-                print "start", start_pos
-                print "end", end_pos
+                #print "start", start_pos
+                #print "end", end_pos
                 interleaved = numpy.array([start_pos, end_pos]).swapaxes(0,1).reshape(-1,3)
                 pointArrayList.append(interleaved)
             if pointArrayList:

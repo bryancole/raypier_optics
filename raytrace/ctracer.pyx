@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#cython: boundscheck=False
+#cython: nonecheck=False
 
 cdef extern from "math.h":
     double sqrt(double arg)
@@ -604,7 +605,7 @@ cdef class FaceList(object):
         m = trans.matrix
         rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
         dt = [m.get_element(i,3) for i in xrange(3)]
-        print "TRANS", rot, dt
+        #print "TRANS", rot, dt
         self.transform = Transform(rotation=rot, translation=dt)
         inv_trans = trans.linear_inverse
         m = inv_trans.matrix
@@ -643,7 +644,7 @@ cdef class FaceList(object):
         
         p1 = transform_c(self.inv_trans, P1)
         p2 = transform_c(self.inv_trans, P2)
-        print "LOCAL", p1, p2
+        #print "LOCAL", p1, p2
         faces = self.faces
         
         nearest.dist = INFINITY
@@ -707,7 +708,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         ray = rays.rays[i]
         P1 = ray.origin
         P2 = addvv_(P1, multvs_(ray.direction, max_length))
-        print "points", P1, P2
+        #print "points", P1, P2
         nearest = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
         for j in xrange(n_sets-1):
             face_set = face_sets[j+1]
@@ -722,10 +723,10 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             #evaluate new ray
             ray.end_face_idx = nearest.face_idx
             rays.rays[i].length = nearest.dist
-            print "ray length", ray.length
+            #print "ray length", ray.length
             point = nearest.point
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
-            print "s normal", normal
+            #print "s normal", normal
             new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
                                                     point,
                                                     normal
