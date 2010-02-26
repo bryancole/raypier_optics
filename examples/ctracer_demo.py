@@ -6,8 +6,8 @@ A simple example
 """
 import sys
 sys.path.append('..')
-import pyximport
-pyximport.install()
+#import pyximport
+#pyximport.install()
 
 from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel

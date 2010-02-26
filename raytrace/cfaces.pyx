@@ -1,5 +1,6 @@
 #cython: boundscheck=False
 #cython: nonecheck=False
+#cython: cdivision=True
 
 """
 Cython module for Face definitions

@@ -28,6 +28,9 @@ from enthought.traits.ui.api import View, Item, Tabbed, VGroup, Include, \
 
 from enthought.tvtk.api import tvtk
 
+import pyximport
+pyximport.install()
+
 from raytrace.ctracer import RayCollection, Ray
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple
 from raytrace.bases import Renderable

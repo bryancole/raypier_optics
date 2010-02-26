@@ -42,6 +42,10 @@ from raytrace.faces import Face
 from raytrace.bases import Traceable, Probe, Result
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
+        
+import pyximport
+pyximport.install()
+        
 from raytrace import ctracer
 
 counter = count()

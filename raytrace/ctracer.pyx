@@ -1,5 +1,6 @@
 #cython: boundscheck=False
 #cython: nonecheck=False
+#cython: cdivision=True
 
 cdef extern from "math.h":
     double sqrt(double arg)
