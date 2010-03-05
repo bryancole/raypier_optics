@@ -187,6 +187,7 @@ class RayTraceModel(HasQueue):
     def trace_ray_source(self, ray_source, optics):
         """trace a ray source"""
         rays = ray_source.InputRays #FIXME
+        rays.reset_length()
         traced_rays = []
         limit = self.recursion_limit
         count = 0

@@ -1,10 +1,12 @@
+#!/bin/env python
+
 #cython: boundscheck=False
 #cython: nonecheck=False
 #cython: cdivision=True
 
 cdef extern from "math.h":
     double sqrt(double arg)
-    double abs(double arg)
+    double fabs(double arg)
     double INFINITY
     
 from stdlib cimport malloc, free
@@ -76,7 +78,11 @@ def py_set_v(O):
     return (v_.x, v_.y, v_.z)
 
 cdef inline double sep_(vector_t p1, vector_t p2):
-    return sqrt((p2.x-p1.x)**2 + (p2.y-p1.y)**2 + (p2.z-p1.z)**2)
+    cdef double a,b
+    a = (p2.x-p1.x)
+    b = (p2.y-p1.y)
+    c = (p2.z-p1.z)
+    return sqrt((a*a) + (b*b) + (c*c))
 
 def sep(a, b):
     cdef vector_t a_, b_
@@ -166,7 +172,7 @@ def subvs(a, b):
     return (c_.x, c_.y, c_.z)
 
 cdef inline double mag_(vector_t a):
-    return sqrt(a.x**2 + a.y**2 + a.z**2)
+    return sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
 
 def mag(a):
     cdef vector_t a_
@@ -174,7 +180,7 @@ def mag(a):
     return mag_(a_)
 
 cdef inline double mag_sq_(vector_t a):
-    return a.x**2 + a.y**2 + a.z**2
+    return a.x*a.x + a.y*a.y + a.z*a.z
 
 def mag_sq(a):
     cdef vector_t a_
@@ -205,7 +211,7 @@ def cross(a, b):
     return (c_.x, c_.y, c_.z)
 
 cdef vector_t norm_(vector_t a):
-    cdef double mag=sqrt(a.x**2 + a.y**2 + a.z**2)
+    cdef double mag=sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
     a.x /= mag
     a.y /= mag
     a.z /= mag
@@ -463,6 +469,11 @@ cdef class RayCollection:
         self.rays[self.n_rays] = r
         self.n_rays += 1
         
+    def reset_length(self):
+        cdef int i
+        for i in xrange(self.n_rays):
+            self.rays[i].length = INFINITY
+        
     def add_ray(self, Ray r):
         if self.n_rays == self.max_size:
             raise ValueError("RayCollection is full up")
@@ -631,6 +642,9 @@ cdef class FaceList(object):
             cdef Transform t=Transform()
             t.trans = self.inv_trans
             return t
+        
+    def __getitem__(self, intidx):
+        return self.faces[intidx]
         
      
     cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length):
@@ -803,7 +817,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             return complex(self.n_inside_.real, self.n_inside_.imag)
         
         def __set__(self, v):
-            assert isinstance(v, complex)
+            v = complex(v)
             self.n_inside_.real = v.real
             self.n_inside_.imag = v.imag
             
@@ -812,7 +826,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             return complex(self.n_outside_.real, self.n_outside_.imag)
         
         def __set__(self, v):
-            assert isinstance(v, complex)
+            v = complex(v)
             self.n_outside_.real = v.real
             self.n_outside_.imag = v.imag
             
@@ -838,9 +852,10 @@ cdef class DielectricMaterial(InterfaceMaterial):
             int flip
             
         normal = norm_(normal)
+        in_ray.direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray, normal)
         cosTheta = dotprod_(normal, in_ray.direction)
-        cos1 = abs(cosTheta)
+        cos1 = fabs(cosTheta)
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
@@ -848,24 +863,28 @@ cdef class DielectricMaterial(InterfaceMaterial):
             n2 = self.n_inside_.real
             sp_ray.refractive_index = self.n_inside_
             flip = 1
+            print "out to in", n1, n2
         else:
             n1 = self.n_inside_.real
             n2 = self.n_outside_.real
             sp_ray.refractive_index = self.n_outside_
             flip = -1
+            print "in to out", n1, n2
             
         N2 = (n2/n1)**2
         N2cosTheta = N2*cos1
         
-        N2_sin2 = cos1**2 + (N2 - 1)
-        
+        N2_sin2 = (cosTheta*cosTheta) + (N2 - 1)
+        print "TIR", N2_sin2, cosTheta, N2, cos1
+        print (normal.x, normal.y, normal.z), in_ray.direction
+        cosThetaNormal = multvs_(normal, cosTheta)
         if N2_sin2 < 0.0:
             #total internal reflection
-            cosThetaNormal = multvs_(normal, cosTheta)
             reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = reflected
+            sp_ray.length = INFINITY
             sp_ray.E1_amp.real *= -1
             sp_ray.E1_amp.imag *= -1
             sp_ray.E2_amp.real *= -1
@@ -880,7 +899,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             c2 = sqrt(1-tan_mag_sq)
             transmitted = subvv_(tg2, multvs_(normal, c2*flip))
             
-            cos2 = abs(dotprod_(transmitted, normal))
+            cos2 = fabs(dotprod_(transmitted, normal))
             Two_n1_cos1 = (2*n1)*cos1
             aspect = sqrt(cos2/cos1) * Two_n1_cos1
             
@@ -892,9 +911,11 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = transmitted
+            sp_ray.length = INFINITY
             sp_ray.E1_amp.real *= T_s
             sp_ray.E1_amp.imag *= T_s
             sp_ray.E2_amp.real *= T_p
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
+            return sp_ray
             return sp_ray

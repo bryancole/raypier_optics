@@ -23,12 +23,12 @@ from enthought.tvtk.api import tvtk
 
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
-     ComplexEditor, VectorEditor
+     ComplexEditor, VectorEditor, Optic
      
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
 from raytrace.cfaces import CircularFace
-from raytrace.ctracer import FaceList
+from raytrace.ctracer import FaceList, DielectricMaterial
 
 import math, numpy
 
@@ -96,6 +96,45 @@ class PECMirror(BaseMirror):
         transF2 = tvtk.TransformFilter(input=transF1.output, transform=self.transform)
         self.config_pipeline()
         return transF2
+    
+    
+class PlanarWindow(PECMirror, Optic):
+    n_inside = 1.5
+    name = "Planar window"
+    
+    material = Instance(DielectricMaterial, ())
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('diameter', editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('offset', editor=NumEditor),
+                       Item('n_inside', editor=NumEditor),
+                        ),
+                   )
+                   
+    vtkproperty = tvtk.Property(opacity = 0.4,
+                             color = (0.8,0.8,1.0))
+                   
+    def _material_default(self):
+        m = DielectricMaterial()
+        m.n_inside = self.n_inside
+        m.n_outside =  1.0
+        return m
+    
+    def _n_inside_changed(self, n):
+        self.material.n_inside = n
+                   
+    def _thickness_changed(self, new_t):
+        self.faces[1].z_plane = new_t
+    
+    def _faces_default(self):
+        m = self.material
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self, z_plane=0, material=m),
+                    CircularFace(owner=self, z_plane=self.thickness, 
+                        invert_normal=True, material=m)]
+        return fl
     
             
 if __name__=="__main__":

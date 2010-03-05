@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #cython: boundscheck=False
 #cython: nonecheck=False
 #cython: cdivision=True
@@ -14,11 +16,13 @@ from ctracer cimport Face, sep_, intersection_t,\
 
 cdef class CircularFace(Face):
     cdef public double diameter, offset, z_plane
+    cdef public short int invert_normal
     
     params = ['diameter', 'offset']
     
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
+        self.invert_normal = int(kwds.get('invert_normal', 0))
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
         """returns the intersection in terms of the 
@@ -26,7 +30,7 @@ cdef class CircularFace(Face):
         p1 and p2 are in the local coordinate system
         """
         cdef:
-            double max_length, h, X, Y
+            double max_length, h, X, Y, d=self.diameter
             intersection_t inter
             vector_t point
         #print "CFACE", p1, p2
@@ -38,7 +42,7 @@ cdef class CircularFace(Face):
             return inter
         X = p1.x + h*(p2.x-p1.x) - self.offset
         Y = p1.y + h*(p2.y-p1.y)
-        if (X**2 + Y**2) > (self.diameter/2.)**2:
+        if (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
             inter.dist = INFINITY
             return inter
@@ -58,6 +62,9 @@ cdef class CircularFace(Face):
         cdef vector_t normal
         normal.x=0
         normal.y=0
-        normal.z=-1
+        if self.invert_normal==0:
+            normal.z=-1
+        else:
+            normal.z=+1
         return normal
     
