@@ -63,7 +63,6 @@ cdef inline vector_t rotate_c(transform_t t, vector_t p):
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22
     return out
 
-
 cdef inline vector_t set_v(vector_t v, object O):
     v.x = O[0]
     v.y = O[1]
@@ -89,6 +88,18 @@ def sep(a, b):
     a_ = set_v(a_, a)
     b_ = set_v(b_, b)
     return sep_(a_, b_)
+
+cdef inline vector_t invert_(vector_t v):
+    v.x = -v.x
+    v.y = -v.y
+    v.z = -v.z
+    return v
+
+def invert(v):
+    cdef vector_t v_
+    v_ = set_v(v_, v)
+    v_ = invert_(v_)
+    return (v_.x, v_.y, v_.z)
 
 cdef inline vector_t multvv_(vector_t a, vector_t b):
     cdef vector_t out
@@ -555,6 +566,7 @@ cdef class Face(object):
             self.material = material
         else:
             self.material = PECMaterial()
+        self.invert_normal = int(kwds.get('invert_normal', 0))
         
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
@@ -690,6 +702,8 @@ cdef class FaceList(object):
         
         out = transform_c(self.inv_trans, point)
         out = face.compute_normal_c(out)
+        if face.invert_normal:
+            out = invert_(out)
         out = rotate_c(self.trans, out)
         return out
     
@@ -812,6 +826,11 @@ cdef class DielectricMaterial(InterfaceMaterial):
     """Simulates Fresnel reflection and refraction at a
     normal dielectric interface
     """
+    
+    def __cinit__(self, **kwds):
+        self.n_inside = kwds.get('n_inside', 1.5)
+        self.n_outside = kwds.get('n_outside', 1.0)
+    
     property n_inside:
         def __get__(self):
             return complex(self.n_inside_.real, self.n_inside_.imag)

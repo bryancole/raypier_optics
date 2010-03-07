@@ -182,6 +182,8 @@ class Traceable(ModelObject):
     
     intersections = List([])
     
+    material = Instance(ctracer.InterfaceMaterial)
+    
     faces = Instance(ctracer.FaceList, 
                 desc="Container of traceable faces (Face instances)",
                  transient = True)
@@ -303,6 +305,11 @@ class Optic(Traceable):
     
     vtkproperty = tvtk.Property(opacity = 0.4,
                              color = (0.8,0.8,1.0))
+                             
+    def _material_default(self):
+        m = ctracer.DielectricMaterial(n_inside = self.n_inside,
+                                    n_outside = self.n_outside)
+        return m
     
     def calc_refractive_index(self, wavelengths):
         """
@@ -318,6 +325,8 @@ class Optic(Traceable):
     
     @on_trait_change("n_inside, n_outside")
     def n_changed(self):
+        self.material.n_inside = self.n_inside
+        self.material.n_outside = self.n_outside
         self.update = True
     
 ### The following functions have been moved to the Face subclasses

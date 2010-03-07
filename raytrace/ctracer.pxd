@@ -61,6 +61,8 @@ cdef inline vector_t cross_(vector_t a, vector_t b)
 cdef inline vector_t norm_(vector_t a)
 cdef ray_t convert_to_sp(ray_t ray, vector_t normal)
 cdef inline double mag_(vector_t a)
+cdef inline double mag_sq_(vector_t a)
+cdef inline vector_t invert_(vector_t v)
 
 ##################################
 ### Python extension types
@@ -108,6 +110,7 @@ cdef class Face(object):
     cdef public int idx #index in the global face list
     cdef public double max_length
     cdef public InterfaceMaterial material
+    cdef public short int invert_normal
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2)
 

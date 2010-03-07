@@ -22,6 +22,11 @@ class TestVectorMathsFunctions(unittest.TestCase):
         c = ctracer.addvv(a,b)
         self.assertEquals(c, tuple(ai+bi for ai,bi in zip(a,b)))
         
+    def test_invert(self):
+        a = (1.2, 3.4, 5.6)
+        b = ctracer.invert(a)
+        self.assertEquals(a, tuple(-bi for bi in b))
+        
     def test_subvv(self):
         a = [1.,2.,3.]
         b = [2.,3.,4.]

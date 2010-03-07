@@ -102,8 +102,6 @@ class PlanarWindow(PECMirror, Optic):
     n_inside = 1.5
     name = "Planar window"
     
-    material = Instance(DielectricMaterial, ())
-    
     traits_view = View(VGroup(
                        Traceable.uigroup,
                        Item('diameter', editor=NumEditor),
@@ -115,15 +113,9 @@ class PlanarWindow(PECMirror, Optic):
                    
     vtkproperty = tvtk.Property(opacity = 0.4,
                              color = (0.8,0.8,1.0))
-                   
+                             
     def _material_default(self):
-        m = DielectricMaterial()
-        m.n_inside = self.n_inside
-        m.n_outside =  1.0
-        return m
-    
-    def _n_inside_changed(self, n):
-        self.material.n_inside = n
+        return Optic._material_default(self)
                    
     def _thickness_changed(self, new_t):
         self.faces[1].z_plane = new_t

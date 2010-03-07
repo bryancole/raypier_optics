@@ -9,30 +9,31 @@ Cython module for Face definitions
 """
 cdef extern from "math.h":
     double INFINITY
+    double sqrt(double)
 
 from ctracer cimport Face, sep_, intersection_t,\
-        vector_t, ray_t, FaceList
+        vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
+            addvv_, multvs_
 
 
 cdef class CircularFace(Face):
     cdef public double diameter, offset, z_plane
-    cdef public short int invert_normal
     
     params = ['diameter', 'offset']
     
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
-        self.invert_normal = int(kwds.get('invert_normal', 0))
     
     cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
-        """returns the intersection in terms of the 
-        fractional distance between p1 and p2.
-        p1 and p2 are in the local coordinate system
+        """returns the intersection in terms of an intersection_t struct.
+        'dist' is the true distance to the intersection
+        'point' is the position of the intersection in local coords
+        'face_idx' is the index of the intersecting face in the global face list
         """
         cdef:
             double max_length, h, X, Y, d=self.diameter
             intersection_t inter
-            vector_t point
+            
         #print "CFACE", p1, p2
         max_length = sep_(p1, p2)
         h = (self.z_plane-p1.z)/(p2.z-p1.z)
@@ -47,10 +48,9 @@ cdef class CircularFace(Face):
             inter.dist = INFINITY
             return inter
         inter.dist = max_length * h
-        point.x = X + self.offset
-        point.y = Y
-        point.z = self.z_plane
-        inter.point = point
+        inter.point.x = X + self.offset
+        inter.point.y = Y
+        inter.point.z = self.z_plane
         inter.face_idx = self.idx
         #print "CF_INTER", inter.point, inter.dist, inter.face_idx
         return inter
@@ -62,9 +62,63 @@ cdef class CircularFace(Face):
         cdef vector_t normal
         normal.x=0
         normal.y=0
-        if self.invert_normal==0:
-            normal.z=-1
-        else:
-            normal.z=+1
+        normal.z=-1
         return normal
     
+    
+cdef class SphericalFace(Face):
+    cdef public double diameter, curvature, z_height
+    
+    params = ['diameter', 'curvature']
+    
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_plane', 0.0)
+    
+    cdef intersection_t intersect_c(self, vector_t r, vector_t p2):
+        """returns the intersection in terms of the 
+        fractional distance between p1 and p2.
+        p1 and p2 are in the local coordinate system
+        """
+        cdef:
+            double A,B,C,D, cz
+            intersection_t inter
+            vector_t s, d, pt
+            
+        s = subvv_(p2, r)
+        cz = self.z_height - self.curvature
+        d = r
+        d.z -= cz
+        
+        A = mag_sq_(s)
+        B = 2*dotprod_(s,d)
+        C = mag_sq_(d) - self.curvature**2
+        D = B*B - 4*A*C
+        
+        inter.dist = INFINITY
+        if D < 0: #no intersection with sphere
+            return inter
+        
+        D = sqrt(D)
+        
+        A = (-B+D)/(2*A) #1st root
+        pt = addvv_(r, multvs_(s, A))
+        if pt.z < cz: #wrong root
+            A = (-B-D)/(2*A) #2nd root
+            pt = addvv_(r, multvs_(s, A))
+        
+        if A>1.0 or A<self.tolerance:
+            return inter
+        if (pt.x*pt.x + pt.y*pt.y) > (self.diameter*self.diameter/4.):
+            return inter
+        
+        inter.point = pt
+        inter.dist = A*sep_(r, p2)
+        inter.face_idx = self.idx
+        return inter
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        p.z -= (self.z_height - self.curvature)
+        return norm_(p)
