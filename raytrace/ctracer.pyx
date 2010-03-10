@@ -37,12 +37,6 @@ cdef struct ray_t:
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
     double tx, ty, tz
-    
-    
-cdef struct intersection_t:
-    unsigned int face_idx #the intersecting face
-    vector_t point #position of intersection
-    double dist #fractional of ray between origin and intersection
 
 
 ##############################
@@ -314,32 +308,6 @@ cdef class Transform:
         
         def __get__(self):
             return (self.trans.tx, self.trans.ty, self.trans.tz)
-
-
-cdef class Intersection:
-    
-    property face_idx:
-        def __get__(self):
-            return self.inter.face_idx
-        
-        def __set__(self, unsigned int i):
-            self.inter.face_idx = i
-            
-    property point:
-        def __get__(self):
-            return (self.inter.point.x,
-                    self.inter.point.y,
-                    self.inter.point.z)
-        def __set__(self, v):
-            self.inter.point.x = v[0]
-            self.inter.point.y = v[1]
-            self.inter.point.z = v[2]
-            
-    property dist:
-        def __get__(self):
-            return self.inter.dist
-        def __set__(self, double d):
-            self.inter.dist = d
 
 
 cdef class Ray:
@@ -701,78 +669,8 @@ cdef class FaceList(object):
         p = set_v(p, point)
         p = self.compute_normal_c(face, p)
         return (p.x, p.y, p.z)
-
-##################################
-### Python module functions
-##################################
-
-cdef RayCollection trace_segment_c(RayCollection rays, 
-                                    list face_sets, 
-                                    list all_faces,
-                                    float max_length):
-    cdef:
-        FaceList face_set #a FaceList
-        unsigned int size, i, j
-        vector_t P1, P2, normal, point
-        int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
-        ray_t new_ray
-        ray_t *ray
-        RayCollection new_rays
-   
-    #need to allocate the output rays here 
-    new_rays = RayCollection(rays.n_rays)
     
-    for i in range(rays.n_rays):
-        ray = rays.rays + i
-        ray.length = max_length
-        ray.end_face_idx = -1
-        nearest_idx=-1
-        #print "points", P1, P2
-        for j in xrange(n_sets):
-            face_set = face_sets[j]
-            #intersect_c returns the face idx of the intersection, or -1 otherwise
-            idx = (<FaceList>face_set).intersect_c(ray, max_length)
-            if idx >= 0:
-                nearest_set = j
-                nearest_idx = idx
-                
-        if nearest_idx >= 0:
-            #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_idx]
-            #print "ray length", ray.length
-            point = addvv_(P1, multvs_(ray.direction, ray.length))
-            normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
-            #print "s normal", normal
-            new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
-                                                    point,
-                                                    normal
-                                                    )
-            new_ray.length = max_length
-            new_rays.add_ray_c(new_ray)
-    return new_rays
 
-
-def trace_segment(RayCollection rays, 
-                    list face_sets, 
-                    list all_faces,
-                    max_length=100):
-    for fs in face_sets:
-        fs.sync_transforms()
-    return trace_segment_c(rays, face_sets, all_faces, max_length)
-
-
-def transform(Transform t, p):
-    cdef vector_t p1, p2
-    assert isinstance(t, Transform)
-    assert len(p)==3
-    p1.x = p[0]
-    p1.y = p[1]
-    p1.z = p[2]
-    p2 = transform_c(t.trans, p1)
-    return (p2.x, p2.y, p2.z)
-    
-    
-    
 cdef class PECMaterial(InterfaceMaterial):
     """Simulates a Perfect Electrical Conductor
     """
@@ -849,7 +747,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
         """
         cdef:
             vector_t cosThetaNormal, reflected, transmitted
-            vector_t tangent, tg2
+            vector_t tangent, tg2, in_direction
             ray_t sp_ray
             complex_t cpx
             double cosTheta, n1, n2, N2, cos1
@@ -858,10 +756,13 @@ cdef class DielectricMaterial(InterfaceMaterial):
             int flip
             
         normal = norm_(normal)
-        in_ray.direction = norm_(in_ray[0].direction)
+        in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
-        cosTheta = dotprod_(normal, in_ray.direction)
+        cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
+        
+        print "TRACE"
+        print normal, in_direction
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
@@ -882,11 +783,11 @@ cdef class DielectricMaterial(InterfaceMaterial):
         
         N2_sin2 = (cosTheta*cosTheta) + (N2 - 1)
         print "TIR", N2_sin2, cosTheta, N2, cos1
-        print (normal.x, normal.y, normal.z), in_ray.direction
+        print (normal.x, normal.y, normal.z), in_direction
         cosThetaNormal = multvs_(normal, cosTheta)
         if N2_sin2 < 0.0:
             #total internal reflection
-            reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+            reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = reflected
@@ -899,7 +800,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             return sp_ray
         else:
             #normal transmission            
-            tangent = subvv_(in_ray.direction, cosThetaNormal)
+            tangent = subvv_(in_direction, cosThetaNormal)
             tg2 = multvs_(tangent, n1/n2)
             tan_mag_sq = mag_sq_(tg2)
             c2 = sqrt(1-tan_mag_sq)
@@ -924,3 +825,75 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
             return sp_ray
+
+    
+
+##################################
+### Python module functions
+##################################
+
+cdef RayCollection trace_segment_c(RayCollection rays, 
+                                    list face_sets, 
+                                    list all_faces,
+                                    float max_length):
+    cdef:
+        FaceList face_set #a FaceList
+        unsigned int size, i, j
+        vector_t P1, normal, point
+        int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
+        ray_t new_ray
+        ray_t *ray
+        RayCollection new_rays
+   
+    #need to allocate the output rays here 
+    new_rays = RayCollection(rays.n_rays)
+    
+    for i in range(rays.n_rays):
+        ray = rays.rays + i
+        ray.length = max_length
+        ray.end_face_idx = -1
+        nearest_idx=-1
+        #print "points", P1, P2
+        for j in xrange(n_sets):
+            face_set = face_sets[j]
+            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            idx = (<FaceList>face_set).intersect_c(ray, max_length)
+            if idx >= 0:
+                nearest_set = j
+                nearest_idx = idx
+        if nearest_idx >= 0:
+            #print "GET FACE", nearest.face_idx, len(all_faces)
+            face = all_faces[nearest_idx]
+            #print "ray length", ray.length
+            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+            normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
+            #print "s normal", normal
+            new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                    point,
+                                                    normal
+                                                    )
+            new_ray.length = max_length
+            new_rays.add_ray_c(new_ray)
+    return new_rays
+
+
+def trace_segment(RayCollection rays, 
+                    list face_sets, 
+                    list all_faces,
+                    max_length=100):
+    for fs in face_sets:
+        fs.sync_transforms()
+    return trace_segment_c(rays, face_sets, all_faces, max_length)
+
+
+def transform(Transform t, p):
+    cdef vector_t p1, p2
+    assert isinstance(t, Transform)
+    assert len(p)==3
+    p1.x = p[0]
+    p1.y = p[1]
+    p1.z = p[2]
+    p2 = transform_c(t.trans, p1)
+    return (p2.x, p2.y, p2.z)
+    
+    

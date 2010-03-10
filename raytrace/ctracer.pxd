@@ -32,12 +32,6 @@ cdef struct ray_t:
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
     double tx, ty, tz
-    
-    
-cdef struct intersection_t:
-    int face_idx #the intersecting face
-    vector_t point #position of intersection
-    double dist #fractional of ray between origin and intersection
 
 cdef struct ray_pair_t:
     ray_t trans, refln
@@ -70,9 +64,6 @@ cdef inline vector_t invert_(vector_t v)
 
 cdef class Transform:
     cdef transform_t trans
-
-cdef class Intersection:
-    cdef intersection_t inter
 
 cdef class Ray:
     cdef ray_t ray
