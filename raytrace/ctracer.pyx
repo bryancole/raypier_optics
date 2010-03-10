@@ -533,10 +533,10 @@ cdef class InterfaceMaterial(object):
     the materials characterics of a Face
     """
     
-    cdef ray_t eval_child_ray_c(self, ray_t old_ray, 
+    cdef ray_t eval_child_ray_c(self, ray_t *old_ray, 
                                 unsigned int ray_idx, 
                                 vector_t p, vector_t normal):
-        return old_ray
+        return old_ray[0]
     
     def eval_child_ray(self, Ray old_ray, ray_idx, point, 
                         normal):
@@ -547,7 +547,7 @@ cdef class InterfaceMaterial(object):
         
         p = set_v(p, point)
         n = set_v(n, normal)
-        out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, 
+        out.ray = self.eval_child_ray_c(&old_ray.ray, ray_idx, 
                                         p, n)
         return out
     
@@ -569,13 +569,12 @@ cdef class Face(object):
         self.invert_normal = int(kwds.get('invert_normal', 0))
         
     
-    cdef intersection_t intersect_c(self, vector_t p1, vector_t p2):
-        """returns the intersection in terms of the 
+    cdef int intersect_c(self, vector_t p1, vector_t p2, ray_t *ray):
+        """returns the face index of the intersection in terms of the 
         fractional distance between p1 and p2.
         p1 and p2 are in the local coordinate system
         """
-        cdef intersection_t inter
-        return inter
+        return -1
     
     def update(self):
         """Called to update the parameters from the owner
@@ -585,18 +584,15 @@ cdef class Face(object):
             v = getattr(self.owner, name)
             setattr(self, name, v)
     
-    def intersect(self, p1, p2):
+    def intersect(self, p1, p2, Ray r):
         cdef:
             vector_t p1_, p2_
-            intersection_t inter
-            Intersection py_inter
+            int idx
         
         p1_ = set_v(p1_, p1)
         p2_ = set_v(p2_, p2)
-        inter = self.intersect_c(p1_, p2_)
-        py_inter = Intersection()
-        py_inter.inter = inter
-        return py_inter
+        idx = self.intersect_c(p1_, p2_, &r.ray)
+        return idx
 
     cdef vector_t compute_normal_c(self, vector_t p):
         return p
@@ -659,43 +655,36 @@ cdef class FaceList(object):
         return self.faces[intidx]
         
      
-    cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length):
+    cdef int intersect_c(self, ray_t *ray, double max_length):
         """Finds the face with the nearest intersection
         point, for the ray defined by the two input points,
         P1 and P2 (in global coords).
         """
-        cdef vector_t p1, p2, point
+        cdef vector_t p1, p2
         cdef list faces
         cdef unsigned int i
-        cdef intersection_t inter, nearest
+        cdef int idx=-1, all_idx=-1
         
-        p1 = transform_c(self.inv_trans, P1)
-        p2 = transform_c(self.inv_trans, P2)
+        p1 = transform_c(self.inv_trans, ray.origin)
+        p2 = transform_c(self.inv_trans, 
+                        addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        max_length)))
         #print "LOCAL", p1, p2
         faces = self.faces
         
-        nearest.dist = INFINITY
-        
         for i in xrange(len(faces)):
-            inter = (<Face>(faces[i])).intersect_c(p1, p2)
-            if 0.0 < inter.dist < nearest.dist:
-                nearest = inter
-        
-        nearest.point = transform_c(self.trans, nearest.point)
-        
-        #print "INTER", nearest.point, nearest.dist, nearest.face_idx
-        return nearest
+            idx = (<Face>(faces[i])).intersect_c(p1, p2, ray)
+            if idx >= 0:
+                all_idx = idx
+        return all_idx
     
-    def intersect(self, P1, P2, double max_length):
+    def intersect(self, Ray r, double max_length):
         cdef vector_t P1_, P2_
-        cdef intersection_t inter
-        cdef Intersection i2=Intersection()
+        cdef int idx
         
-        P1_ = set_v(P1_, P1)
-        P2_ = set_v(P2_, P2)
-        inter = self.intersect_c(P1_, P2_, max_length)
-        i2.inter = inter
-        return i2
+        idx = self.intersect_c(&r.ray, max_length)
+        return idx
     
     cdef vector_t compute_normal_c(self, Face face, vector_t point):
         cdef vector_t out
@@ -723,37 +712,35 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     float max_length):
     cdef:
         FaceList face_set #a FaceList
-        unsigned int size, i, j, nearest_set=0
+        unsigned int size, i, j
         vector_t P1, P2, normal, point
-        intersection_t inter, nearest
-        int n_sets=len(face_sets)
-        ray_t ray, new_ray
+        int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
+        ray_t new_ray
+        ray_t *ray
         RayCollection new_rays
    
     #need to allocate the output rays here 
     new_rays = RayCollection(rays.n_rays)
     
     for i in range(rays.n_rays):
-        ray = rays.rays[i]
-        P1 = ray.origin
-        P2 = addvv_(P1, multvs_(ray.direction, max_length))
+        ray = rays.rays + i
+        ray.length = max_length
+        ray.end_face_idx = -1
+        nearest_idx=-1
         #print "points", P1, P2
-        nearest = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
-        for j in xrange(n_sets-1):
-            face_set = face_sets[j+1]
-            inter = (<FaceList>face_set).intersect_c(P1, P2, max_length)
-            if inter.dist < nearest.dist:
-                nearest = inter
-                nearest_set = j+1
+        for j in xrange(n_sets):
+            face_set = face_sets[j]
+            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            idx = (<FaceList>face_set).intersect_c(ray, max_length)
+            if idx >= 0:
+                nearest_set = j
+                nearest_idx = idx
                 
-        if nearest.dist < INFINITY:
+        if nearest_idx >= 0:
             #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest.face_idx]
-            #evaluate new ray
-            ray.end_face_idx = nearest.face_idx
-            rays.rays[i].length = nearest.dist
+            face = all_faces[nearest_idx]
             #print "ray length", ray.length
-            point = nearest.point
+            point = addvv_(P1, multvs_(ray.direction, ray.length))
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
             #print "s normal", normal
             new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
@@ -790,7 +777,7 @@ cdef class PECMaterial(InterfaceMaterial):
     """Simulates a Perfect Electrical Conductor
     """
     cdef ray_t eval_child_ray_c(self,
-                                ray_t in_ray, 
+                                ray_t *in_ray, 
                                 unsigned int idx, 
                                 vector_t point,
                                 vector_t normal):
@@ -807,7 +794,7 @@ cdef class PECMaterial(InterfaceMaterial):
             double cosTheta
         
         normal = norm_(normal)
-        sp_ray = convert_to_sp(in_ray, normal)
+        sp_ray = convert_to_sp(in_ray[0], normal)
         cosTheta = dotprod_(normal, in_ray.direction)
         cosThetaNormal = multvs_(normal, cosTheta)
         reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
@@ -850,7 +837,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             self.n_outside_.imag = v.imag
             
     cdef ray_t eval_child_ray_c(self,
-                                ray_t in_ray, 
+                                ray_t *in_ray, 
                                 unsigned int idx, 
                                 vector_t point,
                                 vector_t normal):
@@ -871,8 +858,8 @@ cdef class DielectricMaterial(InterfaceMaterial):
             int flip
             
         normal = norm_(normal)
-        in_ray.direction = norm_(in_ray.direction)
-        sp_ray = convert_to_sp(in_ray, normal)
+        in_ray.direction = norm_(in_ray[0].direction)
+        sp_ray = convert_to_sp(in_ray[0], normal)
         cosTheta = dotprod_(normal, in_ray.direction)
         cos1 = fabs(cosTheta)
         
@@ -936,5 +923,4 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= T_p
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
-            return sp_ray
             return sp_ray
