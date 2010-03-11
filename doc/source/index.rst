@@ -10,6 +10,8 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
+   
+   cython_branch_info
 
 Indices and tables
 ==================

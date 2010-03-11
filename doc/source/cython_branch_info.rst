@@ -22,3 +22,23 @@ The main tracing functionality is provided by two new (compiled) modules:
  - Transform
  
  
+.. module:: ctracer
+..moduleauthor:: Bryan Cole <bryancole.cam@googlemail.com>
+
+ 
+.. class:: Ray
+
+  Ray is a wrapper class around the ray_t structure.
+  
+.. class:: RayCollection(max_size)
+
+  A RayCollection is a wrapper around a C-array of ray_t.
+  
+  .. method:: add_ray(ray)
+  
+    ray is an instance of Ray. Adds the given Ray to the array
+  
+  
+.. module:: cfaces
+
+  This module contains the concrete implementation of Face classes
