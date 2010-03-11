@@ -23,7 +23,24 @@ from distutils.extension import Extension
 from Cython.Distutils import build_ext
 #from setuptools import find_packages
 
-ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"])]
+###Cython.Distutils and Distribute don't play nice so we'll create the
+###C-modules explicitly
+import subprocess, os
+
+def create_module(pyx_name):
+    cname = os.path.splitext(pyx_name)[0] + ".c"
+    if os.path.exists(cname) and \
+        os.stat(cname).st_mtime > os.stat(pyx_name).st_mtime:
+        return
+    ret = subprocess.call(['cython',pyx_name])
+    if ret < 0:
+        raise CythonError("Failed to compile %s with Cython"%pyx_name)
+
+for fname in ['ctracer.pyx','cfaces.pyx']:
+    create_module("raytrace/%s"%fname)
+
+ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"]),
+            Extension("cfaces", ["raytrace/cfaces.pyx"])]
 
 setup(
     name="raytrace",
@@ -31,6 +48,7 @@ setup(
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
+    ext_package = "raytrace",
     ext_modules = ext_modules,
     zip_safe = True, #why not!
     

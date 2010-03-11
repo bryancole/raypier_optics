@@ -80,9 +80,10 @@ cdef class InterfaceMaterial(object):
     """Abstract base class for objects describing
     the materials characterics of a Face
     """
-    cdef ray_t eval_child_ray_c(self, ray_t *old_ray, 
-                                unsigned int ray_idx, 
-                                vector_t point, vector_t normal)
+    cdef eval_child_ray_c(self, ray_t *old_ray, 
+                            unsigned int ray_idx, 
+                            vector_t point, vector_t normal,
+                            RayCollection new_rays)
                                 
                                 
 cdef class PECMaterial(InterfaceMaterial):

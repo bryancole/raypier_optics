@@ -9,7 +9,7 @@ cdef extern from "math.h":
     double fabs(double arg)
     double INFINITY
     
-from stdlib cimport malloc, free
+from stdlib cimport malloc, free, realloc
 
 ############################################
 ### C type declarations for internal use ###
@@ -445,6 +445,12 @@ cdef class RayCollection:
         free(self.rays)
         
     cdef add_ray_c(self, ray_t r):
+        if self.n_rays == self.max_size:
+            if self.max_size == 0:
+                self.max_size = 1
+            else:
+                self.max_size *= 2
+            self.rays = <ray_t*>realloc(self.rays, self.max_size*sizeof(ray_t))
         self.rays[self.n_rays] = r
         self.n_rays += 1
         
@@ -454,15 +460,10 @@ cdef class RayCollection:
             self.rays[i].length = INFINITY
         
     def add_ray(self, Ray r):
-        if self.n_rays == self.max_size:
-            raise ValueError("RayCollection is full up")
-        self.rays[self.n_rays] = r.ray
-        self.n_rays += 1
+        self.add_ray_c(r.ray)
         
     def add_ray_list(self, list rays):
         cdef int i
-        if self.n_rays + len(rays) >= self.max_size:
-            raise IndexError("RayCollection size is too small to hold this many rays")
         for i in xrange(len(rays)):
             if not isinstance(rays[i], Ray):
                 raise TypeError("ray list contains non-Ray instance at index %d"%i)
@@ -492,7 +493,7 @@ cdef class RayCollection:
     
     def __setitem__(self, int idx, Ray r):
         if idx >= self.n_rays:
-            raise IndexError("Requested index %d from a size %d array"%(idx, self.n_rays))
+            raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
         self.rays[idx] = r.ray
     
     
@@ -501,13 +502,14 @@ cdef class InterfaceMaterial(object):
     the materials characterics of a Face
     """
     
-    cdef ray_t eval_child_ray_c(self, ray_t *old_ray, 
+    cdef eval_child_ray_c(self, ray_t *old_ray, 
                                 unsigned int ray_idx, 
-                                vector_t p, vector_t normal):
-        return old_ray[0]
+                                vector_t p, vector_t normal,
+                                RayCollection new_rays):
+        pass
     
     def eval_child_ray(self, Ray old_ray, ray_idx, point, 
-                        normal):
+                        normal, RayCollection new_rays):
         cdef:
             vector_t p, n
             Ray out=Ray()
@@ -515,9 +517,8 @@ cdef class InterfaceMaterial(object):
         
         p = set_v(p, point)
         n = set_v(n, normal)
-        out.ray = self.eval_child_ray_c(&old_ray.ray, ray_idx, 
-                                        p, n)
-        return out
+        self.eval_child_ray_c(&old_ray.ray, ray_idx, 
+                                        p, n, new_rays)
     
     
 cdef class Face(object):
@@ -674,11 +675,12 @@ cdef class FaceList(object):
 cdef class PECMaterial(InterfaceMaterial):
     """Simulates a Perfect Electrical Conductor
     """
-    cdef ray_t eval_child_ray_c(self,
-                                ray_t *in_ray, 
-                                unsigned int idx, 
-                                vector_t point,
-                                vector_t normal):
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            vector_t normal,
+                            RayCollection new_rays):
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -704,7 +706,7 @@ cdef class PECMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = -sp_ray.E2_amp.real
         sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
         sp_ray.parent_idx = idx
-        return sp_ray
+        new_rays.add_ray_c(sp_ray)
     
     
 cdef class DielectricMaterial(InterfaceMaterial):
@@ -734,11 +736,12 @@ cdef class DielectricMaterial(InterfaceMaterial):
             self.n_outside_.real = v.real
             self.n_outside_.imag = v.imag
             
-    cdef ray_t eval_child_ray_c(self,
-                                ray_t *in_ray, 
-                                unsigned int idx, 
-                                vector_t point,
-                                vector_t normal):
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            vector_t normal,
+                            RayCollection new_rays):
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -797,7 +800,6 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= -1
             sp_ray.E2_amp.imag *= -1
             sp_ray.parent_idx = idx
-            return sp_ray
         else:
             #normal transmission            
             tangent = subvv_(in_direction, cosThetaNormal)
@@ -824,7 +826,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= T_p
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
-            return sp_ray
+        new_rays.add_ray_c(sp_ray)
 
     
 
@@ -868,12 +870,11 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
             #print "s normal", normal
-            new_ray = (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
                                                     point,
-                                                    normal
+                                                    normal,
+                                                    new_rays
                                                     )
-            new_ray.length = max_length
-            new_rays.add_ray_c(new_ray)
     return new_rays
 
 
