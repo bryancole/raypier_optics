@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from enthought.traits.api import HasTraits, Instance, Float, Complex,\
-        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str, Bool
+        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str, Bool, Enum
         
 from enthought.traits.ui.api import View, Item
 
