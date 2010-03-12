@@ -116,7 +116,7 @@ cdef class FaceList(object):
     cdef public list faces
     cdef public object owner
      
-    cdef int intersect_c(self, ray_t *ray, double max_length)
+    cdef int intersect_c(self, ray_t *ray, vector_t end_point, double max_length)
     cdef vector_t compute_normal_c(self, Face face, vector_t point)
 
 

@@ -38,11 +38,12 @@ cdef class CircularFace(Face):
                 this is set to the intersecting face idx
         """
         cdef:
-            double max_length, h, X, Y, d=self.diameter
+            double max_length = sep_(p1, p2)
+            double h = (self.z_plane-p1.z)/(p2.z-p1.z)
+            double X, Y, d=self.diameter
             
         #print "CFACE", p1, p2
-        max_length = sep_(p1, p2)
-        h = (self.z_plane-p1.z)/(p2.z-p1.z)
+        
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
             return 0

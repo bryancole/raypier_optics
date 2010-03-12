@@ -624,26 +624,19 @@ cdef class FaceList(object):
         return self.faces[intidx]
         
      
-    cdef int intersect_c(self, ray_t *ray, double max_length):
+    cdef int intersect_c(self, ray_t *ray, vector_t ray_end, double max_length):
         """Finds the face with the nearest intersection
         point, for the ray defined by the two input points,
         P1 and P2 (in global coords).
         """
         cdef:
-            vector_t p1, p2
-            list faces
+            vector_t p1 = transform_c(self.inv_trans, ray.origin)
+            vector_t p2 = transform_c(self.inv_trans, ray_end)
+            list faces=self.faces
             unsigned int i
             int all_idx=-1
             double dist
             Face face
-        
-        p1 = transform_c(self.inv_trans, ray.origin)
-        p2 = transform_c(self.inv_trans, 
-                        addvv_(ray.origin, 
-                                multvs_(ray.direction, 
-                                        max_length)))
-        #print "LOCAL", p1, p2
-        faces = self.faces
         
         for i in xrange(len(faces)):
             face = faces[i]
@@ -655,10 +648,11 @@ cdef class FaceList(object):
         return all_idx
     
     def intersect(self, Ray r, double max_length):
-        cdef vector_t P1_, P2_
+        cdef vector_t P1_
         cdef int idx
         
-        idx = self.intersect_c(&r.ray, max_length)
+        P1_ = addvv_(r.ray.origin, multvs_(r.ray.direction, r.ray.length))
+        idx = self.intersect_c(&r.ray, P1_, max_length)
         return idx
     
     cdef vector_t compute_normal_c(self, Face face, vector_t point):
@@ -861,11 +855,14 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         ray.length = max_length
         ray.end_face_idx = -1
         nearest_idx=-1
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    max_length))
         #print "points", P1, P2
         for j in xrange(n_sets):
             face_set = face_sets[j]
             #intersect_c returns the face idx of the intersection, or -1 otherwise
-            idx = (<FaceList>face_set).intersect_c(ray, max_length)
+            idx = (<FaceList>face_set).intersect_c(ray, point, max_length)
             if idx >= 0:
                 nearest_set = j
                 nearest_idx = idx
