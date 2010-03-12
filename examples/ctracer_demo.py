@@ -19,8 +19,8 @@ import numpy
 source = ConfocalRaySource(focus=(0,0,0),
                             direction=(0,1,0),
                             working_dist = 100.,
-                            number=20,
-                            rings=3,
+                            number=50,
+                            rings=50,
                             detail_resolution=5,
                             theta=10.)
                             

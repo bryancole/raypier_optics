@@ -538,12 +538,12 @@ cdef class Face(object):
         self.invert_normal = int(kwds.get('invert_normal', 0))
         
     
-    cdef int intersect_c(self, vector_t p1, vector_t p2, ray_t *ray):
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
         """returns the face index of the intersection in terms of the 
         fractional distance between p1 and p2.
         p1 and p2 are in the local coordinate system
         """
-        return -1
+        return 0
     
     def update(self):
         """Called to update the parameters from the owner
@@ -553,15 +553,15 @@ cdef class Face(object):
             v = getattr(self.owner, name)
             setattr(self, name, v)
     
-    def intersect(self, p1, p2, Ray r):
+    def intersect(self, p1, p2):
         cdef:
             vector_t p1_, p2_
-            int idx
+            double dist
         
         p1_ = set_v(p1_, p1)
         p2_ = set_v(p2_, p2)
-        idx = self.intersect_c(p1_, p2_, &r.ray)
-        return idx
+        dist = self.intersect_c(p1_, p2_)
+        return dist
 
     cdef vector_t compute_normal_c(self, vector_t p):
         return p
@@ -629,10 +629,13 @@ cdef class FaceList(object):
         point, for the ray defined by the two input points,
         P1 and P2 (in global coords).
         """
-        cdef vector_t p1, p2
-        cdef list faces
-        cdef unsigned int i
-        cdef int idx=-1, all_idx=-1
+        cdef:
+            vector_t p1, p2
+            list faces
+            unsigned int i
+            int all_idx=-1
+            double dist
+            Face face
         
         p1 = transform_c(self.inv_trans, ray.origin)
         p2 = transform_c(self.inv_trans, 
@@ -643,9 +646,12 @@ cdef class FaceList(object):
         faces = self.faces
         
         for i in xrange(len(faces)):
-            idx = (<Face>(faces[i])).intersect_c(p1, p2, ray)
-            if idx >= 0:
-                all_idx = idx
+            face = faces[i]
+            dist = face.intersect_c(p1, p2)
+            if 0 < dist < ray.length:
+                ray.length = dist
+                all_idx = face.idx
+                ray.end_face_idx = all_idx
         return all_idx
     
     def intersect(self, Ray r, double max_length):

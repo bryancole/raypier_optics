@@ -104,7 +104,7 @@ cdef class Face(object):
     cdef public InterfaceMaterial material
     cdef public short int invert_normal
     
-    cdef int intersect_c(self, vector_t p1, vector_t p2, ray_t *ray)
+    cdef double intersect_c(self, vector_t p1, vector_t p2)
 
     cdef vector_t compute_normal_c(self, vector_t p)
     

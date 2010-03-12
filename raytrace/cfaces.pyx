@@ -24,7 +24,7 @@ cdef class CircularFace(Face):
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
     
-    cdef int intersect_c(self, vector_t p1, vector_t p2, ray_t *ray):
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
         """Intersects the given ray with this face.
         
         params:
@@ -45,18 +45,13 @@ cdef class CircularFace(Face):
         h = (self.z_plane-p1.z)/(p2.z-p1.z)
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
-            return -1
+            return 0
         X = p1.x + h*(p2.x-p1.x) - self.offset
         Y = p1.y + h*(p2.y-p1.y)
         if (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
-            return -1
-        h *= max_length
-        if h > ray.length:
-            return -1
-        ray.length = h
-        ray.end_face_idx = self.idx
-        return self.idx
+            return 0
+        return h * max_length
 
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
@@ -77,7 +72,7 @@ cdef class SphericalFace(Face):
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_plane', 0.0)
     
-    cdef int intersect_c(self, vector_t r, vector_t p2, ray_t *ray):
+    cdef double intersect_c(self, vector_t r, vector_t p2):
         """Intersects the given ray with this face.
         
         params:
@@ -105,7 +100,7 @@ cdef class SphericalFace(Face):
         D = B*B - 4*A*C
         
         if D < 0: #no intersection with sphere
-            return -1
+            return 0
         
         D = sqrt(D)
         
@@ -116,16 +111,10 @@ cdef class SphericalFace(Face):
             pt = addvv_(r, multvs_(s, A))
         
         if A>1.0 or A<self.tolerance:
-            return -1
+            return 0
         if (pt.x*pt.x + pt.y*pt.y) > (self.diameter*self.diameter/4.):
-            return -1
-        
-        A *= sep_(r, p2)
-        if A > ray.length:
-            return -1
-        ray.length = A
-        ray.end_face_idx = self.idx
-        return self.idx
+            return 0
+        return A * sep_(r, p2)
     
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
