@@ -123,3 +123,84 @@ cdef class SphericalFace(Face):
         """
         p.z -= (self.z_height - self.curvature)
         return norm_(p)
+    
+    
+cdef class ExtrudedPlanarFace(Face):
+    cdef:
+        double z1, z2, x1_, y1_, x2_, y2_
+        vector_t normal
+        
+    property x1:
+        def __get__(self):
+            return self.x1_
+        
+        def __set__(self, double v):
+            self.x1_ = v
+            self.calc_normal()
+            
+    property y1:
+        def __get__(self):
+            return self.y1_
+        
+        def __set__(self, double v):
+            self.y1_ = v
+            self.calc_normal()
+            
+    property x2:
+        def __get__(self):
+            return self.x2_
+        
+        def __set__(self, double v):
+            self.x2_ = v
+            self.calc_normal()
+            
+    property y2:
+        def __get__(self):
+            return self.y2_
+        
+        def __set__(self, double v):
+            self.y2_ = v
+            self.calc_normal()
+            
+    cdef calc_normal(self):
+        cdef vector_t n
+            
+        n.y = self.x2 - self.x1
+        n.x = self.y1 - self.y2
+        n.z = 0
+        self.normal = norm_(n)
+        
+    cdef double intersect_c(self, vector_t r, vector_t p2):
+        cdef: 
+            vector_t s, u, v
+            double a, dz
+            
+        u.x = self.x1
+        u.y = self.y1
+        
+        v.x = self.x2 - u.x
+        v.y = self.y2 - u.y
+        
+        s = subvv_(p2, r)
+        
+        #fractional distance of intersection along edge
+        a = (s.y*(u.x-r.x) - s.x*(u.y-r.y)) / (s.x*v.y - s.y*v.x)
+        if a<0:
+            return 0
+        if a>1:
+            return 0
+        #distance of intersection along ray (in XY plane)
+        a = (v.x*(r.y-u.y) - v.y*(r.x-u.x)) / (s.x*v.y - s.y*v.x)
+        
+        #distance in 3D
+        dz = a*(p2.z - r.z)
+        
+        if self.z1 < (r.z+dz) < self.z2:
+            return sqrt(a*a + dz*dz)
+        else:
+            return 0
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        return self.normal
+    
+    
