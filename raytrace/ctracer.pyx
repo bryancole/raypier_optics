@@ -57,7 +57,8 @@ cdef inline vector_t rotate_c(transform_t t, vector_t p):
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22
     return out
 
-cdef inline vector_t set_v(vector_t v, object O):
+cdef inline vector_t set_v(object O):
+    cdef vector_t v
     v.x = O[0]
     v.y = O[1]
     v.z = O[2]
@@ -65,9 +66,7 @@ cdef inline vector_t set_v(vector_t v, object O):
 
 def py_set_v(O):
     cdef vector_t v_
-    print "before", (v_.x, v_.y, v_.z)
-    v_ = set_v(v_, O)
-    print "after", (v_.x, v_.y, v_.z)
+    v_ = set_v(O)
     return (v_.x, v_.y, v_.z)
 
 cdef inline double sep_(vector_t p1, vector_t p2):
@@ -78,9 +77,7 @@ cdef inline double sep_(vector_t p1, vector_t p2):
     return sqrt((a*a) + (b*b) + (c*c))
 
 def sep(a, b):
-    cdef vector_t a_, b_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    cdef vector_t a_ = set_v(a), b_ = set_v(b)
     return sep_(a_, b_)
 
 cdef inline vector_t invert_(vector_t v):
@@ -90,8 +87,7 @@ cdef inline vector_t invert_(vector_t v):
     return v
 
 def invert(v):
-    cdef vector_t v_
-    v_ = set_v(v_, v)
+    cdef vector_t v_ = set_v(v)
     v_ = invert_(v_)
     return (v_.x, v_.y, v_.z)
 
@@ -104,8 +100,8 @@ cdef inline vector_t multvv_(vector_t a, vector_t b):
 
 def multvv(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = multvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -118,7 +114,7 @@ cdef inline vector_t multvs_(vector_t a, double b):
 
 def multvs(a, b):
     cdef vector_t a_, c_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     c_ = multvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
@@ -131,8 +127,8 @@ cdef inline vector_t addvv_(vector_t a, vector_t b):
 
 def addvv(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = addvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -145,7 +141,7 @@ cdef inline vector_t addvs_(vector_t a, double b):
 
 def addvs(a, b):
     cdef vector_t a_, c_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     c_ = addvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
@@ -158,8 +154,8 @@ cdef inline vector_t subvv_(vector_t a, vector_t b):
 
 def subvv(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = subvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -172,7 +168,7 @@ cdef inline vector_t subvs_(vector_t a, double b):
 
 def subvs(a, b):
     cdef vector_t a_, c_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     c_ = subvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
@@ -181,7 +177,7 @@ cdef inline double mag_(vector_t a):
 
 def mag(a):
     cdef vector_t a_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     return mag_(a_)
 
 cdef inline double mag_sq_(vector_t a):
@@ -189,7 +185,7 @@ cdef inline double mag_sq_(vector_t a):
 
 def mag_sq(a):
     cdef vector_t a_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     return mag_sq_(a_)
 
 cdef inline double dotprod_(vector_t a, vector_t b):
@@ -197,8 +193,8 @@ cdef inline double dotprod_(vector_t a, vector_t b):
 
 def dotprod(a, b):
     cdef vector_t a_, b_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     return dotprod_(a_,b_)
 
 cdef inline vector_t cross_(vector_t a, vector_t b):
@@ -210,8 +206,8 @@ cdef inline vector_t cross_(vector_t a, vector_t b):
 
 def cross(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = cross_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -224,7 +220,7 @@ cdef vector_t norm_(vector_t a):
 
 def norm(a):
     cdef vector_t a_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     a_ = norm_(a_)
     return (a_.x, a_.y, a_.z)
 
@@ -270,7 +266,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
 def Convert_to_SP(Ray ray, normal):
     cdef vector_t n
     cdef ray_t r
-    n = set_v(n, normal)
+    n = set_v(normal)
     r = convert_to_sp(ray.ray, n)
     out = Ray()
     out.ray = r
@@ -515,8 +511,8 @@ cdef class InterfaceMaterial(object):
             Ray out=Ray()
             unsigned int idx
         
-        p = set_v(p, point)
-        n = set_v(n, normal)
+        p = set_v(point)
+        n = set_v(normal)
         self.eval_child_ray_c(&old_ray.ray, ray_idx, 
                                         p, n, new_rays)
     
@@ -558,8 +554,8 @@ cdef class Face(object):
             vector_t p1_, p2_
             double dist
         
-        p1_ = set_v(p1_, p1)
-        p2_ = set_v(p2_, p2)
+        p1_ = set_v(p1)
+        p2_ = set_v(p2)
         dist = self.intersect_c(p1_, p2_)
         return dist
 
@@ -667,7 +663,7 @@ cdef class FaceList(object):
     
     def compute_normal(self, Face face, point):
         cdef vector_t p
-        p = set_v(p, point)
+        p = set_v(point)
         p = self.compute_normal_c(face, p)
         return (p.x, p.y, p.z)
     

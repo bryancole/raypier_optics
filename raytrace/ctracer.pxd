@@ -42,7 +42,7 @@ cdef struct ray_pair_t:
 
 cdef inline vector_t transform_c(transform_t t, vector_t p)
 cdef inline vector_t rotate_c(transform_t t, vector_t p)
-cdef inline vector_t set_v(vector_t v, object O)
+cdef inline vector_t set_v(object O)
 cdef inline double sep_(vector_t p1, vector_t p2)
 cdef inline vector_t multvv_(vector_t a, vector_t b)
 cdef inline vector_t multvs_(vector_t a, double b)
