@@ -95,7 +95,9 @@ class TestPECMaterial(unittest.TestCase):
     def test_eval_child(self):
         m = ctracer.PECMaterial()
         in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
-        out_ray = m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1))
+        out_rays = ctracer.RayCollection(1)
+        m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1), out_rays)
+        out_ray = out_rays[0]
         self.assertEquals(out_ray.direction, (1,0,-1))
         
         
@@ -133,13 +135,14 @@ def sep(a,b):
         
 class TestTransform(unittest.TestCase):
     def test_trans(self):
+        print "loading tvtk"
         from enthought.tvtk.api import tvtk
+        print "complete"
         t = tvtk.Transform()
         t.rotate_x(10)
         t.rotate_y(15)
         t.rotate_z(20)
         t.translate(3,4,5)
-        print t.matrix
         o = AnOwner(transform=t)
         fl = ctracer.FaceList(owner=o)
         fl.sync_transforms()

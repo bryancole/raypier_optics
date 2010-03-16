@@ -29,31 +29,32 @@ class TestCircularFace(unittest.TestCase):
     def test_intersection(self):
         o = AnOwner(diameter=5.5, offset=6.6)
         c = cfaces.CircularFace(owner=o)
-        inter = c.intersect((0,0,-2),(0,0,2))
-        self.assertEquals(inter.dist, 2.0)
+        dist = c.intersect((0,0,-2), (0,0,2))
+        self.assertEquals(dist, 2.0)
         
     def test_intersection2(self):
         o = AnOwner(diameter=5.5, offset=6.6)
         c = cfaces.CircularFace(owner=o)
-        inter = c.intersect((-1,0,-1), (1,0,1))
-        self.assertEquals(inter.dist, sqrt(2.0))
+        dist = c.intersect((-1,0,-1), (1,0,1))
+        self.assertEquals(dist, sqrt(2.0))
         
     def test_face_set_intersection(self):
         o = AnOwner(diameter=5.5, offset=6.6)
         c = cfaces.CircularFace(owner=o)
+        c.idx = 7
         fl = ctracer.FaceList()
         fl.faces = [c]
-        inter = fl.intersect((-1,0,-1), (1,0,1), 20)
-        print inter.face_idx
-        self.assertEquals(inter.point, (0.0,0.0,0.0))
-        self.assertEquals(inter.dist, sqrt(2.0))
+        r = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1), length=10)
+        idx = fl.intersect(r, 20)
+        self.assertEquals(r.end_face_idx, 7)
+        self.assertEquals(r.length, sqrt(2.0))
         
     def test_miss(self):
         o = AnOwner(diameter=5.5, offset=6.6)
         c = cfaces.CircularFace(owner=o)
-        inter = c.intersect((6,0,-2),(6,0,2))
+        dist = c.intersect((6,0,-2),(6,0,2))
         import numpy
-        self.assertEquals(inter.dist, numpy.Infinity)
+        self.assertEquals(dist, 0.0)
         
 #    def test_eval_child(self):
 #        o = AnOwner(diameter=5.5, offset=6.6)
