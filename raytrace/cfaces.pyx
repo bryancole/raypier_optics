@@ -15,6 +15,9 @@ from ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_
 
+import numpy as np
+cimport numpy as np
+
 
 cdef class CircularFace(Face):
     cdef public double diameter, offset, z_plane
@@ -204,3 +207,65 @@ cdef class ExtrudedPlanarFace(Face):
         return self.normal
     
     
+cdef point_in_polygon_c(double X, double Y,  obj):
+    cdef int i, size, ct
+    cdef double y1, y2, h, x, x1, x2
+    cdef np.ndarray[np.float64_t, ndim=2] pts
+    
+    pts = obj
+    size = pts.shape[0]
+    
+    y1 = pts[size-1,1]
+    x1 = pts[size-1,0]
+    for i in xrange(size):
+        y2 = pts[i,1]
+        x2 = pts[i,0]
+        h = (Y - y1) / (y2 - y1)
+        if 0 < h <= 1.0:
+            x = x1 + h*(x2 - x1)
+            if x > X:
+                ct += 1
+        y1 = y2
+        x1 = x2
+    if ct%2:
+        return 0
+    else:
+        return 1
+    
+    
+def point_in_polygon(double X, double Y, point_list):
+    pts = np.ascontiguousarray(point_list, dtype=np.float64)
+    assert pts.shape[1]==2
+    return bool(point_in_polygon_c(X, Y, pts))
+    
+    
+cdef class PolygonFace(Face):
+    cdef public double z_plane
+    cdef object _xy_points
+    
+    property xy_points:
+        def __get__(self):
+            return self._xy_points
+        
+        def __set__(self, pts):
+            data = np.ascontiguousarray(pts, dtype=np.float64)
+            assert data.shape[1]==2
+            self._xy_points=data
+            
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        cdef:
+            double max_length = sep_(p1, p2)
+            double h = (self.z_plane-p1.z)/(p2.z-p1.z)
+            double X, Y
+        
+        if (h<self.tolerance) or (h>1.0):
+            #print "H", h
+            return 0
+        X = p1.x + h*(p2.x-p1.x)
+        Y = p1.y + h*(p2.y-p1.y)
+        #test for (X,Y) in polygon
+        if point_in_polygon_c(X,Y, self._xy_points):
+            return h * max_length
+        else:
+            return 0.0
+        

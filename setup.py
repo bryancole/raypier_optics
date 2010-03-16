@@ -38,9 +38,14 @@ def create_module(pyx_name):
 
 for fname in ['ctracer.pyx','cfaces.pyx']:
     create_module("raytrace/%s"%fname)
+    
+import numpy
+np_include = os.path.join(numpy.__path__[0], r"core/include")
 
-ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"]),
-            Extension("cfaces", ["raytrace/cfaces.pyx"])]
+ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"],
+                        include_dirs=[np_include]),
+            Extension("cfaces", ["raytrace/cfaces.pyx"],
+                        include_dirs=[np_include])]
 
 setup(
     name="raytrace",
