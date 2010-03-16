@@ -40,7 +40,7 @@ for fname in ['ctracer.pyx','cfaces.pyx']:
     create_module("raytrace/%s"%fname)
     
 import numpy
-np_include = os.path.join(numpy.__path__[0], r"core/include")
+np_include = numpy.get_include()
 
 ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"],
                         include_dirs=[np_include]),
