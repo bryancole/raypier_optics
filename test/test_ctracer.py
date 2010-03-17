@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
-import pyximport
-pyximport.install()
+#import pyximport
+#pyximport.install()
 
 import sys
 sys.path.append('..')
 from raytrace import ctracer
 import unittest
 from math import sqrt
-
+import random
+import numpy
 
 class TestVectorMathsFunctions(unittest.TestCase):
     def test_set_v(self):
@@ -123,6 +124,36 @@ class TestRayCollection(unittest.TestCase):
         rays = [r for r in rc]
         self.assertEquals(len(rays), 6)
         
+    @staticmethod
+    def make_ray():
+        rnd = random.random
+        r = ctracer.Ray(origin=(rnd(), rnd(), rnd()),
+                        direction=(rnd(), rnd(), rnd())
+                        )
+        return r
+    
+    @staticmethod
+    def compare(ray, row):
+        a = tuple(ray.origin)==tuple(row['origin'])
+        b = tuple(ray.direction)==tuple(row['direction'])
+        return a and b
+        
+    def test_copy_to_array(self):
+        rc = ctracer.RayCollection(10)
+        rays = [self.make_ray() for i in xrange(7)]
+        for ray in rays:
+            rc.add_ray(ray)
+        data = rc.copy_as_array()
+        is_same = [self.compare(ray,row) for ray,row in zip(rays, data)]
+        self.assertTrue(all(is_same))
+        
+    def test_from_array(self):
+        a = numpy.empty(5, dtype=ctracer.ray_dtype)
+        rc = ctracer.RayCollection.from_array(a)
+        for i in xrange(len(a)):
+            self.assertEquals(tuple(a[i]['origin']), tuple(rc[i].origin))
+            self.assertEquals(tuple(a[i]['direction']), tuple(rc[i].direction))
+        
         
 class AnOwner(object):
     def __init__(self, **kwds):
@@ -134,6 +165,7 @@ def sep(a,b):
         
         
 class TestTransform(unittest.TestCase):
+    """
     def test_trans(self):
         print "loading tvtk"
         from enthought.tvtk.api import tvtk
@@ -153,7 +185,7 @@ class TestTransform(unittest.TestCase):
         pt3 = ctracer.transform(fl.transform, pt)
         print pt, pt2, pt3
         self.assertEquals(sep(pt2,pt3), 0.0)
-        
+    """
         
         
 class TestTraceSegment(unittest.TestCase):

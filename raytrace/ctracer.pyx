@@ -11,6 +11,26 @@ cdef extern from "math.h":
     
 from stdlib cimport malloc, free, realloc
 
+cdef extern from "stdlib.h" nogil:
+    void *memcpy(void *str1, void *str2, size_t n)
+
+import numpy as np
+cimport numpy as np_
+
+ray_dtype = np.dtype([('origin', np.double, (3,)),
+                        ('direction', np.double, (3,)),
+                        ('normals', np.double, (3,)),
+                        ('E_vector', np.double, (3,)),
+                        ('refractive_index', np.complex128),
+                        ('E1_amp', np.complex128),
+                        ('E2_amp', np.complex128),
+                        ('length', np.double),
+                        ('wavelength', np.double),
+                        ('parent_idx', np.uint),
+                        ('end_face_idx', np.uint)
+                        ])
+                        
+
 ############################################
 ### C type declarations for internal use ###
 ############################################
@@ -492,6 +512,19 @@ cdef class RayCollection:
             raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
         self.rays[idx] = r.ray
     
+    def copy_as_array(self):
+        cdef np_.ndarray out = np.empty(self.n_rays, dtype=ray_dtype)
+        memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
+        return out
+    
+    @classmethod
+    def from_array(cls, np_.ndarray data):
+        cdef int size=data.shape[0]
+        cdef RayCollection rc = RayCollection(size)
+        assert data.dtype is ray_dtype
+        memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(ray_t))
+        rc.n_rays = size
+        return rc
     
 cdef class InterfaceMaterial(object):
     """Abstract base class for objects describing
@@ -760,8 +793,8 @@ cdef class DielectricMaterial(InterfaceMaterial):
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
         
-        print "TRACE"
-        print normal, in_direction
+        #print "TRACE"
+        #print normal, in_direction
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
@@ -769,20 +802,20 @@ cdef class DielectricMaterial(InterfaceMaterial):
             n2 = self.n_inside_.real
             sp_ray.refractive_index = self.n_inside_
             flip = 1
-            print "out to in", n1, n2
+            #print "out to in", n1, n2
         else:
             n1 = self.n_inside_.real
             n2 = self.n_outside_.real
             sp_ray.refractive_index = self.n_outside_
             flip = -1
-            print "in to out", n1, n2
+            #print "in to out", n1, n2
             
         N2 = (n2/n1)**2
         N2cosTheta = N2*cos1
         
         N2_sin2 = (cosTheta*cosTheta) + (N2 - 1)
-        print "TIR", N2_sin2, cosTheta, N2, cos1
-        print (normal.x, normal.y, normal.z), in_direction
+        #print "TIR", N2_sin2, cosTheta, N2, cos1
+        #print (normal.x, normal.y, normal.z), in_direction
         cosThetaNormal = multvs_(normal, cosTheta)
         if N2_sin2 < 0.0:
             #total internal reflection
