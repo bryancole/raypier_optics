@@ -19,7 +19,7 @@ cimport numpy as np_
 
 ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('direction', np.double, (3,)),
-                        ('normals', np.double, (3,)),
+                        ('normal', np.double, (3,)),
                         ('E_vector', np.double, (3,)),
                         ('refractive_index', np.complex128),
                         ('E1_amp', np.complex128),
@@ -623,7 +623,7 @@ cdef class FaceList(object):
         for i in xrange(len(faces)):
             face = faces[i]
             dist = face.intersect_c(p1, p2)
-            if 0 < dist < ray.length:
+            if face.tolerance < dist < ray.length:
                 ray.length = dist
                 all_idx = face.idx
                 ray.end_face_idx = all_idx

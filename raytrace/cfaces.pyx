@@ -13,7 +13,7 @@ cdef extern from "math.h":
 
 from ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
-            addvv_, multvs_
+            addvv_, multvs_, mag_
 
 import numpy as np
 cimport numpy as np
@@ -130,8 +130,17 @@ cdef class SphericalFace(Face):
     
 cdef class ExtrudedPlanarFace(Face):
     cdef:
-        double z1, z2, x1_, y1_, x2_, y2_
+        double x1_, y1_, x2_, y2_
+        public double z1, z2
         vector_t normal
+        
+    def __cinit__(self, **kwds):
+        self.x1 = kwds.get('x1',0)
+        self.y1 = kwds.get('y1',0)
+        self.x2 = kwds.get('x2',0)
+        self.y2 = kwds.get('y2',0)
+        self.z1 = kwds.get('z1',0)
+        self.z2 = kwds.get('z2',0)
         
     property x1:
         def __get__(self):
@@ -188,18 +197,20 @@ cdef class ExtrudedPlanarFace(Face):
         
         #fractional distance of intersection along edge
         a = (s.y*(u.x-r.x) - s.x*(u.y-r.y)) / (s.x*v.y - s.y*v.x)
+        #print "dist along edge:", a, r, s, v, u
         if a<0:
             return 0
         if a>1:
             return 0
         #distance of intersection along ray (in XY plane)
         a = (v.x*(r.y-u.y) - v.y*(r.x-u.x)) / (s.x*v.y - s.y*v.x)
+        #print "dist along ray:", a 
         
         #distance in 3D
         dz = a*(p2.z - r.z)
         
         if self.z1 < (r.z+dz) < self.z2:
-            return sqrt(a*a + dz*dz)
+            return a * mag_(s)
         else:
             return 0
     

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import pyximport
-pyximport.install()
+#import pyximport
+#pyximport.install()
 
 import sys
 sys.path.append('..')
@@ -56,14 +56,28 @@ class TestCircularFace(unittest.TestCase):
         import numpy
         self.assertEquals(dist, 0.0)
         
-#    def test_eval_child(self):
-#        o = AnOwner(diameter=5.5, offset=6.6)
-#        c = cfaces.CircularFace(owner=o)
-#        from raytrace import ctracer
-#        in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
-#        fl = ctracer.FaceList()
-#        out_ray = c.eval_child_ray(in_ray, 1, (0,0,0), fl)
-#        self.assertEquals(out_ray.direction, (1,0,-1))
+
+class TestExtrudedFace(unittest.TestCase):
+    def setUp(self):
+        o = AnOwner()
+        self.f = cfaces.ExtrudedPlanarFace(owner=o, z1=-1, z2=3,
+                                            x1=-2.0,y1=2.0, x2=2.0, y2=-2.0)
+        
+    def test_intersection_1(self):
+        dist = self.f.intersect((-5,0,0),(5,0,0))
+        self.assertEquals(dist, 5.0)
+        
+    def test_miss_1(self):
+        dist = self.f.intersect((-5,0,4),(5,0,4))
+        self.assertEquals(dist, 0.0)
+        
+    def test_miss_2(self):
+        dist = self.f.intersect((-5,0,-2),(5,0,-0.1))
+        self.assertEquals(dist, 0.0)
+        
+    def test_miss_3(self):
+        dist = self.f.intersect((-5,2.1,-1),(5,2.1,1))
+        self.assertEquals(dist, 0.0)
     
 if __name__=="__main__":
     unittest.main()
