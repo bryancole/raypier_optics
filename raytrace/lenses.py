@@ -26,7 +26,8 @@ from raytrace.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals
     
 from raytrace.cfaces import CircularFace, SphericalFace
-from raytrace.ctracer import DielectricMaterial, FaceList
+from raytrace.ctracer import FaceList
+from raytrace.cmaterials import DielectricMaterial
 
 import math, numpy
 

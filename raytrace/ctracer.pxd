@@ -53,7 +53,6 @@ cdef inline vector_t subvs_(vector_t a, double b)
 cdef inline double dotprod_(vector_t a, vector_t b)
 cdef inline vector_t cross_(vector_t a, vector_t b)
 cdef inline vector_t norm_(vector_t a)
-cdef ray_t convert_to_sp(ray_t ray, vector_t normal)
 cdef inline double mag_(vector_t a)
 cdef inline double mag_sq_(vector_t a)
 cdef inline vector_t invert_(vector_t v)
@@ -85,14 +84,6 @@ cdef class InterfaceMaterial(object):
                             vector_t point, vector_t normal,
                             RayCollection new_rays)
                                 
-                                
-cdef class PECMaterial(InterfaceMaterial):
-    pass
-
-
-cdef class DielectricMaterial(InterfaceMaterial):
-   cdef complex_t n_inside_
-   cdef complex_t n_outside_
                                 
 
 cdef class Face(object):

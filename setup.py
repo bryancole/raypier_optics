@@ -36,7 +36,7 @@ def create_module(pyx_name):
     if ret < 0:
         raise CythonError("Failed to compile %s with Cython"%pyx_name)
 
-for fname in ['ctracer.pyx','cfaces.pyx']:
+for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
     create_module("raytrace/%s"%fname)
     
 import numpy
@@ -45,7 +45,10 @@ np_include = numpy.get_include()
 ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"],
                         include_dirs=[np_include]),
             Extension("cfaces", ["raytrace/cfaces.pyx"],
-                        include_dirs=[np_include])]
+                        include_dirs=[np_include]),
+            Extension("cmaterials", ["raytrace/cmaterials.pyx"],
+                        include_dirs=[np_include])
+            ]
 
 setup(
     name="raytrace",

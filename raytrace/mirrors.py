@@ -28,7 +28,8 @@ from raytrace.bases import Traceable, normaliseVector, NumEditor,\
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
 from raytrace.cfaces import CircularFace
-from raytrace.ctracer import FaceList, DielectricMaterial
+from raytrace.ctracer import FaceList
+from raytrace.cmaterials import DielectricMaterial
 
 import math, numpy
 

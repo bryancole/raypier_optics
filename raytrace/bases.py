@@ -38,7 +38,7 @@ from raytrace.has_queue import HasQueue, on_trait_change
 from raytrace.faces import Face
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
-from raytrace import ctracer
+from raytrace import ctracer, cmaterials
 
 Vector = Array(shape=(3,))
 
@@ -307,7 +307,7 @@ class Optic(Traceable):
                              color = (0.8,0.8,1.0))
                              
     def _material_default(self):
-        m = ctracer.DielectricMaterial(n_inside = self.n_inside,
+        m = cmaterials.DielectricMaterial(n_inside = self.n_inside,
                                     n_outside = self.n_outside)
         return m
     

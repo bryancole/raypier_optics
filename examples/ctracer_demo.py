@@ -13,6 +13,8 @@ from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel
 from raytrace.mirrors import PECMirror
 
+from raytrace.cmaterials import PECMaterial
+
 import numpy
 
 
@@ -56,7 +58,9 @@ model = RayTraceModel(optics=[m1,m2,m3,m4],
 #start = time.clock()
 #model.trace_all()
 #end = time.clock()
-#print "traced in", end - start                   
+#print "traced in", end - start            
+
+model.update = True       
 
 import timeit
 t = timeit.Timer("model.update = True","from __main__ import model")
@@ -65,4 +69,4 @@ print "time:", ret
 
 
 
-#model.configure_traits()
+model.configure_traits()
