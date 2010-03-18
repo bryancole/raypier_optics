@@ -898,6 +898,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         if nearest_idx >= 0:
             #print "GET FACE", nearest.face_idx, len(all_faces)
             face = all_faces[nearest_idx]
+            face.count += 1
             #print "ray length", ray.length
             point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
             normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)

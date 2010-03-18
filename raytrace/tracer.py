@@ -43,9 +43,6 @@ from raytrace.bases import Traceable, Probe, Result
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
         
-import pyximport
-pyximport.install()
-        
 from raytrace import ctracer
 
 counter = count()
@@ -65,6 +62,12 @@ class RayTraceModel(HasQueue):
     results = List(Result)
     
     optical_path = Float(0.0, transient=True)
+    
+    all_faces = List(ctracer.Face, desc="global list of all faces, created automatically "
+                     " when a tracing operation is initiated. Ray end_face_idx "
+                     "can be used to index this list")
+    face_sets = List(ctracer.FaceList, desc="list of FaceLists extracted from all "
+                     "optics when a tracing operation is initiated")
     
     update = Event()
     _updating = Bool(False)
@@ -132,6 +135,7 @@ class RayTraceModel(HasQueue):
         #print "trace", 
         counter.next()
         if optics is not None:
+            self.prepare_to_trace()
             for o in optics:
                 o.intersections = []
             for ray_source in self.sources:
@@ -183,22 +187,32 @@ class RayTraceModel(HasQueue):
     def render_vtk(self):
         if self.scene is not None:
             self.scene.render()
+            
+    def prepare_to_trace(self):
+        """Called before a tracing operation is performed, to do
+        all synchronisation between optics and their faces
+        """
+        face_sets = [o.faces for o in self.optics]
+        all_faces = list(itertools.chain(*(fs.faces for fs in face_sets)))
+        for i, f in enumerate(all_faces):
+            f.idx = i
+            f.count = 0 #reset intersection count
+            f.update()
+        for fs in face_sets:
+            fs.sync_transforms()
+            
+        self.all_faces = all_faces
+        self.face_sets = face_sets
         
     def trace_ray_source(self, ray_source, optics):
-        """trace a ray source"""
+        """trace a ray source asequentially, using the ctracer framework"""
         rays = ray_source.InputRays #FIXME
         rays.reset_length()
         traced_rays = []
         limit = self.recursion_limit
         count = 0
-        face_sets = [o.faces for o in optics]
-        all_faces = list(itertools.chain(*(fs.faces for fs in face_sets)))
-        for i, f in enumerate(all_faces):
-            f.idx = i
-            f.update()
-        for fs in face_sets:
-            fs.sync_transforms()
-        
+        face_sets = list(self.face_sets)
+        all_faces = list(self.all_faces)
         while rays.n_rays>0 and count<limit:
             #print "count", count
             traced_rays.append(rays)
@@ -240,52 +254,6 @@ class RayTraceModel(HasQueue):
             rays = children
             traces_rays.append(rays)
         return traced_rays
-        
-    def trace_segment(self, rays, optics):
-        """trace a RayCollection"""
-        if not optics:
-            return None
-        size = rays.origin.shape[0]
-        #optic.trace_rays should return a 1d recarray with 
-        #dtype=(('length','f8'),('face','O'),('point','f8',[3,]))
-        intersections = numpy.column_stack([o.trace_rays(rays) for o in optics])
-        
-        shortest = numpy.argmin(intersections['length'], axis=1)
-        ar = numpy.arange(size)
-        
-        intersections = intersections[ar,shortest] #reduce 2D to 1D
-        lengths = intersections['length']
-        
-        #now find the infinite rays, to be filtered out later
-        mask = lengths!=numpy.Infinity
-        and_finite = lambda x: numpy.logical_and(mask, x)
-        
-        faces = intersections['face']
-        
-        ###why?
-        if intersections.size==1:
-            points = intersections['point']
-        else:
-            points = intersections['point']
-            
-        lengthsT = lengths.reshape(-1,1)
-        #print "shape", lengthsT.shape, lengthsT.dtype, lengthsT[:5]
-        rays.length = lengthsT
-        
-        face_mask = ((f, and_finite(faces==f)) for f in set(faces))
-        face_mask = (a for a in face_mask if a[1].any())
-        
-        #tell the input rays which faces terminate each ray
-        #If a ray has no intersection, the end_face is None
-        faces[numpy.logical_not(mask)] = None
-        rays.end_face = faces
-        
-        children = filter(None,[f.eval_children(rays, points, m) for f,m in face_mask])
-        if len(children)==0:
-            return None
-        new_rays = collectRays(*children)
-        new_rays.parent = rays
-        return new_rays
     
     def _save_btn_changed(self):
         filename = save_file()

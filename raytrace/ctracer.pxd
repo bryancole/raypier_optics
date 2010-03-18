@@ -103,6 +103,7 @@ cdef class Face(object):
     cdef public double max_length
     cdef public InterfaceMaterial material
     cdef public short int invert_normal
+    cdef public unsigned int count
     
     cdef double intersect_c(self, vector_t p1, vector_t p2)
 
