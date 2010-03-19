@@ -28,7 +28,7 @@ from enthought.traits.ui.api import View, Item, Tabbed, VGroup, Include, \
 
 from enthought.tvtk.api import tvtk
 
-from raytrace.ctracer import RayCollection, Ray
+from raytrace.ctracer import RayCollection, Ray, ray_dtype
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple
 from raytrace.bases import Renderable
 
@@ -277,6 +277,7 @@ class ParallelRaySource(BaseRaySource):
     
     @cached_property
     def _get_InputRays(self):
+        print "making rays"
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number
@@ -293,19 +294,21 @@ class ParallelRaySource(BaseRaySource):
         d2 = normaliseVector(d2)
         angles = (i*2*numpy.pi/count for i in xrange(count))
         offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
-        
-        origins = numpy.array([origin + offset for offset in offsets])
-        directions = numpy.ones_like(origins) * direction
-        rays = RayCollection(origin=origins, direction=directions,
-                             max_length=self.max_ray_len)
-        rays.set_polarisation(1, 0, 0)
-        size = origins.shape[0],1
-        rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
-        rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
-        rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
-        rays.offset_length = numpy.zeros_like(rays.length)
-        rays.normals = numpy.zeros_like(origins)
-        rays.normals[:,1]=1.0
+        origins = [origin + offset for offset in offsets]
+#        directions = numpy.ones_like(origins) * direction
+#        ray_data = numpy.zeros(count, dtype=ray_dtype)
+#        ray_data['E_vector'] = [[1,0,0]]
+#        ray_data['E1_amp'] = 1.0 + 0.0j
+#        ray_data['E2_amp'] = 0.0
+#        ray_data['refractive_index'] = 1.0+0.0j
+#        ray_data['normal'] = [[0,1,0]]
+#        rays = RayCollection.from_array(ray_data)
+        print "made rays"
+        rays = RayCollection(len(origins))
+        for i in xrange(len(origins)):
+            ray = Ray(origin=origins[i], direction=direction,
+                        length=numpy.Inf)
+            rays.add_ray(ray)
         return rays
     
     
