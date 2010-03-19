@@ -277,12 +277,10 @@ class ParallelRaySource(BaseRaySource):
     
     @cached_property
     def _get_InputRays(self):
-        print "making rays"
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number
         radius = self.radius
-        
         max_axis = numpy.abs(direction).argmax()
         if max_axis==0:
             v = numpy.array([0.,1.,0.])
@@ -292,23 +290,18 @@ class ParallelRaySource(BaseRaySource):
         d1 = normaliseVector(d1)
         d2 = numpy.cross(direction, d1)
         d2 = normaliseVector(d2)
-        angles = (i*2*numpy.pi/count for i in xrange(count))
-        offsets = [radius*(d1*numpy.sin(a) + d2*numpy.cos(a)) for a in angles]
-        origins = [origin + offset for offset in offsets]
-#        directions = numpy.ones_like(origins) * direction
-#        ray_data = numpy.zeros(count, dtype=ray_dtype)
-#        ray_data['E_vector'] = [[1,0,0]]
-#        ray_data['E1_amp'] = 1.0 + 0.0j
-#        ray_data['E2_amp'] = 0.0
-#        ray_data['refractive_index'] = 1.0+0.0j
-#        ray_data['normal'] = [[0,1,0]]
-#        rays = RayCollection.from_array(ray_data)
-        print "made rays"
-        rays = RayCollection(len(origins))
-        for i in xrange(len(origins)):
-            ray = Ray(origin=origins[i], direction=direction,
-                        length=numpy.Inf)
-            rays.add_ray(ray)
+        angles = numpy.arange(count).reshape(-1,1)*(2*numpy.pi/count)
+        offsets = radius*(d1*numpy.sin(angles) + d2*numpy.cos(angles))
+        origins = origin[None,:] + offsets
+        ray_data = numpy.zeros(count, dtype=ray_dtype)
+        ray_data['origin'] = origins
+        ray_data['direction'] = direction
+        ray_data['E_vector'] = [[1,0,0]]
+        ray_data['E1_amp'] = 1.0 + 0.0j
+        ray_data['E2_amp'] = 0.0
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        rays = RayCollection.from_array(ray_data)
         return rays
     
     
@@ -372,31 +365,24 @@ class ConfocalRaySource(BaseRaySource):
         radius = numpy.tan(numpy.pi * theta/180) * working_dist
         
         d1, d2 = self.principle_axes
+        ray_data = numpy.zeros((rings*count)+1, dtype=ray_dtype)
         
-        radii = [(i+1)*radius/rings for i in xrange(rings)]
-        angles = [i*2*numpy.pi/count for i in xrange(count)]
-        offsets = [r*(d1*numpy.sin(a) + d2*numpy.cos(a)) 
-                   for a in angles
-                   for r in radii]
+        radii = ((numpy.arange(rings)+1)*(radius/rings))[:,None,None]
+        angles = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
+        offsets = radii*(d1*numpy.sin(angles) + d2*numpy.cos(angles)) 
+        offsets.shape = (-1,3)
         
-        origins = [origin] + [origin + offset for offset in offsets]
-        directions = normaliseVector([direction] + 
-                                     [direction*working_dist - offset 
-                                      for offset in offsets])
-        rays = RayCollection(len(origins))
-        for i in xrange(len(origins)):
-            ray = Ray(origin=origins[i], direction=directions[i],
-                        length=numpy.Inf)
-            rays.add_ray(ray)
-
-#        rays.set_polarisation(1, 0, 0)
-#        size = origins.shape[0],1
-#        rays.E1_amp = numpy.ones(size, dtype=numpy.complex128)
-#        rays.E2_amp = numpy.zeros(size, dtype=numpy.complex128)
-#        rays.refractive_index = numpy.ones(size, dtype=numpy.complex128)
-#        rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
-#        rays.normals = numpy.zeros_like(origins)
-#        rays.normals[:,1]=1.0
+        ray_data['origin'][1:] = offsets
+        ray_data['origin'] += origin
+        ray_data['direction'][0] = normaliseVector(direction)
+        ray_data['direction'][1:] = normaliseVector((direction*working_dist) - offsets)
+        ray_data['length'] = self.max_ray_len
+        ray_data['E_vector'] = [1,0,0]
+        ray_data['E1_amp'] = 1.0 + 0.0j
+        ray_data['E2_amp'] = 0.0
+        ray_data['refractive_index'] = 1.0
+        ray_data['normal'] = [0,1,0]
+        rays = RayCollection.from_array(ray_data)
         return rays
     
     @cached_property
