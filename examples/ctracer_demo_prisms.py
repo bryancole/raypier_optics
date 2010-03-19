@@ -21,7 +21,7 @@ source = ParallelRaySource(origin=(-7,-20,0),
                             )
                             
 r1 = Rhomboid(name="rhomboid",
-                #material=PECMaterial(),
+                #material=OpaqueMaterial(),
                 z_height_1=-5.0,
                 z_height_2=5.0,
                 height=7.0,

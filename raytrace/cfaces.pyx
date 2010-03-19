@@ -218,8 +218,8 @@ cdef class ExtrudedPlanarFace(Face):
         return self.normal
     
     
-cdef point_in_polygon_c(double X, double Y,  obj):
-    cdef int i, size, ct
+cdef int point_in_polygon_c(double X, double Y, object obj):
+    cdef int i, size, ct=0
     cdef double y1, y2, h, x, x1, x2
     cdef np.ndarray[np.float64_t, ndim=2] pts
     
@@ -238,10 +238,7 @@ cdef point_in_polygon_c(double X, double Y,  obj):
                 ct += 1
         y1 = y2
         x1 = x2
-    if ct%2:
-        return 0
-    else:
-        return 1
+    return ct%2
     
     
 def point_in_polygon(double X, double Y, point_list):
@@ -254,13 +251,16 @@ cdef class PolygonFace(Face):
     cdef public double z_plane
     cdef object _xy_points
     
+    def __cinit__(self, z_plane=0.0, xy_points=[[]], **kwds):
+        self.z_plane = z_plane
+        self.xy_points = xy_points
+    
     property xy_points:
         def __get__(self):
             return self._xy_points
         
         def __set__(self, pts):
-            data = np.ascontiguousarray(pts, dtype=np.float64)
-            assert data.shape[1]==2
+            data = np.ascontiguousarray(pts, dtype=np.float64).reshape(-1,2)
             self._xy_points=data
             
     cdef double intersect_c(self, vector_t p1, vector_t p2):
@@ -275,8 +275,19 @@ cdef class PolygonFace(Face):
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         #test for (X,Y) in polygon
-        if point_in_polygon_c(X,Y, self._xy_points):
+        if point_in_polygon_c(X,Y, self._xy_points)==1:
             return h * max_length
         else:
             return 0.0
+        
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef vector_t normal
+        normal.x=0
+        normal.y=0
+        normal.z=-1
+        return normal
+    
         

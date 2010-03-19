@@ -18,7 +18,7 @@
 
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
-            Tuple, Event, cached_property, Set, Int, Trait
+            Tuple, Event, cached_property, Set, Int, Trait, Bool
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Heading
 from enthought.tvtk.api import tvtk
@@ -48,6 +48,8 @@ class Extrusion(Optic):
     z_height_1 = Float(0.0)
     z_height_2 = Float(5.0)
     
+    trace_ends = Bool(True, desc="include the end-faces in tracing")
+    
     data_source = Instance(tvtk.ProgrammableSource, ())
     
     extrude = Instance(tvtk.LinearExtrusionFilter, (), 
@@ -65,18 +67,24 @@ class Extrusion(Optic):
         z2 = self.z_height_2
         profile = self.profile
         m = self.material
-        base = PolygonFace(owner=self, z_plane=z1,
-                        xy_points=profile, material=m)
-        top = PolygonFace(owner=self, z_plane=z2, material=m,
-                        xy_points=profile, invert_normals=True)
         sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=x1, y1=y1, 
                     x2=x2, y2=y2, material=m) for ((x2,y2),(x1,y1)) 
                                             in pairwise(profile)]
-        return sides #+ [base, top] #top and base cause a segfault ATM
+        if self.trace_ends:
+            base = PolygonFace(owner=self, z_plane=z1,
+                        xy_points=profile, material=m)
+            top = PolygonFace(owner=self, z_plane=z2, material=m,
+                        xy_points=profile, invert_normal=True)
+            sides.extend([base, top])
+        return sides
     
     @on_trait_change("z_height_1, z_height_2")
     def config_pipeline(self):
         self.extrude.scale_factor = self.z_height_2 - self.z_height_1
+        self.faces.faces = self.make_faces()
+        self.update=True
+        
+    def _trace_ends_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
         
@@ -114,7 +122,7 @@ class Prism(Extrusion):
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
-                       Item('all_rays'),
+                       Item('trace_ends'),
                        Item('n_inside'),
                        Item('length'),
                        Item('height'),
@@ -140,6 +148,7 @@ class Rhomboid(Extrusion):
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
+                       Item('trace_ends'),
                        Item('n_inside'),
                        Item('z_height_1'),
                        Item('z_height_2'),
