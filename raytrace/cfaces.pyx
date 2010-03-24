@@ -13,7 +13,8 @@ cdef extern from "math.h":
 
 from ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
-            addvv_, multvs_, mag_
+            addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
+                rotate_c
 
 import numpy as np
 cimport numpy as np
@@ -221,9 +222,8 @@ cdef class ExtrudedPlanarFace(Face):
 cdef int point_in_polygon_c(double X, double Y, object obj):
     cdef int i, size, ct=0
     cdef double y1, y2, h, x, x1, x2
-    cdef np.ndarray[np.float64_t, ndim=2] pts
+    cdef np.ndarray[np.float64_t, ndim=2] pts=obj
     
-    pts = obj
     size = pts.shape[0]
     
     y1 = pts[size-1,1]
@@ -235,10 +235,10 @@ cdef int point_in_polygon_c(double X, double Y, object obj):
         if 0 < h <= 1.0:
             x = x1 + h*(x2 - x1)
             if x > X:
-                ct += 1
+                ct = not ct
         y1 = y2
         x1 = x2
-    return ct%2
+    return ct
     
     
 def point_in_polygon(double X, double Y, point_list):
@@ -291,3 +291,99 @@ cdef class PolygonFace(Face):
         return normal
     
         
+cdef class EllipsoidalFace(Face):
+    cdef:
+        public double major, minor #axis lengths
+        transform_t trans, inv_trans
+        public double x1, x2, y1, y2, z1, z2 #local bounds of the ellpsoid block
+        
+    property transform:
+        def __get__(self):
+            t = Transform()
+            t.trans = self.trans
+            return t
+        
+        def __set__(self, Transform t):
+            self.trans = t.trans
+            
+    property inverse_transform:
+        def __set__(self, Transform t):
+            self.inv_trans = t.trans
+           
+        def __get__(self):
+            cdef Transform t=Transform()
+            t.trans = self.inv_trans
+            return t
+            
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        cdef:
+            double B,A, a, b, c, d
+            
+            vector_t S = subvv_(p2, p1)
+            vector_t r = transform_c(self.trans, p1)
+            vector_t s = transform_c(self.trans, p2)
+            
+        s = subvv_(s, r)
+        
+        B = self.minor**2
+        A = self.major**2
+        
+        a = A*(s.z*s.z + s.y*s.y) + B*s.x*s.x
+        b = 2*( A*(r.z*s.z + r.y*s.y) + B*r.x*s.x )
+        c = A*(r.z*r.z + r.y*r.y) + B*r.x*r.x - A*B
+        
+        d = b*b - 4*a*c
+        d = sqrt(d)
+        root1 = (-b + d)/(2*a)
+        root2 = (-b - d)/(2*a)
+        if not 0 < root1 < 1:
+            root1 = 2
+        if not 0 < root2 < 1:
+            root2 = 2
+        if root1 > root2:
+            root1 = root2
+        if root1 > 1:
+            return 0
+        
+        p2 = addvv_(p1, multvs_(S, root1))
+        if not self.x1 < p2.x < self.x2:
+            return 0
+        if not self.y1 < p2.y < self.y2:
+            return 0
+        if not self.z1 < p2.z < self.z2:
+            return 0
+        return root1
+        
+    cdef vector_t compute_normal_c(self, vector_t p):
+        cdef vector_t n
+        
+        p = transform_c(self.trans, p)
+        
+        n.x = p.x/-(self.major**2)
+        n.y = p.y/-(self.minor**2)
+        n.z = p.z/-(self.minor**2)
+        
+        n = rotate_c(self.inv_trans, n)
+        return norm_(n)
+    
+    def update(self):
+        super(EllipsoidalFace, self).update()
+        owner = self.owner
+        self.sync_transform(owner.ellipse_trans)
+        self.major, self.minor = owner.axes
+        self.x1, self.x2 = owner.X_bounds
+        self.y1, self.y2 = owner.Y_bounds
+        self.z1, self.z2 = owner.Z_bounds
+        
+    def sync_transform(self, vtk_trans):
+        m = vtk_trans.matrix
+        rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
+        dt = [m.get_element(i,3) for i in xrange(3)]
+        #print "TRANS", rot, dt
+        self.transform = Transform(rotation=rot, translation=dt)
+        inv_trans = vtk_trans.linear_inverse
+        m = inv_trans.matrix
+        rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
+        dt = [m.get_element(i,3) for i in xrange(3)]
+        self.inverse_transform = Transform(rotation=rot, translation=dt)
+    

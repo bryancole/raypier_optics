@@ -81,12 +81,17 @@ class Ellipsoid(BaseMirror):
                        )
     
     def _faces_default(self):
-        print "owner", self
-        print "focus1", self.focus1
-        f = PECEllipsoidFace(owner=self)
-        print f.owner
-        print f.focus1
-        return [f]
+        facelist = FaceList(owner=self)
+        facelist.faces=[EllipsoidalFace(owner=self,
+                                x1=self.X_bounds[0],
+                                x2=self.X_bounds[1],
+                                y1=self.Y_bounds[0],
+                                y2=self.Y_bounds[1],
+                                z1=self.Z_bounds[0],
+                                z2=self.Z_bounds[1],
+                                major=self.axes[0],
+                                minor=self.axes[1])]
+        return facelist
     
     @on_trait_change("focus1, focus2, size")
     def config_trans(self, *args):
