@@ -3,6 +3,8 @@ syntax: glob
 
 *.pyc
 *~
+*.so
+*.dll
 
 
 syntax: regexp

@@ -29,7 +29,8 @@ from enthought.traits.ui.api import View, Item, Tabbed, VGroup, Include, \
 from enthought.tvtk.api import tvtk
 
 from raytrace.ctracer import RayCollection, Ray, ray_dtype
-from raytrace.utils import normaliseVector, Range, TupleVector, Tuple
+from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
+            UnitTupleVector
 from raytrace.bases import Renderable
 
 Vector = Array(shape=(3,))
@@ -248,7 +249,7 @@ class BaseRaySource(HasTraits):
     
 class ParallelRaySource(BaseRaySource):
     origin = Tuple((0.,0.,0.))
-    direction = Tuple((0.,0.,1.))
+    direction = UnitTupleVector
     number = Int(20)
     radius = Float(10.)
     
@@ -308,7 +309,7 @@ class ParallelRaySource(BaseRaySource):
 
 class ConfocalRaySource(BaseRaySource):
     focus = TupleVector
-    direction = TupleVector
+    direction = UnitTupleVector
     number = Range(1,50,20, editor_traits={'mode':'spinner'})
     theta = Range(0.0,90.0,value=30)
     working_dist = Float(100.0)

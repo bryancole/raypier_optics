@@ -75,7 +75,7 @@ cdef class SphericalFace(Face):
     params = ['diameter', 'curvature']
     
     def __cinit__(self, **kwds):
-        self.z_height = kwds.get('z_plane', 0.0)
+        self.z_height = kwds.get('z_height', 0.0)
     
     cdef double intersect_c(self, vector_t r, vector_t p2):
         """Intersects the given ray with this face.
