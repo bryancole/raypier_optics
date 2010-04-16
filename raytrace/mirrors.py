@@ -27,7 +27,7 @@ from raytrace.bases import Traceable, normaliseVector, NumEditor,\
      
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
-from raytrace.cfaces import CircularFace
+from raytrace.cfaces import CircularFace, RectangularFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 
@@ -98,7 +98,7 @@ class PECMirror(BaseMirror):
         self.config_pipeline()
         return transF2
     
-    
+
 class PlanarWindow(PECMirror, Optic):
     n_inside = 1.5
     name = "Planar window"
@@ -126,6 +126,96 @@ class PlanarWindow(PECMirror, Optic):
         fl = FaceList(owner=self)
         fl.faces = [CircularFace(owner=self, z_plane=0, material=m),
                     CircularFace(owner=self, z_plane=self.thickness, 
+                        invert_normal=True, material=m)]
+        return fl
+
+class RectMirror(BaseMirror):
+    name = "Rectangular Mirror"
+    length = Float(25.4)
+    width = Float(25.4)
+    thickness = Float(5.0, desc="purely for visualisation purposes")
+    offset = Float(0.0)
+    
+    vtk_cube = Instance(tvtk.CubeSource, (), transient=True)
+    
+    cube_trans = Instance(tvtk.Transform, (), transient=True)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('length', editor=NumEditor),
+                       Item('width', editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('offset', editor=NumEditor)
+                        ),
+                   )
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces = [RectangularFace(owner=self)]
+        return fl
+    
+    ''' #copied from cylinder, probably easy to modify for a cube
+    def make_step_shape(self):
+        from raytrace.step_export import make_cylinder
+        cyl = make_cylinder(self.centre, 
+                             self.direction, 
+                             self.diameter/2, 
+                             self.thickness,
+                             self.offset,
+                             self.x_axis)
+        return cyl, "green"
+    '''
+    @on_trait_change("length, width, offset")
+    def config_pipeline(self):
+        cube = self.vtk_cube
+        cube.x_length = self.length
+        cube.y_length = self.width
+        thick = self.thickness
+        cube.z_length = thick
+        
+        t = self.cube_trans
+        t.identity()
+        t.translate(self.offset,0,-thick/2) #not sure about self.offset
+        t.rotate_x(180.)
+        
+        self.update = True
+    
+    def _pipeline_default(self):
+        cube = self.vtk_cube
+        norms = tvtk.PolyDataNormals(input=cube.output)
+        transF1 = tvtk.TransformFilter(input=norms.output, transform=self.cube_trans)
+        transF2 = tvtk.TransformFilter(input=transF1.output, transform=self.transform)
+        self.config_pipeline()
+        return transF2
+
+class RectWindow(RectMirror, Optic):
+    n_inside = 1.5
+    name = "Rectangular window"
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('length', editor=NumEditor),
+                       Item('width',editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('offset', editor=NumEditor),
+                       Item('n_inside', editor=NumEditor),
+                        ),
+                   )
+                   
+    vtkproperty = tvtk.Property(opacity = 0.4,
+                             color = (0.8,0.8,1.0))
+                             
+    def _material_default(self):
+        return Optic._material_default(self)
+                   
+    def _thickness_changed(self, new_t):
+        self.faces[1].z_plane = new_t
+    
+    def _faces_default(self):
+        m = self.material
+        fl = FaceList(owner=self)
+        fl.faces = [RectangularFace(owner=self, z_plane=0, material=m),
+                    RectangularFace(owner=self, z_plane=self.thickness, 
                         invert_normal=True, material=m)]
         return fl
     

@@ -23,7 +23,7 @@ cimport numpy as np
 cdef class CircularFace(Face):
     cdef public double diameter, offset, z_plane
     
-    params = ['diameter', 'offset']
+    params = ['diameter', 'offset']  #changed spelling to induce error.
     
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
@@ -56,6 +56,7 @@ cdef class CircularFace(Face):
         if (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
             return 0
+        print "inter: ",h * max_length
         return h * max_length
 
     cdef vector_t compute_normal_c(self, vector_t p):
@@ -68,6 +69,56 @@ cdef class CircularFace(Face):
         normal.z=-1
         return normal
     
+cdef class RectangularFace(Face):
+    cdef public double length, width, offset, z_plane
+    
+    params = ['length', 'width', 'offset']
+    
+    def __cinit__(self, **kwds):
+        self.z_plane = kwds.get('z_plane', 0.0)
+    
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          ray - pointer to the input ray
+          
+        returns:
+          idx - -1 if no intersection is found *or* the distance to the 
+                intersection is larger than the existing ray.length. OTherwise,
+                this is set to the intersecting face idx
+        """
+        cdef:
+            double max_length = sep_(p1, p2)
+            double h = (self.z_plane-p1.z)/(p2.z-p1.z)
+            double X, Y, lngth=self.length, wdth = self.width
+            
+        #print "CFACE", p1, p2
+        
+        if (h<self.tolerance) or (h>1.0):
+            #print "H", h
+            return 0
+        X = p1.x + h*(p2.x-p1.x) - self.offset
+        Y = p1.y + h*(p2.y-p1.y)
+        
+        #if x or y displacement is greater than length or width of rectangle, no intersect
+        if X*X > lngth*lngth/4:
+            return 0
+        if Y*Y > wdth*wdth/4:
+            return 0 
+        return h * max_length
+
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef vector_t normal
+        normal.x=0
+        normal.y=0
+        normal.z=-1
+        return normal
     
 cdef class SphericalFace(Face):
     cdef public double diameter, curvature, z_height
