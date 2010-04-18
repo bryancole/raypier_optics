@@ -215,7 +215,7 @@ class RectWindow(RectMirror, Optic):
         m = self.material
         fl = FaceList(owner=self)
         fl.faces = [RectangularFace(owner=self, z_plane=0, material=m),
-                    RectangularFace(owner=self, z_plane=self.thickness, 
+                    RectangularFace(owner=self, z_plane=-self.thickness, 
                         invert_normal=True, material=m)]
         return fl
     
