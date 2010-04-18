@@ -278,6 +278,23 @@ cdef class Transform:
             return (self.trans.tx, self.trans.ty, self.trans.tz)
 
 
+cdef class RayCollectionIterator:        
+    def __cinit__(self, RayCollection rays):
+        self.rays = rays
+        self.counter = 0
+        
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        cdef Ray ray=Ray.__new__(Ray)
+        if self.counter >= self.rays.n_rays:
+            raise StopIteration
+        ray.ray = self.rays.rays[self.counter]
+        self.counter += 1
+        return ray
+
+
 cdef class Ray:
     
     def __cinit__(self, **kwds):
@@ -423,14 +440,20 @@ cdef class RayCollection:
         self.n_rays += 1
         
     def reset_length(self):
+        """Sets the length of all rays in this RayCollection to Infinity
+        """
         cdef int i
         for i in xrange(self.n_rays):
             self.rays[i].length = INFINITY
         
     def add_ray(self, Ray r):
+        """Adds the given Ray instance to this collection
+        """
         self.add_ray_c(r.ray)
         
     def add_ray_list(self, list rays):
+        """Adds the given list of Rays to this collection
+        """
         cdef int i
         for i in xrange(len(rays)):
             if not isinstance(rays[i], Ray):
@@ -439,9 +462,13 @@ cdef class RayCollection:
             self.add_ray_c((<Ray>rays[i]).ray)
         
     def clear_ray_list(self):
+        """Empties this RayCollection (by setting the count to zero)
+        """
         self.n_rays = 0
         
     def get_ray_list(self):
+        """Returns the contents of this RayCollection as a list of Rays
+        """
         cdef int i
         cdef list ray_list = []
         cdef Ray r
@@ -463,20 +490,31 @@ cdef class RayCollection:
         if idx >= self.n_rays:
             raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
         self.rays[idx] = r.ray
+        
+    def __iter__(self):
+        return RayCollectionIterator(self)
     
     def copy_as_array(self):
+        """Returns the contents of this RayCollection as a numpy array
+        (the data is always copied).
+        """
         cdef np_.ndarray out = np.empty(self.n_rays, dtype=ray_dtype)
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
     
     @classmethod
     def from_array(cls, np_.ndarray data):
+        """Creates a new RayCollection from the given numpy array. The array
+        dtype should be a ctracer.ray_dtype. The data is copied into the 
+        RayCollection
+        """
         cdef int size=data.shape[0]
         cdef RayCollection rc = RayCollection(size)
         assert data.dtype is ray_dtype
         memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(ray_t))
         rc.n_rays = size
         return rc
+        
     
 cdef class InterfaceMaterial(object):
     """Abstract base class for objects describing

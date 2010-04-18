@@ -73,6 +73,11 @@ cdef class RayCollection:
     cdef public RayCollection parent
         
     cdef add_ray_c(self, ray_t r)
+    
+cdef class RayCollectionIterator:
+    cdef:
+        RayCollection rays
+        unsigned int counter
 
 
 cdef class InterfaceMaterial(object):
