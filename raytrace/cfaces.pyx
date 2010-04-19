@@ -23,7 +23,7 @@ cimport numpy as np
 cdef class CircularFace(Face):
     cdef public double diameter, offset, z_plane
     
-    params = ['diameter', 'offset']  #changed spelling to induce error.
+    params = ['diameter', 'offset']
     
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
@@ -56,7 +56,6 @@ cdef class CircularFace(Face):
         if (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
             return 0
-        print "inter: ",h * max_length
         return h * max_length
 
     cdef vector_t compute_normal_c(self, vector_t p):
