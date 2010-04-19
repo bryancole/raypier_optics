@@ -34,12 +34,10 @@ cdef class CircularFace(Face):
         params:
           p1 - the origin of the input ray, in local coords
           p2 - the end-point of the input ray, in local coords
-          ray - pointer to the input ray
           
         returns:
-          idx - -1 if no intersection is found *or* the distance to the 
-                intersection is larger than the existing ray.length. OTherwise,
-                this is set to the intersecting face idx
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
         """
         cdef:
             double max_length = sep_(p1, p2)
@@ -350,23 +348,32 @@ cdef class EllipsoidalFace(Face):
         d = sqrt(d)
         root1 = (-b + d)/(2*a)
         root2 = (-b - d)/(2*a)
-        if not 0 < root1 < 1:
+        p2 = addvv_(p1, multvs_(S, root2))
+        p1 = addvv_(p1, multvs_(S, root1))
+        
+        if not self.x1 < p2.x < self.x2:
+            root2 = 2
+        if not self.y1 < p2.y < self.y2:
+            root2 = 2
+        if not self.z1 < p2.z < self.z2:
+            root2 = 2
+            
+        if not self.x1 < p1.x < self.x2:
             root1 = 2
-        if not 0 < root2 < 1:
+        if not self.y1 < p1.y < self.y2:
+            root1 = 2
+        if not self.z1 < p1.z < self.z2:
+            root1 = 2
+        
+        if root1 < self.tolerance:
+            root1 = 2
+        if root2 < self.tolerance:
             root2 = 2
         if root1 > root2:
             root1 = root2
         if root1 > 1:
             return 0
-        
-        p2 = addvv_(p1, multvs_(S, root1))
-        if not self.x1 < p2.x < self.x2:
-            return 0
-        if not self.y1 < p2.y < self.y2:
-            return 0
-        if not self.z1 < p2.z < self.z2:
-            return 0
-        return root1
+        return root1*mag_(S)
         
     cdef vector_t compute_normal_c(self, vector_t p):
         cdef vector_t n

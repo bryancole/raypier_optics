@@ -559,9 +559,8 @@ cdef class Face(object):
         
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
-        """returns the face index of the intersection in terms of the 
-        fractional distance between p1 and p2.
-        p1 and p2 are in the local coordinate system
+        """returns the distance of the nearest valid intersection between 
+        p1 and p2. p1 and p2 are in the local coordinate system
         """
         return 0
     
