@@ -8,15 +8,17 @@ from enthought.traits.api import Instance, Float, on_trait_change,\
 from enthought.traits.ui.api import View, Item, DropEditor
 
 from raytrace.bases import Result
-from raytrace.faces import Face
+from raytrace.ctracer import Face
 from raytrace.tracer import RayTraceModel
 from enthought.traits.ui.editors.drop_editor import DropEditor
 
 import numpy
+import itertools
 
 def get_total_intersections(raysList, face):
-    return sum((rays.end_face==face).sum() for rays in raysList)
-
+    all_rays = itertools.chain(*raysList)
+    idx = face.idx
+    return sum(1 for ray in all_rays if ray.end_face_idx==idx)
 
 class Ratio(Result):
     name = "a ratio"
@@ -62,12 +64,11 @@ class Ratio(Result):
         #instead, just take the first source found
         source = self._tracer.sources[0]
         
-        #a list of RayCollections
+        #a list of RayCollection instances
         raysList = source.TracedRays
         
         nom_count = get_total_intersections(raysList, nom)
         denom_count = get_total_intersections(raysList, denom)
-        
         try:
             self.result = float(nom_count)/float(denom_count)
         except ZeroDivisionError:

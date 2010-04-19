@@ -5,7 +5,7 @@
 
 import sys
 sys.path.append('..')
-from raytrace import ctracer
+from raytrace import ctracer, cmaterials
 import unittest
 from math import sqrt
 import random
@@ -94,7 +94,7 @@ class TestVectorMathsFunctions(unittest.TestCase):
         
 class TestPECMaterial(unittest.TestCase):
     def test_eval_child(self):
-        m = ctracer.PECMaterial()
+        m = cmaterials.PECMaterial()
         in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
         out_rays = ctracer.RayCollection(1)
         m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1), out_rays)
@@ -123,6 +123,19 @@ class TestRayCollection(unittest.TestCase):
         self.assertEquals(rc.n_rays, 6)
         rays = [r for r in rc]
         self.assertEquals(len(rays), 6)
+        
+    def test_iteration2(self):
+        ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
+        rc = ctracer.RayCollection(10)
+        for i in xrange(6):
+            rc.add_ray(ray)
+        self.assertEquals(rc.n_rays, 6)
+        itr = iter(rc)
+        self.assertEquals(type(itr), ctracer.RayCollectionIterator)
+        for i in xrange(6):
+            r1 = itr.next()
+            self.assertEquals(r1.origin, ray.origin)
+            self.assertEquals(r1.direction, ray.direction)
         
     @staticmethod
     def make_ray():
