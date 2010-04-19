@@ -3,6 +3,8 @@ syntax: glob
 
 *.pyc
 *~
+*.so
+*.dll
 
 
 syntax: regexp
@@ -11,3 +13,4 @@ syntax: regexp
 ^raytrace\.egg-info$
 syntax: glob
 teraview*.py
+doc/build/**

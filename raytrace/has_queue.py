@@ -26,7 +26,7 @@ def on_trait_change ( name, post_init = False,
 
 
 class QueuedTraitChangeNotifyWrapper(TraitChangeNotifyWrapper):
-    def __init__(self, handler, owner):
+    def __init__(self, handler, owner, target=None):
         retrigger = getattr(handler, 'retrigger', 'all')
         self.dispatch = getattr(self, self._policy_map[retrigger])
         TraitChangeNotifyWrapper.__init__(self, handler, owner)
@@ -103,7 +103,7 @@ class HasQueue(HasTraits):
     trait_set = wrap_queue( HasTraits.trait_set )
         
     def _on_trait_change( self, handler, name = None, remove = False,
-                                 dispatch = 'same', priority = False ):
+                                 dispatch = 'same', priority = False, target = None):
         dispatch = getattr(handler, "dispatch", dispatch)
         super(HasQueue, self)._on_trait_change( handler, name=name, 
                                                 remove=remove,

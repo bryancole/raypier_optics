@@ -1,10 +1,35 @@
-#!/usr/bin/env python
+#!/bin/env python
+
+#cython: boundscheck=False
+#cython: nonecheck=False
+#cython: cdivision=True
 
 cdef extern from "math.h":
     double sqrt(double arg)
+    double fabs(double arg)
     double INFINITY
     
-from stdlib cimport malloc, free
+from stdlib cimport malloc, free, realloc
+
+cdef extern from "stdlib.h" nogil:
+    void *memcpy(void *str1, void *str2, size_t n)
+
+import numpy as np
+cimport numpy as np_
+
+ray_dtype = np.dtype([('origin', np.double, (3,)),
+                        ('direction', np.double, (3,)),
+                        ('normal', np.double, (3,)),
+                        ('E_vector', np.double, (3,)),
+                        ('refractive_index', np.complex128),
+                        ('E1_amp', np.complex128),
+                        ('E2_amp', np.complex128),
+                        ('length', np.double),
+                        ('wavelength', np.double),
+                        ('parent_idx', np.uint),
+                        ('end_face_idx', np.uint)
+                        ])
+                        
 
 ############################################
 ### C type declarations for internal use ###
@@ -32,12 +57,6 @@ cdef struct ray_t:
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
     double tx, ty, tz
-    
-    
-cdef struct intersection_t:
-    unsigned int face_idx #the intersecting face
-    vector_t point #position of intersection
-    double dist #fractional of ray between origin and intersection
 
 
 ##############################
@@ -51,7 +70,15 @@ cdef inline vector_t transform_c(transform_t t, vector_t p):
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22 + t.tz
     return out
 
-cdef inline vector_t set_v(vector_t v, object O):
+cdef inline vector_t rotate_c(transform_t t, vector_t p):
+    cdef vector_t out
+    out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02
+    out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12
+    out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22
+    return out
+
+cdef inline vector_t set_v(object O):
+    cdef vector_t v
     v.x = O[0]
     v.y = O[1]
     v.z = O[2]
@@ -59,19 +86,30 @@ cdef inline vector_t set_v(vector_t v, object O):
 
 def py_set_v(O):
     cdef vector_t v_
-    print "before", (v_.x, v_.y, v_.z)
-    v_ = set_v(v_, O)
-    print "after", (v_.x, v_.y, v_.z)
+    v_ = set_v(O)
     return (v_.x, v_.y, v_.z)
 
 cdef inline double sep_(vector_t p1, vector_t p2):
-    return sqrt((p2.x-p1.x)**2 + (p2.y-p1.y)**2 + (p2.z-p1.z)**2)
+    cdef double a,b
+    a = (p2.x-p1.x)
+    b = (p2.y-p1.y)
+    c = (p2.z-p1.z)
+    return sqrt((a*a) + (b*b) + (c*c))
 
 def sep(a, b):
-    cdef vector_t a_, b_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    cdef vector_t a_ = set_v(a), b_ = set_v(b)
     return sep_(a_, b_)
+
+cdef inline vector_t invert_(vector_t v):
+    v.x = -v.x
+    v.y = -v.y
+    v.z = -v.z
+    return v
+
+def invert(v):
+    cdef vector_t v_ = set_v(v)
+    v_ = invert_(v_)
+    return (v_.x, v_.y, v_.z)
 
 cdef inline vector_t multvv_(vector_t a, vector_t b):
     cdef vector_t out
@@ -82,8 +120,8 @@ cdef inline vector_t multvv_(vector_t a, vector_t b):
 
 def multvv(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = multvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -96,7 +134,7 @@ cdef inline vector_t multvs_(vector_t a, double b):
 
 def multvs(a, b):
     cdef vector_t a_, c_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     c_ = multvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
@@ -109,8 +147,8 @@ cdef inline vector_t addvv_(vector_t a, vector_t b):
 
 def addvv(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = addvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -123,7 +161,7 @@ cdef inline vector_t addvs_(vector_t a, double b):
 
 def addvs(a, b):
     cdef vector_t a_, c_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     c_ = addvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
@@ -136,8 +174,8 @@ cdef inline vector_t subvv_(vector_t a, vector_t b):
 
 def subvv(a, b):
     cdef vector_t a_, b_, c_
-    a_ = set_v(a_, a)
-    b_ = set_v(b_, b)
+    a_ = set_v(a)
+    b_ = set_v(b)
     c_ = subvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
@@ -150,9 +188,61 @@ cdef inline vector_t subvs_(vector_t a, double b):
 
 def subvs(a, b):
     cdef vector_t a_, c_
-    a_ = set_v(a_, a)
+    a_ = set_v(a)
     c_ = subvs_(a_, b)
     return (c_.x, c_.y, c_.z)
+
+cdef inline double mag_(vector_t a):
+    return sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
+
+def mag(a):
+    cdef vector_t a_
+    a_ = set_v(a)
+    return mag_(a_)
+
+cdef inline double mag_sq_(vector_t a):
+    return a.x*a.x + a.y*a.y + a.z*a.z
+
+def mag_sq(a):
+    cdef vector_t a_
+    a_ = set_v(a)
+    return mag_sq_(a_)
+
+cdef inline double dotprod_(vector_t a, vector_t b):
+    return a.x*b.x + a.y*b.y + a.z*b.z
+
+def dotprod(a, b):
+    cdef vector_t a_, b_
+    a_ = set_v(a)
+    b_ = set_v(b)
+    return dotprod_(a_,b_)
+
+cdef inline vector_t cross_(vector_t a, vector_t b):
+    cdef vector_t c
+    c.x = a.y*b.z - a.z*b.y
+    c.y = a.z*b.x - a.x*b.z
+    c.z = a.x*b.y - a.y*b.x
+    return c
+
+def cross(a, b):
+    cdef vector_t a_, b_, c_
+    a_ = set_v(a)
+    b_ = set_v(b)
+    c_ = cross_(a_, b_)
+    return (c_.x, c_.y, c_.z)
+
+cdef vector_t norm_(vector_t a):
+    cdef double mag=sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
+    a.x /= mag
+    a.y /= mag
+    a.z /= mag
+    return a
+
+def norm(a):
+    cdef vector_t a_
+    a_ = set_v(a)
+    a_ = norm_(a_)
+    return (a_.x, a_.y, a_.z)
 
 ##################################
 ### Python extension types
@@ -188,30 +278,21 @@ cdef class Transform:
             return (self.trans.tx, self.trans.ty, self.trans.tz)
 
 
-cdef class Intersection:
-    
-    property face_idx:
-        def __get__(self):
-            return self.inter.face_idx
+cdef class RayCollectionIterator:        
+    def __cinit__(self, RayCollection rays):
+        self.rays = rays
+        self.counter = 0
         
-        def __set__(self, unsigned int i):
-            self.inter.face_idx = i
-            
-    property point:
-        def __get__(self):
-            return (self.inter.point.x,
-                    self.inter.point.y,
-                    self.inter.point.z)
-        def __set__(self, v):
-            self.inter.point.x = v[0]
-            self.inter.point.y = v[1]
-            self.inter.point.z = v[2]
-            
-    property dist:
-        def __get__(self):
-            return self.inter.dist
-        def __set__(self, double d):
-            self.inter.dist = d
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        cdef Ray ray=Ray.__new__(Ray)
+        if self.counter >= self.rays.n_rays:
+            raise StopIteration
+        ray.ray = self.rays.rays[self.counter]
+        self.counter += 1
+        return ray
 
 
 cdef class Ray:
@@ -247,12 +328,12 @@ cdef class Ray:
     property normals:
         """normal vector for the face which created this ray"""
         def __get__(self):
-            return (self.ray.normals.x,self.ray.normals.y,self.ray.normals.z)
+            return (self.ray.normal.x,self.ray.normal.y,self.ray.normal.z)
         
         def __set__(self, v):
-            self.ray.normals.x = v[0]
-            self.ray.normals.y = v[1]
-            self.ray.normals.z = v[2]
+            self.ray.normal.x = v[0]
+            self.ray.normal.y = v[1]
+            self.ray.normal.z = v[2]
             
     property E_vector:
         """Unit vector, perpendicular to the ray direction,
@@ -273,6 +354,20 @@ cdef class Ray:
         
         def __set__(self, double v):
             self.ray.length = v
+            
+    property termination:
+        """the end-point of the ray (read only)
+        """
+        def __get__(self):
+            cdef vector_t end
+            cdef float length
+            if self.ray.length > 100.0:
+                length = 100.0
+            else:
+                length = self.ray.length
+            end = addvv_(self.ray.origin, multvs_(self.ray.direction, 
+                                    length))
+            return (end.x, end.y, end.z)
         
     property refractive_index:
         """complex refractive index through which
@@ -335,19 +430,31 @@ cdef class RayCollection:
         free(self.rays)
         
     cdef add_ray_c(self, ray_t r):
+        if self.n_rays == self.max_size:
+            if self.max_size == 0:
+                self.max_size = 1
+            else:
+                self.max_size *= 2
+            self.rays = <ray_t*>realloc(self.rays, self.max_size*sizeof(ray_t))
         self.rays[self.n_rays] = r
         self.n_rays += 1
         
+    def reset_length(self):
+        """Sets the length of all rays in this RayCollection to Infinity
+        """
+        cdef int i
+        for i in xrange(self.n_rays):
+            self.rays[i].length = INFINITY
+        
     def add_ray(self, Ray r):
-        if self.n_rays == self.max_size-1:
-            raise ValueError("RayCollection is full up")
-        self.rays[self.n_rays] = r.ray
-        self.n_rays += 1
+        """Adds the given Ray instance to this collection
+        """
+        self.add_ray_c(r.ray)
         
     def add_ray_list(self, list rays):
+        """Adds the given list of Rays to this collection
+        """
         cdef int i
-        if self.n_rays + len(rays) >= self.max_size:
-            raise IndexError("RayCollection size is too small to hold this many rays")
         for i in xrange(len(rays)):
             if not isinstance(rays[i], Ray):
                 raise TypeError("ray list contains non-Ray instance at index %d"%i)
@@ -355,9 +462,13 @@ cdef class RayCollection:
             self.add_ray_c((<Ray>rays[i]).ray)
         
     def clear_ray_list(self):
+        """Empties this RayCollection (by setting the count to zero)
+        """
         self.n_rays = 0
         
     def get_ray_list(self):
+        """Returns the contents of this RayCollection as a list of Rays
+        """
         cdef int i
         cdef list ray_list = []
         cdef Ray r
@@ -377,25 +488,81 @@ cdef class RayCollection:
     
     def __setitem__(self, int idx, Ray r):
         if idx >= self.n_rays:
-            raise IndexError("Requested index %d from a size %d array"%(idx, self.n_rays))
+            raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
         self.rays[idx] = r.ray
+        
+    def __iter__(self):
+        return RayCollectionIterator(self)
+    
+    def copy_as_array(self):
+        """Returns the contents of this RayCollection as a numpy array
+        (the data is always copied).
+        """
+        cdef np_.ndarray out = np.empty(self.n_rays, dtype=ray_dtype)
+        memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
+        return out
+    
+    @classmethod
+    def from_array(cls, np_.ndarray data):
+        """Creates a new RayCollection from the given numpy array. The array
+        dtype should be a ctracer.ray_dtype. The data is copied into the 
+        RayCollection
+        """
+        cdef int size=data.shape[0]
+        cdef RayCollection rc = RayCollection(size)
+        assert data.dtype is ray_dtype
+        memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(ray_t))
+        rc.n_rays = size
+        return rc
+        
+    
+cdef class InterfaceMaterial(object):
+    """Abstract base class for objects describing
+    the materials characterics of a Face
+    """
+    
+    cdef eval_child_ray_c(self, ray_t *old_ray, 
+                                unsigned int ray_idx, 
+                                vector_t p, vector_t normal,
+                                RayCollection new_rays):
+        pass
+    
+    def eval_child_ray(self, Ray old_ray, ray_idx, point, 
+                        normal, RayCollection new_rays):
+        cdef:
+            vector_t p, n
+            Ray out=Ray()
+            unsigned int idx
+        
+        p = set_v(point)
+        n = set_v(normal)
+        self.eval_child_ray_c(&old_ray.ray, ray_idx, 
+                                        p, n, new_rays)
     
     
 cdef class Face(object):
     
     params = []
     
-    def __cinit__(self, owner=None, tolerance=0.0001):
+    def __cinit__(self, owner=None, tolerance=0.0001, 
+                        max_length=100, material=None, **kwds):
         self.name = "base Face class"
         self.tolerance = tolerance
         self.owner = owner
+        self.max_length = max_length
+        if isinstance(material, InterfaceMaterial):
+            self.material = material
+        else:
+            from raytrace.cmaterials import PECMaterial
+            self.material = PECMaterial()
+        self.invert_normal = int(kwds.get('invert_normal', 0))
+        
     
-    cdef vector_t intersect_c(self, vector_t p1, vector_t p2):
-        """returns the intersection in terms of the 
-        fractional distance between p1 and p2.
-        p1 and p2 are in the local coordinate system
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        """returns the distance of the nearest valid intersection between 
+        p1 and p2. p1 and p2 are in the local coordinate system
         """
-        return p1
+        return 0
     
     def update(self):
         """Called to update the parameters from the owner
@@ -407,39 +574,53 @@ cdef class Face(object):
     
     def intersect(self, p1, p2):
         cdef:
-            vector_t p1_, p2_, p_i
+            vector_t p1_, p2_
+            double dist
         
-        p1_ = set_v(p1_, p1)
-        p2_ = set_v(p2_, p2)
-        p_i = self.intersect_c(p1_, p2_)
-        return (p_i.x, p_i.y, p_i.z)
+        p1_ = set_v(p1)
+        p2_ = set_v(p2)
+        dist = self.intersect_c(p1_, p2_)
+        return dist
 
     cdef vector_t compute_normal_c(self, vector_t p):
         return p
     
     def compute_normal(self, p):
+        """Compute normal vector at a given point, in local
+        face coordinates
+        """
         cdef vector_t p_, n
         n = self.compute_normal_c(p_)
         return (n.x, n.y, n.z)
-    
-    cdef ray_t eval_child_ray_c(self, ray_t old_ray, int ray_idx, 
-                                vector_t p):
-        return old_ray
-    
-    def eval_child_ray(self, Ray old_ray, ray_idx, point):
-        cdef:
-            vector_t p
-            Ray out=Ray()
-            unsigned int idx
-        
-        p = set_v(p, point)
-        out.ray = self.eval_child_ray_c(old_ray.ray, ray_idx, p)
-        return out
         
 
 
 cdef class FaceList(object):
     """A group of faces which share a transform"""
+    def __cinit__(self, owner=None):
+        self.transform = Transform()
+        self.inverse_transform = Transform()
+        self.owner = owner
+        
+    def sync_transforms(self):
+        """sets the transforms from the owner's VTKTransform
+        """
+        try:
+            trans = self.owner.transform
+        except AttributeError:
+            print "NO OWNER", self.owner
+            return
+        m = trans.matrix
+        rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
+        dt = [m.get_element(i,3) for i in xrange(3)]
+        #print "TRANS", rot, dt
+        self.transform = Transform(rotation=rot, translation=dt)
+        inv_trans = trans.linear_inverse
+        m = inv_trans.matrix
+        rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
+        dt = [m.get_element(i,3) for i in xrange(3)]
+        self.inverse_transform = Transform(rotation=rot, translation=dt)
+        
     property transform:
         def __set__(self, Transform t):
             self.trans = t.trans
@@ -458,45 +639,57 @@ cdef class FaceList(object):
             t.trans = self.inv_trans
             return t
         
+    def __getitem__(self, intidx):
+        return self.faces[intidx]
+        
      
-    cdef intersection_t intersect_c(self, vector_t P1, vector_t P2, double max_length):
+    cdef int intersect_c(self, ray_t *ray, vector_t ray_end, double max_length):
         """Finds the face with the nearest intersection
         point, for the ray defined by the two input points,
         P1 and P2 (in global coords).
         """
-        cdef vector_t p1, p2, point
-        cdef list faces
-        cdef double d, dist=INFINITY
-        cdef unsigned int i, nearest
-        cdef intersection_t inter
-        
-        p1 = transform_c(self.trans, P1)
-        p2 = transform_c(self.trans, P2)
-        
-        faces = self.faces
+        cdef:
+            vector_t p1 = transform_c(self.inv_trans, ray.origin)
+            vector_t p2 = transform_c(self.inv_trans, ray_end)
+            list faces=self.faces
+            unsigned int i
+            int all_idx=-1
+            double dist
+            Face face
         
         for i in xrange(len(faces)):
-            point = (<Face>(faces[i])).intersect_c(p1, p2)
-            d = sep(p1, point)
-            if 0.0 < d < dist:
-                dist = d
-                nearest = i
-        
-        inter.face_idx = <Face>(faces[nearest]).idx
-        inter.point = transform_c(self.inv_trans, point)
-        inter.dist = dist/sep(p1,p2)
-        return inter
+            face = faces[i]
+            dist = face.intersect_c(p1, p2)
+            if face.tolerance < dist < ray.length:
+                ray.length = dist
+                all_idx = face.idx
+                ray.end_face_idx = all_idx
+        return all_idx
     
-    def intersect(self, P1, P2, double max_length):
-        cdef vector_t P1_, P2_
-        cdef intersection_t inter
-        cdef Intersection i2=Intersection()
+    def intersect(self, Ray r, double max_length):
+        cdef vector_t P1_
+        cdef int idx
         
-        P1_ = set_v(P1_, P1)
-        P2_ = set_v(P2_, P2)
-        inter = self.intersect_c(P1_, P2_, max_length)
-        i2.inter = inter
-        return i2
+        P1_ = addvv_(r.ray.origin, multvs_(r.ray.direction, r.ray.length))
+        idx = self.intersect_c(&r.ray, P1_, max_length)
+        return idx
+    
+    cdef vector_t compute_normal_c(self, Face face, vector_t point):
+        cdef vector_t out
+        
+        out = transform_c(self.inv_trans, point)
+        out = face.compute_normal_c(out)
+        if face.invert_normal:
+            out = invert_(out)
+        out = rotate_c(self.trans, out)
+        return out
+    
+    def compute_normal(self, Face face, point):
+        cdef vector_t p
+        p = set_v(point)
+        p = self.compute_normal_c(face, p)
+        return (p.x, p.y, p.z)
+    
 
 ##################################
 ### Python module functions
@@ -504,39 +697,59 @@ cdef class FaceList(object):
 
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 
-                                    list all_faces):
+                                    list all_faces,
+                                    float max_length):
     cdef:
         FaceList face_set #a FaceList
-        int size, i
-        vector_t P1, P2, normal
-        float max_length
-        intersection_t inter, inter2
-        int n_sets=len(face_sets)
-        ray_t ray
+        unsigned int size, i, j
+        vector_t P1, normal, point
+        int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
+        ray_t new_ray
+        ray_t *ray
+        RayCollection new_rays
    
     #need to allocate the output rays here 
     new_rays = RayCollection(rays.n_rays)
-   
-    for i in range(size):
-        ray = rays.rays[i]
-        P1 = ray.origin
-        P2 = addvv_(P1, multvs_(ray.direction, max_length))
-        inter = (<FaceList>(face_sets[0])).intersect_c(P1, P2, max_length)
-        dist = sep(inter.point, P1)
-        for j in xrange(n_sets-1):
-            face_set = face_sets[j+1]
-            inter2 = (<FaceList>face_set).intersect_c(P1, P2, max_length)
-            dist2 = sep_(inter2.point, P1)
-            if dist2 < dist:
-                dist = dist2
-                inter = inter2
-                
-        if dist <= INFINITY:
-            face = all_faces[inter.face_idx]
-            #evaluate new ray
-            new_rays.add_ray_c(face.eval_child_ray_c(ray, i, 
-                                                    inter.point))
+    
+    for i in range(rays.n_rays):
+        ray = rays.rays + i
+        ray.length = max_length
+        ray.end_face_idx = -1
+        nearest_idx=-1
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    max_length))
+        #print "points", P1, P2
+        for j in xrange(n_sets):
+            face_set = face_sets[j]
+            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            idx = (<FaceList>face_set).intersect_c(ray, point, max_length)
+            if idx >= 0:
+                nearest_set = j
+                nearest_idx = idx
+        if nearest_idx >= 0:
+            #print "GET FACE", nearest.face_idx, len(all_faces)
+            face = all_faces[nearest_idx]
+            face.count += 1
+            #print "ray length", ray.length
+            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+            normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
+            #print "s normal", normal
+            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                    point,
+                                                    normal,
+                                                    new_rays
+                                                    )
     return new_rays
+
+
+def trace_segment(RayCollection rays, 
+                    list face_sets, 
+                    list all_faces,
+                    max_length=100):
+    for fs in face_sets:
+        fs.sync_transforms()
+    return trace_segment_c(rays, face_sets, all_faces, max_length)
 
 
 def transform(Transform t, p):
@@ -549,4 +762,4 @@ def transform(Transform t, p):
     p2 = transform_c(t.trans, p1)
     return (p2.x, p2.y, p2.z)
     
-
+    

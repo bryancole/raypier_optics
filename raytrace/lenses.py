@@ -25,16 +25,11 @@ from enthought.tvtk.api import tvtk
 from raytrace.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals
     
-from raytrace.faces import CircularFace, SphericalFace, DielectricFace
+from raytrace.cfaces import CircularFace, SphericalFace
+from raytrace.ctracer import FaceList
+from raytrace.cmaterials import DielectricMaterial
 
 import math, numpy
-
-
-class PlanarFace(CircularFace, DielectricFace):
-    pass
-
-class ConvexFace(SphericalFace, DielectricFace):
-    pass
 
 
 class BaseLens(Optic):
@@ -57,7 +52,7 @@ class PlanoConvexLens(BaseLens):
     vtk_sphere = Instance(tvtk.Sphere, ())
     
     clip2 = Instance(tvtk.ClipDataSet, ())
-    
+        
     traits_view = View(VGroup(
                        Traceable.uigroup,  
                        Item('n_inside', editor=ComplexEditor),
@@ -66,9 +61,19 @@ class PlanoConvexLens(BaseLens):
                        Item('curvature', editor=NumEditor)
                        )
                     )
+                    
     
     def _faces_default(self):
-        return [PlanarFace(owner=self), ConvexFace(owner=self)]
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self, diameter=self.diameter,
+                                material = self.material), 
+                SphericalFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                z_height=self.CT, curvature=self.curvature)]
+        return fl
+    
+    def _CT_changed(self, new_ct):
+        self.faces.faces[1].z_height = new_ct
     
     def make_step_shape(self):
         from step_export import make_spherical_lens
@@ -143,119 +148,6 @@ class PlanoConvexLens(BaseLens):
         self.config_pipeline()
         grid.modified()
         return transF
-    
-#    def trace_rays(self, rays, face_id=None):
-#        p1 = rays.origin
-#        p2 = p1 + rays.max_length*rays.direction
-#        t = self.transform
-#        inv_t = t.linear_inverse
-#        P1 = transformPoints(inv_t, p1)
-#        P2 = transformPoints(inv_t, p2)
-#        
-#        dtype=([('length','f8'),('cell','i2'),('point','f8',3)])
-#        result = numpy.zeros(p1.shape[0], dtype=dtype)
-#        
-#        if face_id is None:
-#            plane = self.intersect_with_planeT(P1, P2)
-#            sphere = self.intersect_with_sphereT(P1, P2)
-#            
-#            choice = numpy.argmin([plane[0], sphere[0]], axis=0)
-#            
-#            result['length'] = numpy.choose(choice, [plane[0], sphere[0]]) * rays.max_length
-#            result['cell'] = choice
-#            points = numpy.choose(choice.reshape(-1,1)*numpy.ones((1,3),'i'), [plane[1], sphere[1]])
-#            result['point'] = transformPoints(t, points)
-#        else:
-#            intersect = {0: self.intersect_with_planeT,
-#                         1: self.intersect_with_sphereT}[face_id]
-#            result['length'] = intersect[0] * rays.max_length
-#            results['cell'] = face_id
-#            result['point'] = transformPoints(t, intersect[1])
-#        return result
-#    
-#    def intersect_with_planeT(self, p1, p2):
-#        r = self.diameter/2
-#        x1,y1,z1 = p1.T
-#        x2,y2,z2 = p2.T
-#        #check the ray crosses zero
-#        mask = (z1>=0) == (z2>=0)
-#        #check it's not a self-intersection
-#        mask = numpy.logical_or(mask, abs(z1) < self.tolerance)
-#
-#        h = -z1/(z2-z1)
-#        X = x1 + h*(x2-x1)
-#        Y = y1 + h*(y2-y1)
-#        #print X, Y, X**2 + Y**2, r**2
-#        mask = numpy.logical_or(mask, (X**2 + Y**2) > r**2)
-#        
-#        h[mask] = numpy.Infinity
-#        
-#        return h, numpy.column_stack((X, Y, numpy.zeros_like(X)))
-#            
-#    def intersect_with_sphereT(self, p1, p2):
-#        rad = self.curvature
-#        dot = lambda a,b: (a*b).sum(axis=-1)
-#        r = p1
-#        s = p2 - r
-#        c = numpy.array([[0,0,self.CT - self.curvature]])
-#        d = r - c
-#        
-#        A = dot(s,s)
-#        B = 2*(dot(s,d))
-#        C = dot(d,d) - rad**2
-#        
-#        D = B**2 - 4*A*C
-#        
-#        mask = D < 0
-#
-#        E = numpy.sqrt(D)
-#        roots = ((-B+E)/(2*A), (-B-E)/(2*A))
-#        
-#        for R in roots:
-#            m = numpy.logical_or(R>1.0, R<0.01)
-#            m = numpy.logical_or(m, mask)
-#            pt = r + R.reshape(-1,1)*s
-#            m = numpy.logical_or(m, (pt[:,0]**2 + pt[:,1]**2) > (self.diameter/2.)**2)
-#            m = numpy.logical_or(m, ((pt[:,2]-c[:,2])/rad)<0)
-#            R[m] = numpy.Infinity
-#        R1,R2 = roots
-#        selected = numpy.choose(R2<R1,[R1,R2])
-#        
-#        return selected, r + selected.reshape(-1,1)*s
-#        
-#    def compute_normal(self, points, cell_ids):
-#        trans = self.transform
-#        inv_trans = trans.linear_inverse
-#        
-#        if isinstance(cell_ids, int):
-#            if cell_id==0:
-#                #intersection with plane face
-#                return normaliseVector(trans.transform_normal(0,0,-1))
-#            elif cell_id==1:
-#                #spherical surface
-#                P = transformPoints(inv_trans, points)
-#                centre = numpy.array(self.vtk_sphere.center)
-#                radius = self.vtk_sphere.radius
-#                curve = self.curvature
-#                grad = (P - centre)*2
-#                if curve < 0.0:
-#                    grad *= -1
-#                return transformNormals(trans, grad)
-#            else:
-#                raise ValueError("unknown cell ID")
-#        else:            
-#            P = transformPoints(inv_trans, points)
-#            centre = numpy.array(self.vtk_sphere.center)
-#            radius = self.vtk_sphere.radius
-#            curve = self.curvature
-#            grad = (P - centre)*2
-#            if curve < 0.0:
-#                grad *= -1
-#            
-#            normals = transformNormals(trans, grad)
-#            
-#            normals[cell_ids==0] = numpy.array(trans.transform_normal(0,0,-1))
-#            return normals
 
         
 if __name__=="__main__":

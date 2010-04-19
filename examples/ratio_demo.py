@@ -1,7 +1,8 @@
 """
 A demonstration of how to use a Results subclass
 """
-
+import sys
+sys.path.append('..')
 
 from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel

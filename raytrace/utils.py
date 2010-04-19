@@ -17,8 +17,10 @@
 
 import numpy
 from enthought.tvtk.api import tvtk
-from enthought.traits.api import Range as _Range, Tuple as _Tuple
+from enthought.traits.api import Range as _Range, Tuple as _Tuple,\
+            BaseTuple
 from enthought.traits.ui.api import TupleEditor
+
 
 class EditorTraits(object):
     def get_editor(self, *args, **kwds):
@@ -38,8 +40,20 @@ class Range(EditorTraits, _Range):
 class Tuple(EditorTraits, _Tuple):
     pass
 
+
+class UnitVectorTrait(EditorTraits, BaseTuple):
+    def validate(self, object, name, value):
+        value = super(UnitVectorTrait, self).validate(object,name,value)
+        mag = numpy.sqrt(sum(a**2 for a in value))
+        return tuple(a/mag for a in value)
+
+
 TupleVector = Tuple((0.,0.,0.), editor_traits={'cols':3,
                                              'labels':['x','y','z']})
+                                             
+UnitTupleVector = UnitVectorTrait((0.,0.,1.), editor_traits={'cols':3,
+                                             'labels':['x','y','z']})
+
 
 def normaliseVector(a):
     """normalise a (3,) vector or a (n,3) array of vectors"""

@@ -23,17 +23,16 @@ from enthought.tvtk.api import tvtk
 
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
-     ComplexEditor, VectorEditor
+     ComplexEditor, VectorEditor, Optic
      
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
-from faces import CircularFace, PECFace
+from raytrace.cfaces import CircularFace
+from raytrace.ctracer import FaceList
+from raytrace.cmaterials import DielectricMaterial
 
 import math, numpy
 
-
-class PECCircularFace(CircularFace, PECFace):
-    pass
 
 
 class BaseMirror(Traceable):
@@ -63,7 +62,9 @@ class PECMirror(BaseMirror):
                    )
     
     def _faces_default(self):
-        return [PECCircularFace(owner=self)]
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self)]
+        return fl
     
     def make_step_shape(self):
         from raytrace.step_export import make_cylinder
@@ -96,6 +97,37 @@ class PECMirror(BaseMirror):
         transF2 = tvtk.TransformFilter(input=transF1.output, transform=self.transform)
         self.config_pipeline()
         return transF2
+    
+    
+class PlanarWindow(PECMirror, Optic):
+    n_inside = 1.5
+    name = "Planar window"
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('diameter', editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('offset', editor=NumEditor),
+                       Item('n_inside', editor=NumEditor),
+                        ),
+                   )
+                   
+    vtkproperty = tvtk.Property(opacity = 0.4,
+                             color = (0.8,0.8,1.0))
+                             
+    def _material_default(self):
+        return Optic._material_default(self)
+                   
+    def _thickness_changed(self, new_t):
+        self.faces[1].z_plane = new_t
+    
+    def _faces_default(self):
+        m = self.material
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self, z_plane=0, material=m),
+                    CircularFace(owner=self, z_plane=self.thickness, 
+                        invert_normal=True, material=m)]
+        return fl
     
             
 if __name__=="__main__":
