@@ -67,8 +67,13 @@ class Extrusion(Optic):
         z2 = self.z_height_2
         profile = self.profile
         m = self.material
-        sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=x1, y1=y1, 
-                    x2=x2, y2=y2, material=m) for ((x2,y2),(x1,y1)) 
+	#a plane is extruded differently from a 2d profile
+	if profile.shape == (2,2):
+		sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=profile[0,0], y1=profile[0,1], 
+                    x2=profile[1,0], y2=profile[1,1], material=m)]
+	else:
+        	sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=x1, y1=y1, 
+                	    x2=x2, y2=y2, material=m) for ((x2,y2),(x1,y1)) 
                                             in pairwise(profile)]
         if self.trace_ends:
             base = PolygonFace(owner=self, z_plane=z1,
@@ -200,6 +205,32 @@ class LDLF(Extrusion):
                         (w+dis,h),
                         (-w-dis,h)]
                         
+class Sheet(Extrusion):
+    #just a wrapper for the extrudedplanarface
+    name = "Extruded Sheet"
+    x1 = Float 
+    y1 = Float
+    x2 = Float
+    y2 = Float
+    trace_ends = Bool(False)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('trace_ends'),
+                       Item('n_inside'),
+                       Item('x1'),
+                       Item('x2'),
+                       Item('y1'),
+                       Item('y2')
+                       )
+                       )
+
+    @on_trait_change("x1,x2,y1,y2")
+    def config_profile(self):
+        
+        self.profile = [(self.x1,self.y1),
+                        (self.x2,self.y2)]
+
 if __name__=="__main__":
     from ray_tracer import BuildRaySet, BeamStop, RayTraceModel
     
