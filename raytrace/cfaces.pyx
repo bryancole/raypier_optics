@@ -91,8 +91,8 @@ cdef class SphericalFace(Face):
                 this is set to the intersecting face idx
         """
         cdef:
-            double A,B,C,D, cz
-            vector_t s, d, pt
+            double A,B,C,D, cz, a1, a2
+            vector_t s, d, pt1, pt2
             
         s = subvv_(p2, r)
         cz = self.z_height - self.curvature
@@ -109,17 +109,31 @@ cdef class SphericalFace(Face):
         
         D = sqrt(D)
         
-        A = (-B+D)/(2*A) #1st root
-        pt = addvv_(r, multvs_(s, A))
-        if pt.z < cz: #wrong root
-            A = (-B-D)/(2*A) #2nd root
-            pt = addvv_(r, multvs_(s, A))
+        #1st root
+        a1 = (-B+D)/(2*A) 
+        pt1 = addvv_(r, multvs_(s, a1))
+        #2nd root
+        a2 = (-B-D)/(2*A)
+        pt2 = addvv_(r, multvs_(s, a2))
         
-        if A>1.0 or A<self.tolerance:
+        if pt1.z < cz:
+            a1 = INFINITY
+        if pt2.z < cz:
+            a2 = INFINITY
+            
+        D = self.diameter*self.diameter/4.
+        
+        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
+            a1 = INFINITY
+        if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
+            a2 = INFINITY
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
             return 0
-        if (pt.x*pt.x + pt.y*pt.y) > (self.diameter*self.diameter/4.):
-            return 0
-        return A * sep_(r, p2)
+        return a1 * sep_(r, p2)
     
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
