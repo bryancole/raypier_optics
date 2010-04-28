@@ -29,11 +29,9 @@ from raytrace.bases import Traceable, normaliseVector, NumEditor,\
             VectorEditor, transformPoints, transformNormals
 #from raytrace.sources import RayCollection
 from raytrace.mirrors import BaseMirror
-from raytrace.faces import EllipsoidFace, PECFace, Face
+from raytrace.cfaces import EllipsoidalFace
+from raytrace.ctracer import FaceList
 
-
-class PECEllipsoidFace(EllipsoidFace, PECFace):
-    pass
 
 
 class Ellipsoid(BaseMirror):
