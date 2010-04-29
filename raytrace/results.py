@@ -17,6 +17,10 @@ import itertools
 
 def get_total_intersections(raysList, face):
     all_rays = itertools.chain(*raysList)
+    '''#debug
+    print face.idx, " all_rays: "
+    for ray in all_rays:
+	print ray.end_face_idx  #'''
     idx = face.idx
     return sum(1 for ray in all_rays if ray.end_face_idx==idx)
 
@@ -69,6 +73,7 @@ class Ratio(Result):
         
         nom_count = get_total_intersections(raysList, nom)
         denom_count = get_total_intersections(raysList, denom)
+	print "nom and denom counts", nom_count, denom_count
         try:
             self.result = float(nom_count)/float(denom_count)
         except ZeroDivisionError:
