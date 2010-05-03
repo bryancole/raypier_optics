@@ -34,12 +34,10 @@ cdef class CircularFace(Face):
         params:
           p1 - the origin of the input ray, in local coords
           p2 - the end-point of the input ray, in local coords
-          ray - pointer to the input ray
           
         returns:
-          idx - -1 if no intersection is found *or* the distance to the 
-                intersection is larger than the existing ray.length. OTherwise,
-                this is set to the intersecting face idx
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
         """
         cdef:
             double max_length = sep_(p1, p2)
@@ -141,8 +139,8 @@ cdef class SphericalFace(Face):
                 this is set to the intersecting face idx
         """
         cdef:
-            double A,B,C,D, cz
-            vector_t s, d, pt
+            double A,B,C,D, cz, a1, a2
+            vector_t s, d, pt1, pt2
             
         s = subvv_(p2, r)
         cz = self.z_height - self.curvature
@@ -159,17 +157,31 @@ cdef class SphericalFace(Face):
         
         D = sqrt(D)
         
-        A = (-B+D)/(2*A) #1st root
-        pt = addvv_(r, multvs_(s, A))
-        if pt.z < cz: #wrong root
-            A = (-B-D)/(2*A) #2nd root
-            pt = addvv_(r, multvs_(s, A))
+        #1st root
+        a1 = (-B+D)/(2*A) 
+        pt1 = addvv_(r, multvs_(s, a1))
+        #2nd root
+        a2 = (-B-D)/(2*A)
+        pt2 = addvv_(r, multvs_(s, a2))
         
-        if A>1.0 or A<self.tolerance:
+        if pt1.z < cz:
+            a1 = INFINITY
+        if pt2.z < cz:
+            a2 = INFINITY
+            
+        D = self.diameter*self.diameter/4.
+        
+        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
+            a1 = INFINITY
+        if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
+            a2 = INFINITY
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
             return 0
-        if (pt.x*pt.x + pt.y*pt.y) > (self.diameter*self.diameter/4.):
-            return 0
-        return A * sep_(r, p2)
+        return a1 * sep_(r, p2)
     
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
@@ -386,23 +398,32 @@ cdef class EllipsoidalFace(Face):
         d = sqrt(d)
         root1 = (-b + d)/(2*a)
         root2 = (-b - d)/(2*a)
-        if not 0 < root1 < 1:
+        p2 = addvv_(p1, multvs_(S, root2))
+        p1 = addvv_(p1, multvs_(S, root1))
+        
+        if not self.x1 < p2.x < self.x2:
+            root2 = 2
+        if not self.y1 < p2.y < self.y2:
+            root2 = 2
+        if not self.z1 < p2.z < self.z2:
+            root2 = 2
+            
+        if not self.x1 < p1.x < self.x2:
             root1 = 2
-        if not 0 < root2 < 1:
+        if not self.y1 < p1.y < self.y2:
+            root1 = 2
+        if not self.z1 < p1.z < self.z2:
+            root1 = 2
+        
+        if root1 < self.tolerance:
+            root1 = 2
+        if root2 < self.tolerance:
             root2 = 2
         if root1 > root2:
             root1 = root2
         if root1 > 1:
             return 0
-        
-        p2 = addvv_(p1, multvs_(S, root1))
-        if not self.x1 < p2.x < self.x2:
-            return 0
-        if not self.y1 < p2.y < self.y2:
-            return 0
-        if not self.z1 < p2.z < self.z2:
-            return 0
-        return root1
+        return root1*mag_(S)
         
     cdef vector_t compute_normal_c(self, vector_t p):
         cdef vector_t n
