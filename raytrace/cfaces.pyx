@@ -281,6 +281,63 @@ cdef class ExtrudedPlanarFace(Face):
         return self.normal
     
     
+cdef class ExtrudedBezier2Face(Face):
+    cdef:
+        double X0, X1, X2, Y0, Y1, Y2
+        
+    cdef double intersect_c(self, vector_t r, vector_t p2):
+        cdef: 
+            vector_t s
+            double A, B, C, D
+            double t1, t2, a1, a2
+            double p0s, p1s, p2s
+            
+        s = subvv_(p2, r)
+        
+        ### An inefficient implementation to begin with,
+        ### to check the maths
+        A = s.y*(self.X0 - 2*self.X1 + self.X2) \
+            - s.x*(self.Y0 - 2*self.Y1 + self.Y2)
+        B = 2*( s.x*(self.Y0-self.Y1) - s.y*(self.X0-self.X1) )
+        C = s.y*(self.X0 - r.x) - s.x*(self.Y0 - r.y)
+        
+        D = B*B - 4*A*C
+        
+        if D<0: #no intersection at all
+            return 0
+        
+        D = sqrt(D)
+        
+        ###two possible roots
+        t1 = (-B + D) / (2*A)
+        t2 = (-B - D) / (2*A)
+        
+        p0s = self.X0*s.x + self.Y0*s.y
+        p1s = self.X1*s.x + self.Y1*s.y
+        p2s = self.X2*s.x + self.Y2*s.y
+        
+        if 0 <= t1 < 1:
+            a1 = (1-t1)*(1-t1)*p0s + 2*(1-t1)*t1*p1s + t1*t1*p2s - (r.x*s.x + r.y*s.y)
+            a1 /= (s.x*s.x + s.y*s.y)
+            if not self.tolerance < a1 <= 1:
+                a1 = INFINITY
+        else:
+            a1 = INFINITY
+            
+        if 0 <= t2 < 1:
+            a2 = (1-t2)*(1-t2)*p0s + 2*(1-t2)*t2*p1s + t2*t2*p2s - (r.x*s.x + r.y*s.y)
+            a2 /= (s.x*s.x + s.y*s.y)
+            if not self.tolerance < a2 <= 1:
+                a2 = INFINITY
+        else:
+            a2 = INFINITY
+        
+        if a2 < a1:
+            return a2 * mag_(s)
+        else:
+            return a1 * mag_(s)
+    
+    
 cdef int point_in_polygon_c(double X, double Y, object obj):
     cdef int i, size, ct=0
     cdef double y1, y2, h, x, x1, x2

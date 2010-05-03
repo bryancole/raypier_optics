@@ -19,7 +19,7 @@
 Parabolic troughs and also rectangular mirrors
 """
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
-            Property, List, Instance, on_trait_change, Range, Any,\
+            Property, List, Instance, on_trait_change, Range, Any, Bool,\
             Tuple, Event, cached_property, Set, Int, Trait, PrototypedFrom
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TupleEditor
@@ -40,6 +40,7 @@ class TroughFace(Face):
     name = "Parabolic Trough Face"
     EFL = PrototypedFrom("owner")
     #EFL = 5.
+    EFL_centre = PrototypedFrom("owner")
     length = PrototypedFrom("owner")
     #length = 100
     X_bounds = PrototypedFrom("owner")
@@ -143,6 +144,8 @@ class TroughFace(Face):
         n = P1.shape[0]         #returns how many points there are
         efl = self.EFL #scalar
         h = 1 / (4 * efl)
+        cen_cor = efl * self.EFL_centre
+        
         
         #This was originally written with the Z axis as the long axis of the trough,
         #but inorder for the direction parameter to be useful and point from
@@ -163,7 +166,7 @@ class TroughFace(Face):
         
         a = h
         b = -m
-        c = - q - efl
+        c = - q - cen_cor
         
         d = b**2 - 4*a*c
         
@@ -174,12 +177,12 @@ class TroughFace(Face):
         
         #put these roots into a list of intersection points using y = mx + q
         #I make these 3d with z=0, Which i'll fix later
-        inter1 = numpy.array([root1,h*(root1**2) - efl, numpy.zeros(n)]).T
-        inter2 = numpy.array([root2,h*(root2**2) - efl, numpy.zeros(n)]).T
+        inter1 = numpy.array([root1,h*(root1**2) - cen_cor, numpy.zeros(n)]).T
+        inter2 = numpy.array([root2,h*(root2**2) - cen_cor, numpy.zeros(n)]).T
         
         #Where the slope was infinite these values are wrong:
         
-        perp_result = numpy.array([P1[:,0],h * P1[:,0]**2 - efl ,numpy.zeros(n)]).T
+        perp_result = numpy.array([P1[:,0],h * P1[:,0]**2 - cen_cor ,numpy.zeros(n)]).T
         perp_fix = numpy.array([P1[:,0] == P2[:,0]]*3).T
         
         inter1 = numpy.where(perp_fix,perp_result, inter1)
@@ -349,6 +352,7 @@ class TroughParabloid(BaseMirror):
     length = Float(100.0, desc="length of trough")
     X_bounds = Tuple((-25.5, 25.5), desc="width of parabolic profile")
     EFL = Float(50.8, desc="effective focal length")
+    EFL_centre = Bool(True, desc="make focus the centre")
     
     max_length = Float(1000.0)
     

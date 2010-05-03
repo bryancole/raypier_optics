@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from enthought.traits.api import HasTraits, Instance, Float, Complex,\
-        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str, Bool
+        Tuple, Property, on_trait_change, PrototypedFrom, Any, Str, Bool, Enum
         
 from enthought.traits.ui.api import View, Item
 
@@ -183,11 +183,40 @@ class RectangularFace(Face):
         n = numpy.asarray([t.transform_vector(0,0,-1),])
         return numpy.ones(points.shape) * n
         
+        
 class PolygonFace(Face):
     name = "polygon face"
-    diameter = PrototypedFrom('owner')
-    offset = PrototypedFrom('owner')
+    #diameter = PrototypedFrom('owner') ###what were these two for???
+    #offset = PrototypedFrom('owner')
 
+    xy_points = PrototypedFrom('owner', desc="a list of (x,y) tuples describing"
+                               " the 2D profile of this face")
+    z_height = Float(0.0)
+    z_polarity = Enum("positive", "negative",
+                      desc="direction of the surface normal. 'positive' means"
+                      " the z-axis points out of the solid, 'negative' means"
+                      " it points inwards")
+    
+    def compute_normal(self, points):
+        """computes the surface normal in the global coordinate system"""
+        t = self.transform
+        p = 1 if self.z_polarity=="positive" else -1
+        n = numpy.asarray([t.transform_vector(0,0,p),])
+        return numpy.ones(points.shape) * n
+    
+    def intersect(self, P1, P2, max_length):
+        
+        dtype=([('length','f8'),('face', 'O'),('point','f8',3)])
+        result = numpy.empty(P1.shape[0], dtype=dtype)
+        result['length'] = h_nearest*max_length
+        result['face'] = self
+        result['point'] = nearest
+        return result
+    
+    
+class ExtrusionFace(Face):
+    pass
+    
 
 class EllipsoidFace(Face):
     name = "ellipsoid face"
@@ -563,7 +592,44 @@ class PECFace(Face):
                                    normals = normal)
         return refl_rays
     
-    
+class ApertureFace(Face):
+    def eval_children(self, rays, points, mask=slice(None,None,None)):
+        """
+        rays continue on from here unmodified, but are noted as having been
+        here for staistical measurements.  This is just a copy of the PEC
+        face but with change in direction removed.
+        
+        rays - a RayCollection object
+        points - a (Nx3) array of intersection coordinates
+        mask - a bool array selecting items for this Optic
+        """
+        points = points[mask]
+        n = rays.refractive_index[mask]
+        normal = self.compute_normal(points)
+        input_v = rays.direction[mask]
+        parent_ids = numpy.arange(mask.shape[0])[mask]
+
+        S_amp, P_amp, S_vec, P_vec = Convert_to_SP(input_v, 
+                                                   normal, 
+                                                   rays.E_vector[mask], 
+                                                   rays.E1_amp[mask], 
+                                                   rays.E2_amp[mask])
+
+        new_direction = input_v         #same as the old
+        faces = numpy.array([self,] * points.shape[0])
+        passed_rays = RayCollection(origin=points,
+                                   direction = new_direction,
+                                   max_length = rays.max_length,
+                                   E_vector = S_vec,
+                                   E1_amp = -S_amp,
+                                   E2_amp = -P_amp,
+                                   parent = rays,
+                                   parent_ids = parent_ids,
+                                   face = faces,
+                                   refractive_index=n,
+                                   normals = normal)
+        return passed_rays
+        
 class DielectricFace(Face):
     n_inside = PrototypedFrom("owner")
     n_outside = PrototypedFrom("owner")
@@ -684,7 +750,8 @@ class DielectricFace(Face):
                                parent=rays,
                                parent_ids = parent_ids,
                                faces=faces,
-                               refractive_index=refractive_index) 
+                               refractive_index=refractive_index,
+                               normals=normal) 
             
 
     

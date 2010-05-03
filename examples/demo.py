@@ -2,18 +2,20 @@
 """
 A simple example
 """
+import sys
+sys.path.append('..')
 from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel
 from raytrace.ellipsoids import Ellipsoid
 from raytrace.mirrors import PECMirror
-from raytrace.probes import PolarisationProbe
+#from raytrace.probes import PolarisationProbe
 from raytrace.lenses import PlanoConvexLens
-from raytrace.absorbers import AbsorberDisk
+#from raytrace.absorbers import AbsorberDisk
 import numpy
 
-p1 = PolarisationProbe(centre=(30,30,30),
-                        size=100.,
-                        direction=(1,1,1))
+#p1 = PolarisationProbe(centre=(30,30,30),
+#                        size=100.,
+#                        direction=(1,1,1))
 
 source = ConfocalRaySource(focus=(0,0,0),
                             direction=(0,1,0),
@@ -45,7 +47,7 @@ m2 = PECMirror(name="M2",
                 
 m2.orientation=-160
                 
-m3 = AbsorberDisk(name="M3",
+m3 = PECMirror(name="M3",
                 centre=(0,40,40),
                 direction=(0,1,1),
                 diameter=15.,

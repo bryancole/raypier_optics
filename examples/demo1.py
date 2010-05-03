@@ -2,6 +2,8 @@
 """
 A simple example
 """
+import sys
+sys.path.append('..')
 from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel
 from raytrace.ellipsoids import Ellipsoid

@@ -16,6 +16,33 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy
+from utils import normaliseVector, transformPoints
+from enthought.tvtk.api import tvtk
+
+def transform_pts(centre, direction, points):
+    #take a point from the global referance frame and transform it into the 
+    #local referance frame of an object.  accepts the x,y,z of the centre and
+    #direction of the object's frame.
+    
+    temp = tvtk.Transform()
+
+    temp.identity()
+    temp.translate(centre)
+
+    x,y,z = normaliseVector(direction)
+    Theta = numpy.arccos(z)
+    theta = 180*Theta/numpy.pi
+    phi = 180*numpy.arctan2(x,y)/numpy.pi
+    orientation = -phi, -theta
+    
+    temp.rotate_z(-phi)
+    temp.rotate_x(-theta)
+    
+    inv_t = temp.linear_inverse
+    
+    result =transformPoints(inv_t, points)
+        
+    return result
 
 def compute_length(start, end):
     #takes [n,3] vectors and returns [1,n] array of distances
