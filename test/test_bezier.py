@@ -11,7 +11,7 @@ x = np.linspace(1, 30, 100)
 y = 30/x
 
 #give profile as list of x values then y values.  this profile is evaluated by splprep
-test = Extruded_interpolant(profile = [x,y], z_height_1 = -30, z_height_2=30, \
+test = Extruded_interpolant(profile = [x,y], smoothness =.005, z_height_1 = -30, z_height_2=30, \
 		material = PECMaterial(), trace_ends= False )
 
 source = RectRaySource(origin=(5,50,0),

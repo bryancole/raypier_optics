@@ -107,6 +107,7 @@ class Extruded_interpolant(Optic):
     
     z_height_1 = Float(-30.0)   #must be smaller than z_height_2
     z_height_2 = Float(30.0)
+    smoothness = Float(.005)  #for splprep. found this number by trial and error. there are algorithms to guess better
     
     trace_ends = Bool(False, desc="include the end-faces in tracing")
     
@@ -129,12 +130,13 @@ class Extruded_interpolant(Optic):
         m = self.material
         
         #convert profile to a list of bezier curves defined by three 2D points (knots)
-        tck, uout = splprep(profile, s=.005, k=2, per=False)
+        tck, uout = splprep(profile, s=self.smoothness, k=2, per=False)
         p2 = b_spline_to_bezier_series(tck)
         print "splprep used ",len(p2), " faces to make this spline"
-        if len(p2) > 50:
-            print "!!! thats alot of faces.  spline degree 2 may be too small  !!!""" 
-
+        if len(p2) > 30:
+            print "!!! thats alot of faces.  try adjusting smoothness. /nSpline degree 2 may be too small  !!!""" 
+            tck, uout = splprep(profile, s=self.smoothness, k=3, per=False)
+            print "3rd degree spline would use ",len(tck[0])-7," faces."
         curves = []
         for knots in p2:
             curves.append(ExtrudedBezier2Face(owner=self, X0=knots[0][0], Y0=knots[0][1], \
@@ -161,6 +163,10 @@ class Extruded_interpolant(Optic):
         self.update=True
         
     def _trace_ends_changed(self):
+        self.faces.faces = self.make_faces()
+        self.update=True
+        
+    def _smoothness_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
         
