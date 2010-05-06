@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+import sys
+sys.path.append('..')
+#import pyximport
+#pyximport.install()
+
+from raytrace.sources import ParallelRaySource
+from raytrace.tracer import RayTraceModel
+from raytrace.prisms import LDLF
+from raytrace.cmaterials import PECMaterial, OpaqueMaterial
+from raytrace.results import Ratio
+
+import numpy
+
+slat_width = 15
+slant = 75
+ex_ap = 3
+ent_ap = ex_ap+2*slat_width*numpy.cos(slant*numpy.pi/180.)
+height_offset = slat_width/numpy.sin(slant*numpy.pi/180.)
+
+
+source = ParallelRaySource(origin=(0,30,0),
+                            direction=(0,-1,0),
+                            number=20,
+                            radius=ent_ap/2,
+			    rings = 5,
+                            scale_factor=0.1
+                            )
+#linear dialectric filled light funnel                       
+r1 = LDLF(#material=OpaqueMaterial(),
+                z_height_1=-20.0,
+                z_height_2=20.0,
+                slat_width=slat_width,
+                ap_width=ex_ap,
+                slant=slant,
+                n_inside=1.333) #1.333 = water
+
+
+                           
+ratio = Ratio(denominator=r1.faces[2],
+              nominator=r1.faces[0])
+
+model = RayTraceModel(optics=[r1,],
+                    sources=[source,], results=[ratio,])
+                    
+#model.configure_traits()
+print model.all_faces
+
+ap_ratio = ent_ap/ex_ap
+print "ap ratio: ", ap_ratio
+print "effective concentration: ", ap_ratio*model.results[0].result	#still not right, circular source biases ratio.

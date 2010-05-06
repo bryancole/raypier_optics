@@ -57,6 +57,7 @@ cdef inline double mag_(vector_t a)
 cdef inline double mag_sq_(vector_t a)
 cdef inline vector_t invert_(vector_t v)
 
+
 ##################################
 ### Python extension types
 ##################################

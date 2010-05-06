@@ -283,17 +283,36 @@ cdef class ExtrudedPlanarFace(Face):
     
 cdef class ExtrudedBezier2Face(Face):
     cdef:
-        double X0, X1, X2, Y0, Y1, Y2
-        
+        double X0, X1, X2, Y0, Y1, Y2, z_height_1, z_height_2
+    
+    cdef inline double det2x2_(self, double a11, double a12, double a21, double a22):
+        cdef double out
+        out = a11*a22 - a12*a21 
+        return out
+    
+    def __cinit__(self, X0,X1,Y0,Y1,X2,Y2,z_height_1,z_height_2, **kwds):
+        self.X0=X0
+        self.X1=X1
+        self.X2=X2
+        self.Y0=Y0
+        self.Y1=Y1
+        self.Y2=Y2
+        self.z_height_1 = z_height_1
+        self.z_height_2 = z_height_2
+    
     cdef double intersect_c(self, vector_t r, vector_t p2):
         cdef: 
             vector_t s
             double A, B, C, D
             double t1, t2, a1, a2
             double p0s, p1s, p2s
-            
-        s = subvv_(p2, r)
+            double dZ, z1       #used to calculate z bounds logic
         
+        dZ = p2.z-r.z
+        z1 = r.z
+
+        s = subvv_(p2, r)
+
         ### An inefficient implementation to begin with,
         ### to check the maths
         A = s.y*(self.X0 - 2*self.X1 + self.X2) \
@@ -321,6 +340,8 @@ cdef class ExtrudedBezier2Face(Face):
             a1 /= (s.x*s.x + s.y*s.y)
             if not self.tolerance < a1 <= 1:
                 a1 = INFINITY
+            if not self.z_height_1 <= a1*dZ <= self.z_height_2:
+                a1 = INFINITY
         else:
             a1 = INFINITY
             
@@ -329,6 +350,8 @@ cdef class ExtrudedBezier2Face(Face):
             a2 /= (s.x*s.x + s.y*s.y)
             if not self.tolerance < a2 <= 1:
                 a2 = INFINITY
+            if not self.z_height_1 <= a2*dZ <= self.z_height_2:
+                a2 = INFINITY
         else:
             a2 = INFINITY
         
@@ -336,6 +359,58 @@ cdef class ExtrudedBezier2Face(Face):
             return a2 * mag_(s)
         else:
             return a1 * mag_(s)
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """use vector calc to get polynomial coefficents then use derivative to find 2d normal
+        """
+        cdef vector_t normal
+        cdef double x1,x2,x3,y1,y2,y3,A,B
+        cdef double det,a11,a12,a13,a21,a22,a23
+        
+        normal.x = 0
+        normal.y = 0
+        normal.z = 0
+        
+        x1 = self.X0
+        x2 = self.X1
+        x3 = self.X2
+        y1 = self.Y0
+        y2 = self.Y1
+        y3 = self.Y2
+        
+        #solve for A, B and C using these three points,
+        #first, find determinant of the three equations (y = Ax^2+Bx+C)
+        det = x1*x1*x2 + x1*x3*x3 + x2*x2*x3 - x1*x1*x3 -x1*x2*x2 - x2*x3*x3
+        if det == 0:
+            print "what the hey? compute normal found det == 0"
+            return normal #still just zero's
+            
+        #then find 6 of the 9 elements of the adjoint matrix (don't have to solve 
+        # for C because it is not in derivative
+        
+        a11 = self.det2x2_(x2,1,x3,1)
+        a12 = -self.det2x2_(x1,1,x3,1)
+        a13 = self.det2x2_(x1,1,x2,1)
+        a21 = -self.det2x2_(x2**2,1,x3**2,1)
+        a22 = self.det2x2_(x1**2,1,x3**2,1)
+        a23 = -self.det2x2_(x1**2,1,x2**2,1)
+        
+        #then solve coefficents by multiplying Y by inverse matrix.
+        A = y1*a11/det + y2*a12/det +y3*a13/det
+        B = y1*a21/det + y2*a22/det +y3*a23/det
+        
+        normal.y=0      #its a trough shape!
+        #reuse variables
+        a11 = 2*A*p.x + B
+        if a11 == 0:
+            normal.z = 1
+            normal.x = 0
+        else:
+            normal.y = -1
+            normal.x = a11
+        
+        #print "debug: calculated bezier normal"
+        return norm_(normal)
     
     
 cdef int point_in_polygon_c(double X, double Y, object obj):
