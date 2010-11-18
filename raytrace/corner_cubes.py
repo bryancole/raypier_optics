@@ -31,21 +31,17 @@ from itertools import chain, izip, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raytrace.bases import Optic, Traceable, NumEditor
-from raytrace.cfaces import ElipticalPlaneFace
+from raytrace.cfaces import ElipticalPlaneFace, CircularFace
 from raytrace.ctracer import FaceList
 from raytrace.mirrors import BaseMirror
+from raytrace.cmaterials import PECMaterial
 
 
 class HollowRetroreflector(BaseMirror):
     name = "Hollow Retroreflector"
     diameter = Float(25.4)
-    #thickness = Float(5.0, desc="purely for visualisation purposes")
-    #offset = Float(0.0)
-    
-    imp_cyl = Instance(tvtk.Cylinder, (), transient=True)
-    
-    #cyl_trans = Instance(tvtk.Transform, (), transient=True)
-    
+
+    imp_cyl = Instance(tvtk.Cylinder, (), transient=True)    
     scale = Instance(tvtk.Transform, (), transient=True)
     
     traits_view = View(VGroup(
@@ -59,34 +55,18 @@ class HollowRetroreflector(BaseMirror):
         sqrt2 = numpy.sqrt(2)
         x = sqrt2*numpy.cos(numpy.pi*2./3)
         y = sqrt2*numpy.sin(numpy.pi*2./3)
-        fl.faces = [ElipticalPlaneFace(owner=self, g_x=sqrt2, g_y=0),
-                    ElipticalPlaneFace(owner=self, g_x=x, g_y=y),
-                    ElipticalPlaneFace(owner=self, g_x=x, g_y=-y),
+        m = self.material
+        fl.faces = [ElipticalPlaneFace(owner=self, g_x=sqrt2, g_y=0, material=m),
+                    ElipticalPlaneFace(owner=self, g_x=x, g_y=y, material=m),
+                    ElipticalPlaneFace(owner=self, g_x=x, g_y=-y, material=m),
                     ]
         return fl
-    
-#    def make_step_shape(self):
-#        from raytrace.step_export import make_cylinder
-#        cyl = make_cylinder(self.centre, 
-#                             self.direction, 
-#                             self.diameter/2, 
-#                             self.thickness,
-#                             self.offset,
-#                             self.x_axis)
-#        return cyl, "green"
     
     @on_trait_change("diameter")
     def config_pipeline(self):
         r = self.diameter/2.
         cyl = self.imp_cyl
         cyl.radius = r
-        #thick = self.thickness
-        #cyl.height = thick
-        
-        #t = self.cyl_trans
-        #t.identity()
-        ##t.translate(self.offset,0,thick/2.)
-        #t.rotate_x(90.)
         s=self.scale
         s.identity()
         s.scale(r,r,r)
@@ -119,9 +99,103 @@ class HollowRetroreflector(BaseMirror):
         clip = tvtk.ClipPolyData(input=scale_f.output, clip_function = self.imp_cyl,
                                  inside_out=True)
                                
-        #cyl = self.vtk_cylinder
-        #norms = tvtk.PolyDataNormals(input=cyl.output)
-        #transF1 = tvtk.TransformFilter(input=norms.output, transform=self.cyl_trans)
         transF2 = tvtk.TransformFilter(input=clip.output, transform=self.transform)
         self.config_pipeline()
         return transF2
+    
+    
+class SolidRetroreflector(Optic, HollowRetroreflector):
+    n_inside = 1.5
+    name = "Solid Retroreflector"
+    
+    offset = 0.0
+    
+    thickness = Float(20.0, desc="distance from input face to apex")
+    
+    vtk_grid = Instance(tvtk.ProgrammableSource, (), transient=True)
+    cyl = Instance(tvtk.Cylinder, (), transient=True)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('diameter', editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('n_inside'),
+                        ),
+                   )
+    
+    
+    def _faces_default(self):
+        fl = super(SolidRetroreflector, self)._faces_default()
+        m = self.material
+        fl.faces.append(CircularFace(owner=self, material=m, 
+                                     z_plane=self.thickness,
+                                     invert_normal=True))
+        print "adding circular face", m
+        return fl
+    
+    def _thickness_changed(self, new_t):
+        face = self.faces.faces[-1]
+        print "setting thickness", face, face.z_plane
+        face.z_plane = new_t
+        self.vtk_grid.modified()
+        self.update=True
+        
+    def _diameter_changed(self, d):
+        self.vtk_grid.modified()
+        self.cyl.radius = d/2.
+        self.update=True
+        
+    def create_grid(self):
+        r = 1.1*self.diameter/2.
+        xmin, xmax = -r,r
+        ymin, ymax = -r,r
+        zmin, zmax = 0, self.thickness
+        
+        source = self.vtk_grid
+        sp = source.structured_points_output
+        size = 50
+        dx = (xmax-xmin) / (size-1)
+        dy = (ymax-ymin) / (size-1)
+        dz = (zmax-zmin) / (size-1)
+        sp.dimensions = (size,size,size)
+        sp.whole_extent=(0,size,0,size,0,size)
+        sp.origin = (xmin, ymin, zmin)
+        sp.spacing = (dx, dy, dz)
+        sp.set_update_extent_to_whole_extent()
+        
+    def _pipeline_default(self):
+        grid = self.vtk_grid
+        grid.set_execute_method(self.create_grid)
+        grid.modified()
+        
+        sqrt2 = numpy.sqrt(2)
+        x = sqrt2*numpy.cos(numpy.pi*2./3)
+        y = sqrt2*numpy.sin(numpy.pi*2./3)
+        
+        t = self.thickness
+        planes = tvtk.Planes(points=[[0,0,0],[0,0,0],[0,0,0]],
+                             normals=[[sqrt2,0,-1],[x,y,-1],[x,-y,-1]])
+        tr = tvtk.Transform()
+        tr.rotate_x(90.0)
+        cyl = self.cyl
+        cyl.transform = tr
+        cyl.radius = self.diameter/2.
+        union = tvtk.ImplicitBoolean(operation_type="intersection")
+        union.add_function(planes)
+        union.add_function(cyl)
+        
+        clip = tvtk.ClipVolume(input=grid.structured_points_output,
+                                 clip_function=union,
+                                 inside_out=True,
+                                 mixed3d_cell_generation=True)
+        
+        topoly = tvtk.GeometryFilter(input=clip.output)
+        
+        norm = tvtk.PolyDataNormals(input=topoly.output)
+        transF = tvtk.TransformFilter(input=norm.output, transform=self.transform)
+        self.config_pipeline()
+        grid.modified()
+        return transF
+    
+    def _material_default(self):
+        return Optic._material_default(self)

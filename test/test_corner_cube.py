@@ -1,6 +1,6 @@
 from raytrace.sources import ParallelRaySource
 from raytrace.tracer import RayTraceModel
-from raytrace.corner_cubes import HollowRetroreflector
+from raytrace.corner_cubes import HollowRetroreflector, SolidRetroreflector
 
 
 source = ParallelRaySource(origin=(-10,0.1,50),
@@ -9,7 +9,9 @@ source = ParallelRaySource(origin=(-10,0.1,50),
                            scale=0.1,
                            number=20)
 
-cc = HollowRetroreflector()
+cc = SolidRetroreflector() #
+#cc = HollowRetroreflector()
+print cc.material
 
 model = RayTraceModel(sources=[source],
                       optics=[cc])
