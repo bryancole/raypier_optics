@@ -66,6 +66,45 @@ cdef class CircularFace(Face):
         normal.z=-1
         return normal
     
+    
+cdef class ElipticalPlaneFace(Face):
+    cdef public double g_x, g_y, diameter
+    
+    params = ['diameter']
+    
+    def __cinit__(self, **kwds):
+        self.g_x = kwds.get('g_x', 0.0)
+        self.g_y = kwds.get('g_y', 0.0)
+    
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        cdef:
+            double max_length = sep_(p1, p2)
+            double h = (self.g_x*p1.x + self.g_y*p1.y - p1.z) / \
+                        ((p2.z-p1.z) - self.g_x*(p2.x-p1.x) - self.g_y*(p2.y-p1.y))
+            double X,Y,Z, d=self.diameter
+            
+        if (h<self.tolerance) or (h>1.0):
+            return 0
+        
+        X = p1.x + h*(p2.x-p1.x)
+        Y = p1.y + h*(p2.y-p1.y)
+        Z = p1.z + h*(p2.z-p1.z)
+        if (X*X + Y*Y) > (d*d/4):
+            #print "X", X, "Y", Y
+            return 0
+        return h * max_length
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef vector_t normal
+        normal.x=self.g_x
+        normal.y=self.g_y
+        normal.z=-1
+        return norm_(normal)
+    
+    
 cdef class RectangularFace(Face):
     cdef public double length, width, offset, z_plane
     
