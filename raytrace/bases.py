@@ -19,7 +19,7 @@
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
-            self, Str, Bool, PythonValue, Enum
+            self, Str, Bool, PythonValue, Enum, MetaHasTraits
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
@@ -32,6 +32,7 @@ import numpy
 import threading, os, itertools
 import wx
 from itertools import chain, izip, islice, count
+import yaml
 from raytrace.rays import RayCollection, collectRays
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
@@ -51,13 +52,62 @@ VectorEditor = TupleEditor(labels=['x','y','z'], auto_set=False, enter_set=True)
 
 counter = count()
 
+
+class YAMLObjectMetaclass(MetaHasTraits):
+    """
+    The metaclass for YAMLObject.
+    """
+    def __init__(cls, name, bases, kwds):
+        super(YAMLObjectMetaclass, cls).__init__(name, bases, kwds)
+        if 'yaml_tag' in kwds and kwds['yaml_tag'] is not None:
+            pass
+        else:
+            cls.yaml_tag = "!"+name
+        cls.yaml_loader.add_constructor(cls.yaml_tag, cls.from_yaml)
+        cls.yaml_dumper.add_representer(cls, cls.to_yaml)
+
+
+class YAMLObject(object):
+    """
+    An object that can dump itself to a YAML stream
+    and load itself from a YAML stream.
+    """
+
+    __metaclass__ = YAMLObjectMetaclass
+    __slots__ = ()  # no direct instantiation, so allow immutable subclasses
+
+    yaml_loader = yaml.Loader
+    yaml_dumper = yaml.Dumper
+
+    yaml_tag = None
+    yaml_flow_style = None
+
+    def from_yaml(cls, loader, node):
+        """
+        Convert a representation node to a Python object.
+        """
+        return loader.construct_yaml_object(node, cls)
+    from_yaml = classmethod(from_yaml)
+
+    def to_yaml(cls, dumper, data):
+        """
+        Convert a Python object to a representation node.
+        """
+        return dumper.represent_yaml_object(cls.yaml_tag, data, cls,
+                flow_style=cls.yaml_flow_style)
+    to_yaml = classmethod(to_yaml)
+
+
+
+
 class Direction(HasTraits):
     x = Float
     y = Float
     z = Float
 
 
-class Renderable(HasQueue):
+class Renderable(HasQueue, YAMLObject):
+    __metaclass__ = YAMLObjectMetaclass
     display = Enum("shaded", "wireframe", "hidden")
     
     actors = Instance(tvtk.ActorCollection, (), transient=True)
@@ -180,7 +230,7 @@ class Traceable(ModelObject):
 
     update = Event() #request re-tracing
     
-    intersections = List([])
+    intersections = List([], transient=True)
     
     material = Instance(ctracer.InterfaceMaterial)
     

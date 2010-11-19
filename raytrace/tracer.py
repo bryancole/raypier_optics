@@ -80,15 +80,20 @@ class RayTraceModel(HasQueue):
     
     save_btn = Button("Save scene")
     
-    def _optics_changed(self, opticList):
+    def _optics_changed(self, name, removed, opticList):
         scene = self.scene
         #del scene.actor_list[:]    
         for o in opticList:
             scene.add_actors(o.get_actors(scene))
+        for o in removed:
+            scene.remove_actors(o.get_actors(scene))
         
         for optic in opticList:
             optic.on_trait_change(self.trace_all, "update")
             optic.on_trait_change(self.render_vtk, "render")
+        for optic in removed:
+            optic.on_trait_change(self.trace_all, "update", remove=True)
+            optic.on_trait_change(self.render_vtk, "render", remove=True)
         self.trace_all()
     
     def _rays_changed(self, rayList):
@@ -289,13 +294,18 @@ class RayTraceModel(HasQueue):
         colors = [c for s,c in shapes_colors]
         export_shapes(shapes, fname, colorList=colors)
         
-    def _sources_changed(self, source_list):
+    def _sources_changed(self, name, removed, source_list):
         scene = self.scene
         for source in source_list:
             for actor in source.actors:
                 scene.add_actor(actor)
             source.on_trait_change(self.trace_all, "update")
             source.on_trait_change(self.render_vtk, "render")
+            
+        for source in removed:
+            scene.remove_actors(source.actors)
+            source.on_trait_change(self.trace_all, "update", remove=True)
+            source.on_trait_change(self.render_vtk, "render", remove=True)
         self.trace_all()
     
     

@@ -30,7 +30,7 @@ from itertools import chain, izip, islice, tee
 #from raytrace.tracer import Optic, VTKOptic, normaliseVector, RaySegment,\
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
-from raytrace.bases import Optic, Traceable, NumEditor
+from raytrace.bases import Optic, Traceable, NumEditor, YAMLObject
 from raytrace.cfaces import ElipticalPlaneFace, CircularFace
 from raytrace.ctracer import FaceList
 from raytrace.mirrors import BaseMirror
@@ -105,6 +105,7 @@ class HollowRetroreflector(BaseMirror):
     
     
 class SolidRetroreflector(Optic, HollowRetroreflector):
+    yaml_tag = u"!SolidRetroreflector"
     n_inside = 1.5
     name = "Solid Retroreflector"
     
