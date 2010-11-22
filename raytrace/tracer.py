@@ -25,6 +25,8 @@ from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
             ShellEditor, Controller
             
+from enthought.traits.ui.menu import Menu, MenuBar, Action, Separator
+            
 from enthought.traits.ui.file_dialog import save_file
             
 from enthought.tvtk.api import tvtk
@@ -46,10 +48,73 @@ from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
 from raytrace import ctracer
 
 counter = count()
+
+from raytrace import mirrors, prisms, corner_cubes, parabolics, ellipsoids, sources,\
+    results
+
+optics_classes = Traceable.subclasses
+
+optics_menu = Menu(name = "Components...",
+                   *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
+                    for cls in optics_classes]
+                    )
+
+source_classes = BaseRaySource.subclasses
+sources_menu = Menu(name = "Sources...",
+                   *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
+                    for cls in source_classes]
+                    )
+
+results_classes = Result.subclasses
+results_menu = Menu(name = "Results...",
+                   *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
+                    for cls in results_classes]
+                    )
+
+menubar = MenuBar(Menu(name="File..."),
+                  Menu(optics_menu,
+                       sources_menu,
+                       results_menu,
+                       name="Insert..."))
     
     
 class RayTraceModelHandler(Controller):
-    pass
+    def insert_action(self, info):
+        print info
+        
+    def insert_component(self, info, cls):
+        tracer = info.ui.context['object']
+        tracer.optics.append(cls())
+        
+    def insert_source(self, info, cls):
+        tracer = info.ui.context['object']
+        tracer.sources.append(cls())
+        
+    def insert_result(self, info, cls):
+        tracer = info.ui.context['object']
+        tracer.results.append(cls())
+        
+
+for cls in optics_classes:
+    def make_action(_cls):
+        def action(self, info):
+            self.insert_component(info, _cls)
+        return action
+    setattr(RayTraceModelHandler, "insert_"+cls.__name__, make_action(cls))
+    
+for cls in source_classes:
+    def make_action(_cls):
+        def action(self, info):
+            self.insert_source(info, _cls)
+        return action
+    setattr(RayTraceModelHandler, "insert_"+cls.__name__, make_action(cls))
+    
+for cls in results_classes:
+    def make_action(_cls):
+        def action(self, info):
+            self.insert_result(info, _cls)
+        return action
+    setattr(RayTraceModelHandler, "insert_"+cls.__name__, make_action(cls))
     
     
 class RayTraceModel(HasQueue):
@@ -80,7 +145,9 @@ class RayTraceModel(HasQueue):
     
     save_btn = Button("Save scene")
     
-    def _optics_changed(self, name, removed, opticList):
+    @on_trait_change("optics[]")
+    def on_optics_change(self, obj, name, removed, opticList):
+        print "adding", opticList, removed, name
         scene = self.scene
         #del scene.actor_list[:]    
         for o in opticList:
@@ -430,7 +497,8 @@ ray_tracer_view = View(
                    #height=500,
                    width=800,
                    id="raytrace.view",
-                   handler=controller
+                   handler=controller,
+                   menubar=menubar
                    )
     
 RayTraceModel.class_trait_view("traits_view", ray_tracer_view)

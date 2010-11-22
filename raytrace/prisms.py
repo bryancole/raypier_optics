@@ -43,6 +43,7 @@ def pairwise(itr):
 class Extrusion(Optic):
     """a general flat-faced optic formed by extrusion 
     of a 2D polygon"""
+    abstract=True
     profile = Array(shape=(None,2), dtype=numpy.double)
     
     z_height_1 = Float(0.0)
@@ -129,7 +130,8 @@ class Prism(Extrusion):
                        Traceable.uigroup,
                        Item('trace_ends'),
                        Item('n_inside'),
-                       Item('length'),
+                       Item('z_height_1', label="Z top"),
+                       Item('z_height_2', label="Z bottom"),
                        Item('height'),
                        Item('width'),
                        )
@@ -175,6 +177,32 @@ class Rhomboid(Extrusion):
                   (w-s,-h)]
         points.reverse()
         self.profile = points
+        
+        
+class TruncatedRightanglePrism(Extrusion):
+    name = "truncated right-angle prism"
+    depth = Float #distance from front face to apex
+    width = Float #width of front face
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('trace_ends'),
+                       Item('n_inside'),
+                       Item('depth'),
+                       Item('width'),
+                       )
+                       )
+
+    @on_trait_change("depth, width")
+    def config_profile(self):
+        h = self.depth
+        w = self.width/2.
+        self.profile = [(w,0),
+                        (w, h-w),
+                        (0,h),
+                        (-w, h-w),
+                        (-w,0)]
+        
 
 class LDLF(Extrusion):
     name = "Linear Dialectric Light Funnle"

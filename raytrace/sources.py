@@ -31,24 +31,29 @@ from enthought.tvtk.api import tvtk
 from raytrace.ctracer import RayCollection, Ray, ray_dtype
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector
-from raytrace.bases import Renderable
+from raytrace.bases import Renderable, RaytraceObject
 
 Vector = Array(shape=(3,))
 
 
+class BaseBase(HasTraits, RaytraceObject):
+    pass
 
-class BaseRaySource(HasTraits):
+
+class BaseRaySource(BaseBase):
+    abstract=True
+    subclasses = set()
     name = Title("Ray Source")
     update = Event()
     display = Enum("pipes", "wires", "hidden")
     render = Event()
-    mapper = Instance(tvtk.PolyDataMapper, ())
+    mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
     
     InputRays = Property(Instance(RayCollection), depends_on="max_ray_len")
-    TracedRays = List(RayCollection)
+    TracedRays = List(RayCollection, transient=True)
     
     InputDetailRays = Property(Instance(RayCollection), depends_on="InputRays")
-    TracedDetailRays = List(RayCollection)
+    TracedDetailRays = List(RayCollection, transient=True)
 
     detail_resolution = Int(32)
 
@@ -62,7 +67,8 @@ class BaseRaySource(HasTraits):
     show_normals = Bool(False)
     
     #idx selector for the input ways which should be visualised
-    view_ray_ids = Trait(None, Array(dtype=numpy.int))
+    #making this transient because pyYAML fails to serialise arrays
+    view_ray_ids = Trait(None, Array(dtype=numpy.int), transient=True)
     
     tube = Instance(tvtk.TubeFilter, (), transient=True)
     sphere = Instance(tvtk.SphereSource, (), transient=True)

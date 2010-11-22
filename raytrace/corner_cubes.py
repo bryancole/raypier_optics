@@ -30,7 +30,7 @@ from itertools import chain, izip, islice, tee
 #from raytrace.tracer import Optic, VTKOptic, normaliseVector, RaySegment,\
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
-from raytrace.bases import Optic, Traceable, NumEditor, YAMLObject
+from raytrace.bases import Optic, Traceable, NumEditor, RaytraceObject
 from raytrace.cfaces import ElipticalPlaneFace, CircularFace
 from raytrace.ctracer import FaceList
 from raytrace.mirrors import BaseMirror

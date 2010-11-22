@@ -53,27 +53,30 @@ VectorEditor = TupleEditor(labels=['x','y','z'], auto_set=False, enter_set=True)
 counter = count()
 
 
-class YAMLObjectMetaclass(MetaHasTraits):
+class RaytraceObjectMetaclass(MetaHasTraits):
     """
     The metaclass for YAMLObject.
     """
     def __init__(cls, name, bases, kwds):
-        super(YAMLObjectMetaclass, cls).__init__(name, bases, kwds)
+        super(RaytraceObjectMetaclass, cls).__init__(name, bases, kwds)
         if 'yaml_tag' in kwds and kwds['yaml_tag'] is not None:
             pass
         else:
             cls.yaml_tag = "!"+name
         cls.yaml_loader.add_constructor(cls.yaml_tag, cls.from_yaml)
         cls.yaml_dumper.add_representer(cls, cls.to_yaml)
+        
+        if not kwds.get('abstract', False):
+            cls.subclasses.add(cls)
 
 
-class YAMLObject(object):
+class RaytraceObject(object):
     """
     An object that can dump itself to a YAML stream
     and load itself from a YAML stream.
     """
 
-    __metaclass__ = YAMLObjectMetaclass
+    __metaclass__ = RaytraceObjectMetaclass
     __slots__ = ()  # no direct instantiation, so allow immutable subclasses
 
     yaml_loader = yaml.Loader
@@ -81,6 +84,9 @@ class YAMLObject(object):
 
     yaml_tag = None
     yaml_flow_style = None
+    
+    abstract = True
+    subclasses = set()
 
     def from_yaml(cls, loader, node):
         """
@@ -106,8 +112,8 @@ class Direction(HasTraits):
     z = Float
 
 
-class Renderable(HasQueue, YAMLObject):
-    __metaclass__ = YAMLObjectMetaclass
+class Renderable(HasQueue, RaytraceObject):
+    __metaclass__ = RaytraceObjectMetaclass
     display = Enum("shaded", "wireframe", "hidden")
     
     actors = Instance(tvtk.ActorCollection, (), transient=True)
@@ -243,6 +249,9 @@ class Traceable(ModelObject):
     
     polydata = Property(depends_on=['update', ])
     
+    abstract=True
+    subclasses = set()
+    
     def _actors_default(self):
         pipeline = self.pipeline
         
@@ -348,6 +357,7 @@ Traceable.uigroup = VGroup(
 
     
 class Optic(Traceable):
+    abstract=True
     n_inside = Complex(1.0+0.0j) #refractive
     n_outside = Complex(1.0+0.0j)
     
@@ -382,6 +392,7 @@ class Optic(Traceable):
     
 class VTKOptic(Optic):
     """Polygonal optics using a vtkOBBTree to do the ray intersections"""
+    abstract=True
     data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
     
     obb = Instance(tvtk.OBBTree, (), transient=True)
@@ -446,7 +457,9 @@ class VTKOptic(Optic):
         return short[0], short[1], short[2], self
     
     
-class Result(HasTraits):
+class Result(HasTraits, RaytraceObject):
+    abstract=True
+    subclasses = set()
     name = Str("a result")
     
     def calc_result(self, tracer):
