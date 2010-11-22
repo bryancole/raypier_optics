@@ -23,7 +23,7 @@ class MeanOpticalPathLength(Result):
     source = Instance(BaseRaySource)
     target = Instance(Face)
     
-    result = Float(label="Path length")
+    result = Float(label="Path length", transient=True)
     
     traits_view = View(Item('result', style="readonly"),
                        Item('source', editor=DropEditor()),

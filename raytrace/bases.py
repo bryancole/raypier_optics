@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from enthought.traits.api import HasTraits, Array, BaseFloat, Complex,\
             Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
             self, Str, Bool, PythonValue, Enum, MetaHasTraits
@@ -51,6 +51,11 @@ ROField = TextEditor(auto_set=False, enter_set=True, evaluate=float)
 VectorEditor = TupleEditor(labels=['x','y','z'], auto_set=False, enter_set=True)
 
 counter = count()
+
+
+class Float(BaseFloat):
+    def validate(self, obj, name, value):
+        return float(value)
 
 
 class RaytraceObjectMetaclass(MetaHasTraits):
@@ -142,10 +147,12 @@ class ModelObject(Renderable):
     
     centre = Tuple(0.,0.,0.) #position
     
-    _orientation = Tuple(float, float)
+    _orientation = Tuple(Float, Float)
     
-    orientation = Property(Range(-180.0,180.0), depends_on="_orientation")
-    elevation = Property(Range(-180.,180.), depends_on="_orientation")
+    orientation = Property(Range(-180.0,180.0), transient=True,
+                           depends_on="_orientation")
+    elevation = Property(Range(-180.,180.), transient=True,
+                         depends_on="_orientation")
     
     rotation = Range(-180.0,180.0, value=0.0) #rotation around orientation axis
     

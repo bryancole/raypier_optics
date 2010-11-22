@@ -44,19 +44,20 @@ class Extrusion(Optic):
     """a general flat-faced optic formed by extrusion 
     of a 2D polygon"""
     abstract=True
-    profile = Array(shape=(None,2), dtype=numpy.double)
+    profile = Array(shape=(None,2), dtype=numpy.double, transient=True)
     
     z_height_1 = Float(0.0)
     z_height_2 = Float(5.0)
     
     trace_ends = Bool(True, desc="include the end-faces in tracing")
     
-    data_source = Instance(tvtk.ProgrammableSource, ())
+    data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
     
     extrude = Instance(tvtk.LinearExtrusionFilter, (), 
                        {'capping': True, 
                         'extrusion_type':'vector',
-                        'vector': (0.,0.,1.)})
+                        'vector': (0.,0.,1.)},
+                        transient=True)
     
     def _faces_default(self):
         fl = FaceList(owner=self)
