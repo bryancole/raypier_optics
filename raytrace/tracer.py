@@ -210,7 +210,10 @@ class RayTraceModel(HasQueue):
         for o in opticList:
             scene.add_actors(o.get_actors(scene))
         for o in removed:
-            scene.remove_actors(o.get_actors(scene))
+            try:
+                scene.remove_actors(o.get_actors(scene))
+            except:
+                pass
         
         for optic in opticList:
             optic.on_trait_change(self.trace_all, "update")

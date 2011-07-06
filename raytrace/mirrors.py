@@ -36,6 +36,7 @@ import math, numpy
 
 
 class BaseMirror(Traceable):
+    abstract=True
     def _vtkproperty_default(self):
         return tvtk.Property(opacity=1.0,
                              color=(0.8,0.8,0.8),
@@ -62,8 +63,9 @@ class PECMirror(BaseMirror):
                    )
     
     def _faces_default(self):
+        m = self.material
         fl = FaceList(owner=self)
-        fl.faces = [CircularFace(owner=self)]
+        fl.faces = [CircularFace(owner=self, material=m)]
         return fl
     
     def make_step_shape(self):
