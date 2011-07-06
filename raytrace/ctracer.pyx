@@ -26,8 +26,8 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('E2_amp', np.complex128),
                         ('length', np.double),
                         ('wavelength', np.double),
-                        ('parent_idx', np.uint),
-                        ('end_face_idx', np.uint)
+                        ('parent_idx', np.uint32),
+                        ('end_face_idx', np.uint32)
                         ])
                         
 
