@@ -2,6 +2,10 @@
 A module for Results subclasses
 """
 
+import sys
+sys.path.append('..')
+
+
 from enthought.traits.api import Instance, Float, on_trait_change,\
             Button
 
@@ -9,8 +13,8 @@ from enthought.traits.ui.api import View, Item, DropEditor
 
 from raytrace.bases import Result
 from raytrace.sources import BaseRaySource
+from raytrace.tracer import RayTraceModel
 from raytrace.ctracer import Face
-#from raytrace.tracer import RayTraceModel
 from enthought.traits.ui.editors.drop_editor import DropEditor
 
 import numpy
@@ -77,7 +81,7 @@ class Ratio(Result):
     
     result = Float(label="Ratio of intersections")
     
-    _tracer = Instance("RayTraceModel") #to cache the tracer instance
+    _tracer = Instance(RayTraceModel) #to cache the tracer instance
     
     traits_view = View(Item('result', style="readonly"),
                        Item('nominator', editor=DropEditor()),
@@ -116,7 +120,7 @@ class Ratio(Result):
         
         nom_count = get_total_intersections(raysList, nom)
         denom_count = get_total_intersections(raysList, denom)
-	print "nom and denom counts", nom_count, denom_count
+	#print "nom and denom counts", nom_count, denom_count
         try:
             self.result = float(nom_count)/float(denom_count)
         except ZeroDivisionError:
