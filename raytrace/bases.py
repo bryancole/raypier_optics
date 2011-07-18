@@ -16,10 +16,10 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from enthought.traits.api import HasTraits, Array, BaseFloat, Complex,\
             Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
-            self, Str, Bool, PythonValue, Enum
+            self, Str, Bool, PythonValue, Enum, MetaHasTraits
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
@@ -32,6 +32,7 @@ import numpy
 import threading, os, itertools
 import wx
 from itertools import chain, izip, islice, count
+import yaml
 from raytrace.rays import RayCollection, collectRays
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
@@ -51,13 +52,73 @@ VectorEditor = TupleEditor(labels=['x','y','z'], auto_set=False, enter_set=True)
 
 counter = count()
 
+
+class Float(BaseFloat):
+    def validate(self, obj, name, value):
+        return float(value)
+
+
+class RaytraceObjectMetaclass(MetaHasTraits):
+    """
+    The metaclass for YAMLObject.
+    """
+    def __init__(cls, name, bases, kwds):
+        super(RaytraceObjectMetaclass, cls).__init__(name, bases, kwds)
+        if 'yaml_tag' in kwds and kwds['yaml_tag'] is not None:
+            pass
+        else:
+            cls.yaml_tag = "!"+name
+        cls.yaml_loader.add_constructor(cls.yaml_tag, cls.from_yaml)
+        cls.yaml_dumper.add_representer(cls, cls.to_yaml)
+        
+        if not kwds.get('abstract', False):
+            cls.subclasses.add(cls)
+
+
+class RaytraceObject(object):
+    """
+    An object that can dump itself to a YAML stream
+    and load itself from a YAML stream.
+    """
+
+    __metaclass__ = RaytraceObjectMetaclass
+    __slots__ = ()  # no direct instantiation, so allow immutable subclasses
+
+    yaml_loader = yaml.Loader
+    yaml_dumper = yaml.Dumper
+
+    yaml_tag = None
+    yaml_flow_style = None
+    
+    abstract = True
+    subclasses = set()
+
+    def from_yaml(cls, loader, node):
+        """
+        Convert a representation node to a Python object.
+        """
+        return loader.construct_yaml_object(node, cls)
+    from_yaml = classmethod(from_yaml)
+
+    def to_yaml(cls, dumper, data):
+        """
+        Convert a Python object to a representation node.
+        """
+        return dumper.represent_yaml_object(cls.yaml_tag, data, cls,
+                flow_style=cls.yaml_flow_style)
+    to_yaml = classmethod(to_yaml)
+
+
+
+
 class Direction(HasTraits):
     x = Float
     y = Float
     z = Float
 
 
-class Renderable(HasQueue):
+class Renderable(HasQueue, RaytraceObject):
+    __metaclass__ = RaytraceObjectMetaclass
     display = Enum("shaded", "wireframe", "hidden")
     
     actors = Instance(tvtk.ActorCollection, (), transient=True)
@@ -86,10 +147,12 @@ class ModelObject(Renderable):
     
     centre = Tuple(0.,0.,0.) #position
     
-    _orientation = Tuple(float, float)
+    _orientation = Tuple(Float, Float)
     
-    orientation = Property(Range(-180.0,180.0), depends_on="_orientation")
-    elevation = Property(Range(-180.,180.), depends_on="_orientation")
+    orientation = Property(Range(-180.0,180.0), transient=True,
+                           depends_on="_orientation")
+    elevation = Property(Range(-180.,180.), transient=True,
+                         depends_on="_orientation")
     
     rotation = Range(-180.0,180.0, value=0.0) #rotation around orientation axis
     
@@ -180,7 +243,7 @@ class Traceable(ModelObject):
 
     update = Event() #request re-tracing
     
-    intersections = List([])
+    intersections = List([], transient=True)
     
     material = Instance(ctracer.InterfaceMaterial)
     
@@ -192,6 +255,9 @@ class Traceable(ModelObject):
     pipeline = Any(transient=True) #a tvtk.DataSetAlgorithm ?
     
     polydata = Property(depends_on=['update', ])
+    
+    abstract=True
+    subclasses = set()
     
     def _actors_default(self):
         pipeline = self.pipeline
@@ -298,6 +364,7 @@ Traceable.uigroup = VGroup(
 
     
 class Optic(Traceable):
+    abstract=True
     n_inside = Complex(1.0+0.0j) #refractive
     n_outside = Complex(1.0+0.0j)
     
@@ -332,6 +399,7 @@ class Optic(Traceable):
     
 class VTKOptic(Optic):
     """Polygonal optics using a vtkOBBTree to do the ray intersections"""
+    abstract=True
     data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
     
     obb = Instance(tvtk.OBBTree, (), transient=True)
@@ -396,7 +464,9 @@ class VTKOptic(Optic):
         return short[0], short[1], short[2], self
     
     
-class Result(HasTraits):
+class Result(HasTraits, RaytraceObject):
+    abstract=True
+    subclasses = set()
     name = Str("a result")
     
     def calc_result(self, tracer):

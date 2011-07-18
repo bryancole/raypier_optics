@@ -2,23 +2,71 @@
 A module for Results subclasses
 """
 
+
 from enthought.traits.api import Instance, Float, on_trait_change,\
             Button
 
 from enthought.traits.ui.api import View, Item, DropEditor
 
 from raytrace.bases import Result
-from raytrace.ctracer import Face
+from raytrace.sources import BaseRaySource
 from raytrace.tracer import RayTraceModel
+from raytrace.ctracer import Face
 from enthought.traits.ui.editors.drop_editor import DropEditor
 
 import numpy
 import itertools
 
+
+
+class MeanOpticalPathLength(Result):
+    name = "Mean optical path length"
+    source = Instance(BaseRaySource)
+    target = Instance(Face)
+    
+    result = Float(label="Path length", transient=True)
+    
+    traits_view = View(Item('result', style="readonly"),
+                       Item('source', editor=DropEditor()),
+                       Item('target', editor=DropEditor()),
+                       title="Optical path length",
+                       resizable=True,
+                       )
+    
+    @on_trait_change("source, target")
+    def update(self):
+        if self.target is None:
+            return
+        if self.source is None:
+            return
+        if self.source.TracedRays:
+            self._calc_result()
+        
+    def calc_result(self, tracer):
+        self._calc_result()
+    
+    def _calc_result(self):
+        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
+        idx = self.target.idx
+        last = all_rays[0]
+        selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
+        total = numpy.zeros(len(selected_idx), 'd')
+        for ray in all_rays:
+            selected = ray[selected_idx]
+            total += selected['length'] * selected['refractive_index'].real
+            selected_idx = selected['parent_idx']
+        self.result = total.mean()
+        
+        
 def get_total_intersections(raysList, face):
     all_rays = itertools.chain(*raysList)
+    '''#debug
+    print face.idx, " all_rays: "
+    for ray in all_rays:
+    print ray.end_face_idx  #'''
     idx = face.idx
     return sum(1 for ray in all_rays if ray.end_face_idx==idx)
+
 
 class Ratio(Result):
     name = "a ratio"
@@ -69,6 +117,7 @@ class Ratio(Result):
         
         nom_count = get_total_intersections(raysList, nom)
         denom_count = get_total_intersections(raysList, denom)
+	#print "nom and denom counts", nom_count, denom_count
         try:
             self.result = float(nom_count)/float(denom_count)
         except ZeroDivisionError:

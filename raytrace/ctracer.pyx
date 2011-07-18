@@ -151,7 +151,7 @@ def addvv(a, b):
     b_ = set_v(b)
     c_ = addvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
-
+    
 cdef inline vector_t addvs_(vector_t a, double b):
     cdef vector_t out
     out.x = a.x+b

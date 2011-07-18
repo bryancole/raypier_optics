@@ -15,15 +15,18 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import with_statement
 
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
-            self, Str, Bool, PythonValue, Enum
+            self, Str, Bool, PythonValue, Enum, File
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
             ShellEditor, Controller
+            
+from enthought.traits.ui.menu import Menu, MenuBar, Action, Separator
             
 from enthought.traits.ui.file_dialog import save_file
             
@@ -32,7 +35,8 @@ from enthought.tvtk.pyface.scene_model import SceneModel
 from enthought.tvtk.pyface.scene_editor import SceneEditor
 import numpy
 import threading, os, itertools
-import wx
+import wx, os
+import yaml
 from itertools import chain, izip, islice, count
 from raytrace.sources import BaseRaySource
 from raytrace.rays import RayCollection, collectRays
@@ -46,10 +50,105 @@ from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
 from raytrace import ctracer
 
 counter = count()
+
+from raytrace import mirrors, prisms, corner_cubes, parabolics, ellipsoids, sources,\
+    beamstop, absorbers, apertures
+
+optics_classes = Traceable.subclasses
+
+optics_menu = Menu(name = "Components...",
+                   *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
+                    for cls in optics_classes]
+                    )
+
+source_classes = BaseRaySource.subclasses
+sources_menu = Menu(name = "Sources...",
+                   *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
+                    for cls in source_classes]
+                    )
+
+results_classes = Result.subclasses
+results_menu = Menu(name = "Results...",
+                   *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
+                    for cls in results_classes]
+                    )
+
+menubar = MenuBar(Menu(Action(name="Open...", action="open_file_action"),
+                       Action(name="Save...", action="save_file_action"),
+                       Action(name="Save As...", action="save_as_action"),
+                       name="File..."),
+                  Menu(optics_menu,
+                       sources_menu,
+                       results_menu,
+                       name="Insert..."))
     
     
 class RayTraceModelHandler(Controller):
-    pass
+    def save_file_action(self, info):
+        model = info.ui.context['object']
+        try:
+            model.save_as_yaml()
+        except IOError:
+            self.save_as_action(info)
+        
+    def save_as_action(self, info):
+        flags = wx.CHANGE_DIR | wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
+        default_filename = "MyModel.yaml"
+        fname = wx.FileSelector("Choose filename to save model as",
+                               default_filename=default_filename,
+                               wildcard='Model files (*.yaml)|*.yaml|'
+                                        'All files (*.*)|*.*',
+                               flags=flags)
+        if fname:
+            model = info.ui.context['object']
+            model.save_as_yaml(filename=fname)
+        info.ui.title = fname
+    
+    def open_file_action(self, info):
+        flags = wx.CHANGE_DIR | wx.FD_OPEN
+        default_filename = "MyModel.yaml"
+        fname = wx.FileSelector("Choose model file to open",
+                               wildcard='Model files (*.yaml)|*.yaml|'
+                                        'All files (*.*)|*.*',
+                               flags=flags)
+        if os.path.exists(fname):
+            model = info.ui.context['object']
+            model.load_from_yaml(fname)
+        info.ui.title = fname
+        
+    def insert_component(self, info, cls):
+        tracer = info.ui.context['object']
+        tracer.optics.append(cls())
+        
+    def insert_source(self, info, cls):
+        tracer = info.ui.context['object']
+        tracer.sources.append(cls())
+        
+    def insert_result(self, info, cls):
+        tracer = info.ui.context['object']
+        tracer.results.append(cls())
+        
+
+for cls in optics_classes:
+    def make_action(_cls):
+        def action(self, info):
+            self.insert_component(info, _cls)
+        return action
+    setattr(RayTraceModelHandler, "insert_"+cls.__name__, make_action(cls))
+    
+for cls in source_classes:
+    def make_action(_cls):
+        def action(self, info):
+            self.insert_source(info, _cls)
+        return action
+    setattr(RayTraceModelHandler, "insert_"+cls.__name__, make_action(cls))
+    
+for cls in results_classes:
+    def make_action(_cls):
+        def action(self, info):
+            self.insert_result(info, _cls)
+        return action
+    setattr(RayTraceModelHandler, "insert_"+cls.__name__, make_action(cls))
     
     
 class RayTraceModel(HasQueue):
@@ -76,19 +175,52 @@ class RayTraceModel(HasQueue):
     Self = self
     ShellObj = PythonValue({}, transient=True)
         
-    recursion_limit = Int(10, desc="maximum number of refractions or reflections")
+    recursion_limit = Int(200, desc="maximum number of refractions or reflections")
     
     save_btn = Button("Save scene")
     
-    def _optics_changed(self, opticList):
+    filename = File()
+    
+    def load_from_yaml(self, filename):
+        with open(filename, 'r') as fobj:
+            model = yaml.load(fobj)
+        print model
+        self.optics = model['components']
+        self.sources = model['sources']
+        self.results = model['results']
+        self.update = True
+    
+    def save_as_yaml(self, filename=None):
+        if filename is None:
+            filename = self.filename
+            if self.filename is None:
+                raise IOError("no preset filename")
+        model = {"components":list(self.optics),
+                 "sources": list(self.sources),
+                 "results": list(self.results)}
+        with open(filename, 'w') as fobj:
+            yaml.dump(model, fobj)
+        self.filename = filename
+    
+    @on_trait_change("optics[]")
+    def on_optics_change(self, obj, name, removed, opticList):
+        print "adding", opticList, removed, name
         scene = self.scene
         #del scene.actor_list[:]    
         for o in opticList:
             scene.add_actors(o.get_actors(scene))
+        for o in removed:
+            try:
+                scene.remove_actors(o.get_actors(scene))
+            except:
+                pass
         
         for optic in opticList:
             optic.on_trait_change(self.trace_all, "update")
             optic.on_trait_change(self.render_vtk, "render")
+        for optic in removed:
+            optic.on_trait_change(self.trace_all, "update", remove=True)
+            optic.on_trait_change(self.render_vtk, "render", remove=True)
         self.trace_all()
     
     def _rays_changed(self, rayList):
@@ -289,13 +421,18 @@ class RayTraceModel(HasQueue):
         colors = [c for s,c in shapes_colors]
         export_shapes(shapes, fname, colorList=colors)
         
-    def _sources_changed(self, source_list):
+    def _sources_changed(self, name, removed, source_list):
         scene = self.scene
         for source in source_list:
             for actor in source.actors:
                 scene.add_actor(actor)
             source.on_trait_change(self.trace_all, "update")
             source.on_trait_change(self.render_vtk, "render")
+            
+        for source in removed:
+            scene.remove_actors(source.actors)
+            source.on_trait_change(self.trace_all, "update", remove=True)
+            source.on_trait_change(self.render_vtk, "render", remove=True)
         self.trace_all()
     
     
@@ -420,7 +557,8 @@ ray_tracer_view = View(
                    #height=500,
                    width=800,
                    id="raytrace.view",
-                   handler=controller
+                   handler=controller,
+                   menubar=menubar,
                    )
     
 RayTraceModel.class_trait_view("traits_view", ray_tracer_view)

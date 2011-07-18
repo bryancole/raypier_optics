@@ -45,7 +45,7 @@ class UnitVectorTrait(EditorTraits, BaseTuple):
     def validate(self, object, name, value):
         value = super(UnitVectorTrait, self).validate(object,name,value)
         mag = numpy.sqrt(sum(a**2 for a in value))
-        return tuple(a/mag for a in value)
+        return tuple(float(a/mag) for a in value)
 
 
 TupleVector = Tuple((0.,0.,0.), editor_traits={'cols':3,
