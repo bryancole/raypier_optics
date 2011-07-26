@@ -332,12 +332,13 @@ class RectRaySource(BaseRaySource):
     length = Float(10.)
     width = Float(10)
     rings = Range(1,50,3, editor_traits={'mode':'spinner'})
+    theta = Float(0.)
     randomness = Bool(False)
     
     view_ray_ids = numpy.arange(20)
     
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, number, length, width, max_ray_len")
+                         depends_on="origin, direction, number, length, width, theta, max_ray_len")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -349,23 +350,25 @@ class RectRaySource(BaseRaySource):
                        Item('number'),
                        Item('length'),
                        Item('width'),
+                       Item('theta'),
 		       Item('randomness'),
                        label="Geometry")
     
     
-    @on_trait_change("focus, direction, number, length, width, max_ray_len")
+    @on_trait_change("focus, direction, number, length, width, theta, max_ray_len")
     def on_update(self):
         self.data_source.modified()
         self.update=True
     
     @cached_property
     def _get_InputRays(self):
+        from utils import rotation
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number
-	length = self.length
+        length = self.length
         width = self.width
-	randomness = self.randomness
+        randomness = self.randomness
         max_axis = numpy.abs(direction).argmax()
         if max_axis==0:
             v = numpy.array([0.,1.,0.])
@@ -375,7 +378,7 @@ class RectRaySource(BaseRaySource):
         d1 = normaliseVector(d1)
         d2 = numpy.cross(direction, d1)
         d2 = normaliseVector(d2)
-	a = length/2
+        a = length/2
         b = width/2
         X_range = numpy.linspace(-a, a, count)
         Y_range = numpy.linspace(-b, b, count)
@@ -394,7 +397,10 @@ class RectRaySource(BaseRaySource):
                 offsets[block + j] = point
         
         origins = numpy.array([origin + offset for offset in offsets])
-        directions = numpy.ones_like(origins) * direction
+        
+        dirmatrix = numpy.matrix(direction)
+        raydir = rotation(numpy.radians(self.theta))*(dirmatrix.T)
+        directions = numpy.ones_like(origins) * numpy.array(raydir.T)
 
         ray_data['origin'] = origins
         ray_data['direction'] = directions
@@ -414,7 +420,7 @@ class ConfocalRaySource(BaseRaySource):
     theta = Range(0.0,90.0,value=30)
     working_dist = Float(100.0)
     rings = Range(1,50,3, editor_traits={'mode':'spinner'})
-    
+    reverse = -1    #-1 is converging, +1 is diverging
     principle_axes = Property(Tuple(Array,Array), depends_on="direction")
     
     #view_ray_ids = numpy.arange(20)
@@ -456,10 +462,11 @@ class ConfocalRaySource(BaseRaySource):
     
     @cached_property
     def _get_InputRays(self):
+        rev = self.reverse #to determine converging or diverging  
         focus = numpy.array(self.focus)
         direction = numpy.array(self.direction)
         working_dist = self.working_dist
-        origin = focus - direction*working_dist
+        origin = focus - rev*direction*working_dist
         count = self.number
         rings = self.rings
         theta = self.theta
@@ -472,11 +479,11 @@ class ConfocalRaySource(BaseRaySource):
         angles = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
         offsets = radii*(d1*numpy.sin(angles) + d2*numpy.cos(angles)) 
         offsets.shape = (-1,3)
-        
+
         ray_data['origin'][1:] = offsets
         ray_data['origin'] += origin
-        ray_data['direction'][0] = normaliseVector(direction)
-        ray_data['direction'][1:] = normaliseVector((direction*working_dist) - offsets)
+        ray_data['direction'][0] = normaliseVector(rev*direction)
+        ray_data['direction'][1:] = normaliseVector((rev*direction*working_dist) - offsets)
         ray_data['length'] = self.max_ray_len
         ray_data['E_vector'] = [1,0,0]
         ray_data['E1_amp'] = 1.0 + 0.0j

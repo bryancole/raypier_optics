@@ -205,34 +205,6 @@ class TruncatedRightanglePrism(Extrusion):
                         (-w,0)]
         
 
-class LDLF(Extrusion):
-    name = "Linear Dialectric Light Funnle"
-    slat_width= Float #width of slats
-    ap_width = Float #width of exit apperture
-    slant = Float #angle of slanted sides
-    
-    traits_view = View(VGroup(
-                       Traceable.uigroup,
-                       Item('trace_ends'),
-                       Item('n_inside'),
-                       Item('length'),
-                       Item('slat_width'),
-                       Item('ap_width'),
-                       Item('slant')
-                       )
-                       )
-
-    @on_trait_change("slat_width, ap_width, slant")
-    def config_profile(self):
-        theta = self.slant*numpy.pi/180.
-        l = self.slat_width
-        h = l*numpy.sin(theta)
-        dis = l*numpy.cos(theta)
-        w = self.ap_width/2
-        self.profile = [(-w,0),
-                        (w,0),
-                        (w+dis,h),
-                        (-w-dis,h)]
                         
 class Sheet(Extrusion):
     #just a wrapper for the extrudedplanarface

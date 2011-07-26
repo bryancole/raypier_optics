@@ -107,3 +107,13 @@ def Convert_to_SP(input_v, normal_v, E1_vector, E1_amp, E2_amp):
     P_amp = E1_amp*dotprod(E1_vector,P_vector) + E2_amp*dotprod(E2_vector, P_vector)
     
     return S_amp, P_amp, S_vector, P_vector
+
+def rotation(theta):
+   tx=ty=tz = theta
+   cos = numpy.cos
+   sin = numpy.sin
+   Rx = numpy.array([[1,0,0], [0, cos(tx), -sin(tx)], [0, sin(tx), cos(tx)]])
+   Ry = numpy.array([[cos(ty), 0, -sin(ty)], [0, 1, 0], [sin(ty), 0, cos(ty)]])
+   Rz = numpy.array([[cos(tz), -sin(tz), 0], [sin(tz), cos(tz), 0], [0,0,1]])
+
+   return numpy.dot(Rx, numpy.dot(Ry, Rz))

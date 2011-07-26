@@ -11,7 +11,9 @@ x = np.linspace(1, 30, 100)
 y = 30/x
 
 #give profile as list of x values then y values.  this profile is evaluated by splprep
-test = Extruded_interpolant(profile = [x,y], smoothness =.005, z_height_1 = -30, z_height_2=30, \
+#the smaller smoothness is, the more accurate the spline is, but the more faces it takes.
+#try to make s as small as possible without making too many faces. (20 faces isn't unreasonable)
+test = Extruded_interpolant(profile = [x,y], smoothness = .00005, z_height_1 = -30, z_height_2=30, \
 		material = PECMaterial(), trace_ends= False )
 
 source = RectRaySource(origin=(5,50,0),
@@ -24,6 +26,6 @@ source = RectRaySource(origin=(5,50,0),
                             scale_factor=0.2)
 
 model = RayTraceModel(sources=[source],
-                      optics=[test])
-
+                      optics=[test], recursion_limit=2)
 model.configure_traits()
+

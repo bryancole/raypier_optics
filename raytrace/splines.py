@@ -31,11 +31,11 @@ from itertools import chain, izip, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raytrace.bases import Optic, Traceable
-from raytrace.cfaces import PolygonFace, ExtrudedBezier2Face
+from raytrace.cfaces import PolygonFace, ExtrudedBezier2Face, ExtrudedPlanarFace
 from raytrace.ctracer import FaceList
 
 import numpy as np
-from scipy.interpolate import splprep, UnivariateSpline
+from scipy.interpolate import splprep, splev
 
 def b_spline_to_bezier_series(tck, per = False):
   """Convert a parametric b-spline into a sequence of Bezier curves of the same degree.
@@ -104,13 +104,15 @@ class Extruded_interpolant(Optic):
     #
     #I haven't experiemnted to see what is excessive
     profile = Array(shape=(2,None), dtype=numpy.double)
-    
+    tck, uout = [None,None]      #the output of splprep 
+
     z_height_1 = Float(-30.0)   #must be smaller than z_height_2
     z_height_2 = Float(30.0)
-    smoothness = Float(.005)  #for splprep. found this number by trial and error. there are algorithms to guess better
+    smoothness = Float(.0005)  #for splprep. found this number by trial and error. there are algorithms to guess better
     
     trace_ends = Bool(False, desc="include the end-faces in tracing")
-    
+    trace_top = Bool(True, desc="include the end-faces in tracing")
+
     data_source = Instance(tvtk.ProgrammableSource, ())
     
     extrude = Instance(tvtk.LinearExtrusionFilter, (), 
@@ -131,6 +133,7 @@ class Extruded_interpolant(Optic):
         
         #convert profile to a list of bezier curves defined by three 2D points (knots)
         tck, uout = splprep(profile, s=self.smoothness, k=2, per=False)
+        self.tck, self.uout = [tck,uout]
         p2 = b_spline_to_bezier_series(tck)
         print "splprep used ",len(p2), " faces to make this spline"
         if len(p2) > 30:
@@ -141,7 +144,7 @@ class Extruded_interpolant(Optic):
         for knots in p2:
             curves.append(ExtrudedBezier2Face(owner=self, X0=knots[0][0], Y0=knots[0][1], \
                                 X1=knots[1][0], Y1=knots[1][1], X2=knots[2][0], Y2=knots[2][1], \
-                                z_height_1 = self.z_height_1, z_height_2 = self.z_height_2))
+                                z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m))
                                 
         
         if self.trace_ends:
@@ -153,7 +156,15 @@ class Extruded_interpolant(Optic):
             top = PolygonFace(owner=self, z_plane=z2, material=m,
                         xy_points=prof, invert_normal=True)
             curves.extend([base, top])
+
+        if self.trace_top:
+            curves.append( ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=profile[0][0], y1=profile[1][0], 
+                    x2=profile[0][-1], y2=[1][-1], material=m) )
+
         return curves
+
+
+            
     
     @on_trait_change("z_height_1, z_height_2")
     def config_pipeline(self):
@@ -174,11 +185,19 @@ class Extruded_interpolant(Optic):
         self.data_source.modified()
         self.faces.faces = self.make_faces()
         self.update=True
-    
+
+    def get_real_profile(self):
+        #return the evaluated profile of the spline
+        x = np.linspace(0,1,100)    #splprep is defined of 0,1 of the parameter.  100 points
+        profile = splev(x,self.tck)
+
+        return profile
+
     def _pipeline_default(self):
         source = self.data_source
         def execute():
-            xy = np.column_stack((self.profile[:][0],self.profile[:][1]))
+            profile = self.get_real_profile()
+            xy = np.column_stack((profile[:][0],profile[:][1]))
             z = numpy.ones(xy.shape[0]) * self.z_height_1
             points = numpy.column_stack((xy,z))
             

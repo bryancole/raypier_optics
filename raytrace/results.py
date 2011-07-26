@@ -111,15 +111,16 @@ class Ratio(Result):
         if not all((nom, denom)):
             return
         
-        #maybe the object needs a source trait
-        #instead, just take the first source found
-        source = self._tracer.sources[0]
+        nom_count = 0
+        denom_count = 0
+        #just sum result from multiple sources?
+        #maybe a dictionary or something would be better?
+        for source in self._tracer.sources:
+            #a list of RayCollection instances
+            raysList = source.TracedRays
         
-        #a list of RayCollection instances
-        raysList = source.TracedRays
-        
-        nom_count = get_total_intersections(raysList, nom)
-        denom_count = get_total_intersections(raysList, denom)
+            nom_count = nom_count + get_total_intersections(raysList, nom)
+            denom_count = denom_count + get_total_intersections(raysList, denom)
 	#print "nom and denom counts", nom_count, denom_count
         try:
             self.result = float(nom_count)/float(denom_count)
