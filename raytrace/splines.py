@@ -31,7 +31,7 @@ from itertools import chain, izip, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raytrace.bases import Optic, Traceable
-from raytrace.cfaces import PolygonFace, ExtrudedBezier2Face, ExtrudedPlanarFace
+from raytrace.cfaces import PolygonFace, ExtrudedBezierFace, ExtrudedPlanarFace
 from raytrace.ctracer import FaceList
 
 import numpy as np
@@ -132,19 +132,17 @@ class Extruded_interpolant(Optic):
         m = self.material
         
         #convert profile to a list of bezier curves defined by three 2D points (knots)
-        tck, uout = splprep(profile, s=self.smoothness, k=2, per=False)
+        tck, uout = splprep(profile, s=self.smoothness, k=3, per=False)
         self.tck, self.uout = [tck,uout]
-        p2 = b_spline_to_bezier_series(tck)
-        print "splprep used ",len(p2), " faces to make this spline"
-        if len(p2) > 30:
-            print "!!! thats alot of faces.  try adjusting smoothness. /nSpline degree 2 may be too small  !!!""" 
-            tck, uout = splprep(profile, s=self.smoothness, k=3, per=False)
-            print "3rd degree spline would use ",len(tck[0])-7," faces."
+        ctrl_pt_list = b_spline_to_bezier_series(tck)
+        print "splprep used ",len(ctrl_pt_list), " faces to make this spline"
+        if len(ctrl_pt_list) > 30:
+            print "!!! thats alot of faces.  try adjusting smoothness."
+            #need imperfection statistics
+
+        print "from splines.py: ",ctrl_pt_list
         curves = []
-        for knots in p2:
-            curves.append(ExtrudedBezier2Face(owner=self, X0=knots[0][0], Y0=knots[0][1], \
-                                X1=knots[1][0], Y1=knots[1][1], X2=knots[2][0], Y2=knots[2][1], \
-                                z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m))
+        curves.append(ExtrudedBezierFace(owner=self, beziercurves = np.array(ctrl_pt_list), z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m))
                                 
         
         if self.trace_ends:
@@ -158,6 +156,7 @@ class Extruded_interpolant(Optic):
             curves.extend([base, top])
 
         if self.trace_top:
+            print "traced top"
             curves.append( ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=profile[0][0], y1=profile[1][0], 
                     x2=profile[0][-1], y2=[1][-1], material=m) )
 
@@ -174,6 +173,10 @@ class Extruded_interpolant(Optic):
         self.update=True
         
     def _trace_ends_changed(self):
+        self.faces.faces = self.make_faces()
+        self.update=True
+
+    def _trace_top_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
         

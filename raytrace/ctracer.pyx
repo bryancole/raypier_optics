@@ -37,10 +37,12 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
 
 cdef struct vector_t:
     double x,y,z
+
     
 cdef struct complex_t:
     double real
     double imag
+
     
 cdef struct ray_t:
     #vectors

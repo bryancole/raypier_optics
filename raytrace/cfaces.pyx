@@ -7,9 +7,20 @@
 """
 Cython module for Face definitions
 """
+
+#maybe this is a cython .15 thing?
+#from libc.math import INFINITY, M_PI, sqrt, pow, fabs, cos, sin, acos, atan2
+
 cdef extern from "math.h":
     double INFINITY
+    double M_PI
     double sqrt(double)
+    double atan2 (double y, double x )
+    double pow(double x, double y)
+    double fabs(double)
+    double cos(double)
+    double sin(double)
+    double acos(double)
 
 from ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
@@ -17,7 +28,10 @@ from ctracer cimport Face, sep_, \
                 rotate_c
 
 import numpy as np
-cimport numpy as np
+cimport numpy as np_
+
+cdef struct flatvector_t:
+    double x,y
 
 
 cdef class CircularFace(Face):
@@ -318,144 +332,289 @@ cdef class ExtrudedPlanarFace(Face):
     
     cdef vector_t compute_normal_c(self, vector_t p):
         return self.normal
+
+#
+# Functions used for Bezier math.  should go in utils.pyx when there is one
+#
+
+
     
+cdef double eval_bezier(double t, double cp0, double cp1, double cp2, double cp3):
+    #just evaluate a cubic bezier spline
+    return cp0*((1-t)**3) + 3*cp1*t*((1-t)**2) + 3*cp2*(1-t)*(t**2) + cp3*(t**3)
+
+cdef double dif_bezier(double t, double cp0, double cp1, double cp2, double cp3):
+    #calc the derivative of a cubic bezier when parameter = t
+    cdef double A, B, C     #just doin this old school polynomial style
+    A = cp3-3*cp2+3*cp1-cp0
+    B = 3*cp2-6*cp1+3*cp0
+    C = 3*cp1-3*cp0
+    return 3*A*t**2 + 2*B*t + C
+
+cdef struct poly_roots:
+    #my apologies for highly unusable code, 
+    #I am such a noob at passing values between functions
+    double roots[3] 
+    int n
     
-cdef class ExtrudedBezier2Face(Face):
+cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
+     #this code is known not to work in the case of (x-c)^3 (triple zero)
+     # **TODO ** fix this
+     cdef:
+      long double a1 = b/a, a2 = c/a, a3 = d/a
+      long double Q = (a1*a1 - 3.0*a2)/9.0
+      long double R = (2.0*a1*a1*a1 - 9.0*a1*a2 + 27.0*a3)/54.0
+      double R2_Q3 = R*R - Q*Q*Q
+      double theta
+      poly_roots x
+     print "called looking for roots"
+     if (R2_Q3 <= 0):
+      x.n = 3
+      theta = acos(R/sqrt(Q*Q*Q))
+      x.roots[0] = -2.0*sqrt(Q)*cos(theta/3.0) - a1/3.0;
+      x.roots[1] = -2.0*sqrt(Q)*cos((theta+2.0*M_PI)/3.0) - a1/3.0
+      x.roots[2] = -2.0*sqrt(Q)*cos((theta+4.0*M_PI)/3.0) - a1/3.0
+     else:
+      x.n = 1
+      x.roots[0] = pow(sqrt(R2_Q3)+fabs(R), 1/3.0)
+      x.roots[0] += Q/x.roots[0]
+      x.roots[0] *= (1 if (R < 0.0) else -1)
+      x.roots[0] -= a1/3.0
+     return x
+
+cdef flatvector_t rotate2D(double phi, flatvector_t p):
+    cdef flatvector_t result
+    result.x = p.x*cos(phi) - p.y*sin(phi)
+    result.y = p.x*sin(phi) + p.y*cos(phi)     
+    return result
+
+cdef class ExtrudedBezierFace(Face):
+
     cdef:
-        double X0, X1, X2, Y0, Y1, Y2, z_height_1, z_height_2
-    
-    cdef inline double det2x2_(self, double a11, double a12, double a21, double a22):
-        cdef double out
-        out = a11*a22 - a12*a21 
-        return out
-    
-    def __cinit__(self, X0,X1,Y0,Y1,X2,Y2,z_height_1,z_height_2, **kwds):
-        self.X0=X0
-        self.X1=X1
-        self.X2=X2
-        self.Y0=Y0
-        self.Y1=Y1
-        self.Y2=Y2
+        double z_height_1, z_height_2
+        flatvector_t mincorner, maxcorner         #corners of x-y box that bounds entire spline
+        np_.ndarray curves_array        
+
+    cdef int ccw(self, flatvector_t  A, flatvector_t  B, flatvector_t  C):
+        #used by an ingenious line segment intersect algorithim I found.
+        #determines counter clockwiseness of points
+        return (C.y-A.y)*(B.x-A.x) > (B.y-A.y)*(C.x-A.x)
+
+    cdef int line_seg_overlap(self, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
+        #check if two line segments overlap eachother.  Used for rough tests of
+        #intersection before committing to much computation to the potential intersection.
+        # A and B are the begin and end of one line; C,D the other. 
+        # Code from http://www.bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
+        #AB crosses CD if ABCD are all cw or ccw.
+        return self.ccw(A,C,D) != self.ccw(B,C,D) and self.ccw(A,B,C) != self.ccw(A,B,D)
+        
+    cdef int pnt_in_hull(self,flatvector_t p, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
+        #check is p in in polygon ABCD, using the clever ccw function.
+        #point in in polygon iff it is either ccw with all points or not ccw with all points
+        if self.ccw(A,B,p):
+            #for result to be true, all other calls to ccw must agree 
+            if self.ccw(B,C,p) and self.ccw(C,D,p) and self.ccw(D,A,p):
+                   return 1
+        else:
+            if not self.ccw(B,C,p) and not self.ccw(C,D,p) and not self.ccw(D,A,p):
+                    return 1
+        return 0
+
+    def __cinit__(self,np_.ndarray[np_.float64_t ,ndim=3] beziercurves,double z_height_1=0,double z_height_2=0, **kwds):
+        cdef flatvector_t temp1, temp2
+        self.curves_array = beziercurves
         self.z_height_1 = z_height_1
         self.z_height_2 = z_height_2
-    
-    cdef double intersect_c(self, vector_t r, vector_t p2):
+        temp1.x = beziercurves[0,0,0]
+        temp1.y = beziercurves[0,0,1]
+        temp2.x = beziercurves[0,0,0]
+        temp2.y = beziercurves[0,0,1]
+        for bezierpts in beziercurves:
+         for pair in bezierpts:
+            if pair[0] < temp1.x: temp1.x=pair[0]
+            if pair[0] > temp2.x: temp2.x=pair[0]
+            if pair[1] < temp1.y: temp1.y=pair[1]
+            if pair[1] > temp2.y: temp2.y=pair[1]
+
+        self.mincorner = temp1
+        self.maxcorner = temp2
+
+    cdef double intersect_c(self, vector_t ar, vector_t pee2):
+
         cdef: 
-            vector_t s
-            double A, B, C, D
-            double t1, t2, a1, a2
-            double p0s, p1s, p2s
-            double dZ, z1       #used to calculate z bounds logic
-        
-        dZ = p2.z-r.z
-        z1 = r.z
+            flatvector_t tempvector
+            flatvector_t r, p2, s, origin
+            flatvector_t cp0,cp1,cp2,cp3  #holds control points for spline segment under scrutiny
+            double result = INFINITY            #length of ray before it intersects surface. 0 if no valid intersection
+            double dZ                       #rate of change of z. dZ*result+Z0 gives Z coordinate
+            double A,B,C,D,t
+            poly_roots ts
+            vector_t    tempv
 
-        s = subvv_(p2, r)
+        origin.x = 0
+        origin.y = 0
+        #first off, does ray even enter the depth of the extrusion?
+        if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
+            return 0    #does not
 
-        ### An inefficient implementation to begin with,
-        ### to check the maths
-        A = s.y*(self.X0 - 2*self.X1 + self.X2) \
-            - s.x*(self.Y0 - 2*self.Y1 + self.Y2)
-        B = 2*( s.x*(self.Y0-self.Y1) - s.y*(self.X0-self.X1) )
-        C = s.y*(self.X0 - r.x) - s.x*(self.Y0 - r.y)
-        
-        D = B*B - 4*A*C
-        
-        if D<0: #no intersection at all
-            return 0
-        
-        D = sqrt(D)
-        
-        ###two possible roots
-        t1 = (-B + D) / (2*A)
-        t2 = (-B - D) / (2*A)
-        
-        p0s = self.X0*s.x + self.Y0*s.y
-        p1s = self.X1*s.x + self.Y1*s.y
-        p2s = self.X2*s.x + self.Y2*s.y
-        
-        if 0 <= t1 < 1:
-            a1 = (1-t1)*(1-t1)*p0s + 2*(1-t1)*t1*p1s + t1*t1*p2s - (r.x*s.x + r.y*s.y)
-            a1 /= (s.x*s.x + s.y*s.y)
-            if not self.tolerance < a1 <= 1:
-                a1 = INFINITY
-            if not self.z_height_1 <= a1*dZ <= self.z_height_2:
-                a1 = INFINITY
-        else:
-            a1 = INFINITY
+        #strip useless thrid dimension from ray vector
+        r.x = ar.x
+        r.y = ar.y
+        p2.x = pee2.x
+        p2.y = pee2.y
+
+
+        #check if ray intersects x-y bounding box of spline at all
+        tempvector.x = self.mincorner.x
+        tempvector.y = self.maxcorner.y
+        if not self.line_seg_overlap(r,p2,self.mincorner,tempvector):
+         if not  self.line_seg_overlap(r,p2,tempvector,self.maxcorner):
+          tempvector.x = self.maxcorner.x
+          tempvector.y = self.mincorner.y
+          if not self.line_seg_overlap(r,p2,self.maxcorner,tempvector):
+           if not self.line_seg_overlap(r,p2,tempvector,self.mincorner):
+            return 0    #no intersections
+
+        #segment intersects with gross bounding box,
+        #Calc dZ and the 2D origin adjusted ray, because they will probably be used.
+        tempv = subvv_ (pee2,ar) 
+        dZ = tempv.z
+        s.x=tempv.x
+        s.y=tempv.y
+        theta = atan2(s.y,s.x)
+                
+        s = rotate2D(-theta,s)
+        # now, loop through curves and see if segment 1) intersects with individual convex hulls
+        # 2) intersects with spline (return points)
+        for curve in self.curves_array.copy():            #load up control points
+           for pt in curve:
+             pt[0]=pt[0]-ar.x
+             pt[1]=pt[1]-ar.y 
+           cp0.x,cp0.y = curve[0].copy()
+           cp1.x,cp1.y = curve[1].copy()
+           cp2.x,cp2.y = curve[2].copy()
+           cp3.x,cp3.y = curve[3].copy()
+           #rotate ctrl points such that ray is along the x axis
+           cp0 = rotate2D(-theta,cp0)
+           cp1 = rotate2D(-theta,cp1)
+           cp2 = rotate2D(-theta,cp2)
+           cp3 = rotate2D(-theta,cp3)
+
+           #test for intersection between ray (actually segment) and convex hull
+           if self.line_seg_overlap(origin,s,cp0,cp1) or self.line_seg_overlap(origin,s,cp1,cp2) or self.line_seg_overlap(origin,s,cp2,cp3) or self.line_seg_overlap(origin,s,cp3,cp0):
+           
+             #Ray does intersect this convex hull.  Find solution:
+             #Setup A,B,C and D (bernstein polynomials)
+             A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
+             B = 3*cp2.y-6*cp1.y+3*cp0.y
+             C = 3*cp1.y-3*cp0.y
+             D = cp0.y
+             #solve for t
+             ts = roots_of_cubic(A,B,C,D)
+             while ts.n > 0:
+                 ts.n-=1
+                 t = ts.roots[ts.n]
+                 #print "t ",t
+                 #make sure solution is on valid interval
+                 if 0.<t<1.:
+                  #print "im true, right?",ts.n,t
+                  #the x value will also be the length, which is the form of result
+                  B = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x) #reuse B
+                  #print "b at t",B,t
+                  #is x within bounds?
+                  if 0 < B < s.x:
+                    #print "in range"
+                    #is point within Z bounds?
+                    C = dZ*B/s.x    #reuse polynomial doubles
+                    A = C+ar.z     
+                    if self.z_height_1 < A < self.z_height_2:
+                     #print "in z: ",B,result
+                     #is this the shortest length to an intersection so far?
+                     B = sqrt(C**2+B**2)
+                     if B < result:
+                      result = B
+                
             
-        if 0 <= t2 < 1:
-            a2 = (1-t2)*(1-t2)*p0s + 2*(1-t2)*t2*p1s + t2*t2*p2s - (r.x*s.x + r.y*s.y)
-            a2 /= (s.x*s.x + s.y*s.y)
-            if not self.tolerance < a2 <= 1:
-                a2 = INFINITY
-            if not self.z_height_1 <= a2*dZ <= self.z_height_2:
-                a2 = INFINITY
-        else:
-            a2 = INFINITY
-        
-        if a2 < a1:
-            return a2 * mag_(s)
-        else:
-            return a1 * mag_(s)
-    
+        if result == INFINITY: result = 0
+        #print "final answer:",result
+        return result
+
+
+
     cdef vector_t compute_normal_c(self, vector_t p):
-        """use vector calc to get polynomial coefficents then use derivative to find 2d normal
-        """
-        cdef vector_t normal
-        cdef double x1,x2,x3,y1,y2,y3,A,B
-        cdef double det,a11,a12,a13,a21,a22,a23
-        
-        normal.x = 0
-        normal.y = 0
-        normal.z = 0
-        
-        x1 = self.X0
-        x2 = self.X1
-        x3 = self.X2
-        y1 = self.Y0
-        y2 = self.Y1
-        y3 = self.Y2
-        
-        #solve for A, B and C using these three points,
-        #first, find determinant of the three equations (y = Ax^2+Bx+C)
-        det = x1*x1*x2 + x1*x3*x3 + x2*x2*x3 - x1*x1*x3 -x1*x2*x2 - x2*x3*x3
-        if det == 0:
-            print "what the hey? compute normal found det == 0"
-            return normal #still just zero's
-            
-        #then find 6 of the 9 elements of the adjoint matrix (don't have to solve 
-        # for C because it is not in derivative
-        
-        a11 = self.det2x2_(x2,1,x3,1)
-        a12 = -self.det2x2_(x1,1,x3,1)
-        a13 = self.det2x2_(x1,1,x2,1)
-        a21 = -self.det2x2_(x2**2,1,x3**2,1)
-        a22 = self.det2x2_(x1**2,1,x3**2,1)
-        a23 = -self.det2x2_(x1**2,1,x2**2,1)
-        
-        #then solve coefficents by multiplying Y by inverse matrix.
-        A = y1*a11/det + y2*a12/det +y3*a13/det
-        B = y1*a21/det + y2*a22/det +y3*a23/det
-        
-        normal.y=0      #its a trough shape!
-        #reuse variables
-        a11 = 2*A*p.x + B
-        if a11 == 0:
-            normal.z = 1
-            normal.x = 0
-        else:
-            normal.y = -1
-            normal.x = a11
-        
-        #print "debug: calculated bezier normal"
-        return norm_(normal)
+        cdef:
+            flatvector_t ray,cp0,cp1,cp2,cp3
+            double theta, tmp, t
+            poly_roots ts
+
+        #print "called looking for normal"
+        ray.x = p.x
+        ray.y = p.y
+        theta = atan2(p.y,p.x)
+        #ray = rotate2D(-theta, ray)
+        #find which curve this point is in
+        #print "ray: ",ray
+        for curve in self.curves_array.copy():
+            cp0.x,cp0.y = curve[0]
+            cp1.x,cp1.y = curve[1]
+            cp2.x,cp2.y = curve[2]
+            cp3.x,cp3.y = curve[3]
+            #is point even in this hull?
+            #print "\nhull ",cp0
+            #print cp1
+            #print cp2
+            #print cp3
+            if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
+              #then, solve for t
+              
+              cp0 = rotate2D(-theta,cp0)
+              cp1 = rotate2D(-theta,cp1)
+              cp2 = rotate2D(-theta,cp2)
+              cp3 = rotate2D(-theta,cp3)
+              #Setup A,B,C and D (bernstein polynomials)
+              A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
+              B = 3*cp2.y-6*cp1.y+3*cp0.y
+              C = 3*cp1.y-3*cp0.y
+              D = cp0.y
+              ts = roots_of_cubic(A,B,C,D)
+
+                
+              ts.n -= 2       #make n usable as the index to x
+              #print "normal roots: ",ts.n,ts.roots[0],ts.roots[1] 
+              while ts.n < 3:
+                ts.n +=1
+                t = ts.roots[ts.n]
+                #make sure solution is within interval
+                if 0<t<1:
+                 #print "winning t: ",t
+                 #ok, then is this the t to the same point p? 
+                 tmp = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+                 #I will generously allow for rounding error 
+                 if tmp**2 - (ray.x**2+ray.y**2) < .005:
+                    #this is the single solution. return the derivative dy/dx = dy/dt / dx/dt
+                    ray.x = dif_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+                    ray.y = dif_bezier(t,cp0.y,cp1.y,cp2.y,cp3.y)
+                    ray = rotate2D(theta,ray)
+                    p.z = 0     #trough has no slope in z
+                    if ray.x == 0:
+                      p.y = 1
+                      p.x = 0
+                      return p
+                    else:
+                      p.x = 1
+                      p.y = -ray.x/ray.y #m = dy/dx, -1/m = -dx/dy
+                      return norm_(p)
+
+        #how did you get here?  p was supposed to be a point on the curve!
+        print "error: Bezier normal not found, point not actually on curve!"
+        p.x=p.y=p.z = 0
+        return p
     
     
 cdef int point_in_polygon_c(double X, double Y, object obj):
     cdef int i, size, ct=0
     cdef double y1, y2, h, x, x1, x2
-    cdef np.ndarray[np.float64_t, ndim=2] pts=obj
+    cdef np_.ndarray[np_.float64_t, ndim=2] pts=obj
     
     size = pts.shape[0]
     
