@@ -367,7 +367,7 @@ cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
       double R2_Q3 = R*R - Q*Q*Q
       double theta
       poly_roots x
-     print "called looking for roots"
+     #print "called looking for roots"
      if (R2_Q3 <= 0):
       x.n = 3
       theta = acos(R/sqrt(Q*Q*Q))
