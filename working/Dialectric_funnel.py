@@ -7,7 +7,7 @@ sys.path.append('..')
 
 from raytrace.sources import RectRaySource
 from raytrace.tracer import RayTraceModel
-from raytrace.prisms import LDLF
+from raytrace.dielectrictroughs import LDLF
 from raytrace.cmaterials import PECMaterial, OpaqueMaterial
 from raytrace.results import Ratio
 

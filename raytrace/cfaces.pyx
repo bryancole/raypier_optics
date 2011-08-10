@@ -409,16 +409,18 @@ cdef class ExtrudedBezierFace(Face):
         return self.ccw(A,C,D) != self.ccw(B,C,D) and self.ccw(A,B,C) != self.ccw(A,B,D)
         
     cdef int pnt_in_hull(self,flatvector_t p, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
-        #check is p in in polygon ABCD, using the clever ccw function.
-        #point in in polygon iff it is either ccw with all points or not ccw with all points
-        if self.ccw(A,B,p):
-            #for result to be true, all other calls to ccw must agree 
-            if self.ccw(B,C,p) and self.ccw(C,D,p) and self.ccw(D,A,p):
-                   return 1
-        else:
-            if not self.ccw(B,C,p) and not self.ccw(C,D,p) and not self.ccw(D,A,p):
-                    return 1
-        return 0
+        #instead of convex hull, just use xy bounding box, which is quicker to construct
+
+        cdef int i,j,k
+
+        #if p is bigger than atleast one but not all, the it is in the box
+        i = p.x > A.x or p.x>B.x or p.x>C.x or p.x>D.x
+        j = p.x > A.x and p.x>B.x and p.x>C.x and p.x>D.x
+        k = i and not j
+        i = p.y > A.y or p.y>B.y or p.y>C.y or p.y>D.y
+        j = p.y > A.y and p.y>B.y and p.y>C.y and p.y>D.y
+        i = i and not j
+        return i and k
 
     def __cinit__(self,np_.ndarray[np_.float64_t ,ndim=3] beziercurves,double z_height_1=0,double z_height_2=0, **kwds):
         cdef flatvector_t temp1, temp2
@@ -546,8 +548,8 @@ cdef class ExtrudedBezierFace(Face):
             flatvector_t ray,cp0,cp1,cp2,cp3
             double theta, tmp, t
             poly_roots ts
-
-        #print "called looking for normal"
+            np_.ndarray box
+        #print "called looking for normal",p.x,p.y
         ray.x = p.x
         ray.y = p.y
         theta = atan2(p.y,p.x)
@@ -564,9 +566,10 @@ cdef class ExtrudedBezierFace(Face):
             #print cp1
             #print cp2
             #print cp3
+            #print "pt in poly: ",point_in_polygon_c(ray.x,ray.y,box)
             if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
               #then, solve for t
-              
+              #print "in hull"
               cp0 = rotate2D(-theta,cp0)
               cp1 = rotate2D(-theta,cp1)
               cp2 = rotate2D(-theta,cp2)
@@ -590,26 +593,34 @@ cdef class ExtrudedBezierFace(Face):
                  #ok, then is this the t to the same point p? 
                  tmp = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
                  #I will generously allow for rounding error 
+                 #print "got here with ray: ",ray.x,ray.y
                  if tmp**2 - (ray.x**2+ray.y**2) < .005:
                     #this is the single solution. return the derivative dy/dx = dy/dt / dx/dt
+                    
                     ray.x = dif_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
                     ray.y = dif_bezier(t,cp0.y,cp1.y,cp2.y,cp3.y)
                     ray = rotate2D(theta,ray)
                     p.z = 0     #trough has no slope in z
-                    if ray.x == 0:
-                      p.y = 1
-                      p.x = 0
-                      return p
-                    else:
-                      p.x = 1
-                      p.y = -ray.x/ray.y #m = dy/dx, -1/m = -dx/dy
-                      return norm_(p)
+                    #direction of normal is to the left of the parametric curve
+                    #slope of normal is -dx/dy
+                    
+                    if ray.y==0:
+                        p.x=0
+                        p.y = (1 if ray.x>0 else -1)
+                    elif ray.y>0:
+                        p.x=-1
+                        p.y = ray.x/ray.y
+                    elif ray.y<0:
+                        p.x = 1
+                        p.y = -ray.x/ray.y    
+                    return norm_(p)
 
         #how did you get here?  p was supposed to be a point on the curve!
         print "error: Bezier normal not found, point not actually on curve!"
         p.x=p.y=p.z = 0
         return p
-    
+
+
     
 cdef int point_in_polygon_c(double X, double Y, object obj):
     cdef int i, size, ct=0
@@ -631,8 +642,8 @@ cdef int point_in_polygon_c(double X, double Y, object obj):
         y1 = y2
         x1 = x2
     return ct
-    
-    
+
+
 def point_in_polygon(double X, double Y, point_list):
     pts = np.ascontiguousarray(point_list, dtype=np.float64)
     assert pts.shape[1]==2

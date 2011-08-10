@@ -33,6 +33,6 @@ source = RectRaySource(origin=(5,-50,0),
                             scale_factor=0.2)
 
 model = RayTraceModel(sources=[source],
-                      optics=[test], recursion_limit=4)
+                      optics=[test], recursion_limit=10)
 model.configure_traits()
 
