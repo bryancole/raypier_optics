@@ -129,7 +129,37 @@ class BaseRaySource(BaseBase):
             parent = rays.parent
         seq.reverse()
         return seq
-    
+
+    def get_ray_list_by_id(self):
+        """return a list of lists of dictionaries where the index of the outer list is the ray id, and
+        the inner index is the recursion # (0 being the source ray, 1 is after the first
+        face, etc.) and the dictionary keys are the attributes of the ray object"""
+        result = []
+        #keys is copy and pasted from the dtype of a ray object
+        keys = ['origin','direction','normal','E_vector','refractive_index','E1_amp','E2_amp','length','wavelength','parent_idx','end_face_idx']
+        #first, use the virgin rays to fill in r[idx][0]
+
+        for ray in self.TracedRays[0].copy_as_array():
+            r = {}
+            lst = []    #list to contain all relevant dictionaries for each ray
+            for i,att in enumerate(ray):
+                r[keys[i]] = att 
+            lst.append(r)
+            result.append(lst)
+
+        #now, if there are any subsequent ray collections, use the parent_idx attribute to add those rays to result 
+        children = self.TracedRays[1:]      #this is an empty list if there were no ray/face interactions
+        
+        #for loop will do nothing if there are no children
+        for collection in children:
+            for ray in collection.copy_as_array():
+                r = {}
+                for i,att in enumerate(ray):
+                    r[keys[i]] = att
+                parent = int(r['parent_idx']) 
+                result[parent].append(r)
+        return result
+
     def eval_angular_spread(self, idx):
         """A helper method to evaluate the angular spread of a ray-segment.
         @param idx: the index of the RayCollection in the TracedRay list 

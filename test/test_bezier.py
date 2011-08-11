@@ -23,12 +23,12 @@ ctrl_pts = b_spline_to_bezier_series(tck)
 test = Extruded_bezier(control_points = ctrl_pts, z_height_1 = -30, z_height_2=30, \
 		material = DielectricMaterial(), trace_ends= True, trace_top = True,invert_normal=True )
 
-source = RectRaySource(origin=(5,-50,0),
-                            direction=(0,.5,0),
+source = RectRaySource(origin=(18.02645168,-49.50970966,0),
+                            direction=(-.2,1,0),
                             working_dist = 100.,
                             number=1,
-                            length = 10,
-            			    width = 10,
+                            length = 0,
+            			    width = 0,
             			    randomness = False,
                             scale_factor=0.2)
 

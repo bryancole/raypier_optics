@@ -449,11 +449,11 @@ cdef class ExtrudedBezierFace(Face):
             flatvector_t cp0,cp1,cp2,cp3  #holds control points for spline segment under scrutiny
             double result = INFINITY            #length of ray before it intersects surface. 0 if no valid intersection
             double dZ                       #rate of change of z. dZ*result+Z0 gives Z coordinate
-            double A,B,C,D,t
+            double A,B,C,D,t,a,b,c,d
             poly_roots ts
             vector_t    tempv
-
-        origin.x = 0
+        #print "called intersection"
+        origin.x = 0 
         origin.y = 0
         #first off, does ray even enter the depth of the extrusion?
         if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
@@ -500,11 +500,10 @@ cdef class ExtrudedBezierFace(Face):
            cp0 = rotate2D(-theta,cp0)
            cp1 = rotate2D(-theta,cp1)
            cp2 = rotate2D(-theta,cp2)
-           cp3 = rotate2D(-theta,cp3)
-
+           cp3 = rotate2D(-theta,cp3) 
            #test for intersection between ray (actually segment) and convex hull
            if self.line_seg_overlap(origin,s,cp0,cp1) or self.line_seg_overlap(origin,s,cp1,cp2) or self.line_seg_overlap(origin,s,cp2,cp3) or self.line_seg_overlap(origin,s,cp3,cp0):
-           
+             #print "inside intersect hull"
              #Ray does intersect this convex hull.  Find solution:
              #Setup A,B,C and D (bernstein polynomials)
              A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
@@ -516,25 +515,23 @@ cdef class ExtrudedBezierFace(Face):
              while ts.n > 0:
                  ts.n-=1
                  t = ts.roots[ts.n]
-                 #print "t ",t
                  #make sure solution is on valid interval
                  if 0.<t<1.:
-                  #print "im true, right?",ts.n,t
                   #the x value will also be the length, which is the form of result
-                  B = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x) #reuse B
-                  #print "b at t",B,t
+                  b = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+                  #print "b at t",b,t
                   #is x within bounds?
-                  if 0 < B < s.x:
+                  if 0 < b < s.x:
                     #print "in range"
                     #is point within Z bounds?
-                    C = dZ*B/s.x    #reuse polynomial doubles
-                    A = C+ar.z     
-                    if self.z_height_1 < A < self.z_height_2:
+                    c = dZ*b/s.x   
+                    a = c+ar.z     
+                    if self.z_height_1 < a < self.z_height_2:
                      #print "in z: ",B,result
                      #is this the shortest length to an intersection so far?
-                     B = sqrt(C**2+B**2)
-                     if B < result:
-                      result = B
+                     b = sqrt(c**2+b**2)
+                     if b < result and b > self.tolerance:
+                      result = b
                 
             
         if result == INFINITY: result = 0
@@ -545,7 +542,7 @@ cdef class ExtrudedBezierFace(Face):
 
     cdef vector_t compute_normal_c(self, vector_t p):
         cdef:
-            flatvector_t ray,cp0,cp1,cp2,cp3
+            flatvector_t ray,cp0,cp1,cp2,cp3,rotated
             double theta, tmp, t
             poly_roots ts
             np_.ndarray box
@@ -553,20 +550,13 @@ cdef class ExtrudedBezierFace(Face):
         ray.x = p.x
         ray.y = p.y
         theta = atan2(p.y,p.x)
-        #ray = rotate2D(-theta, ray)
         #find which curve this point is in
-        #print "ray: ",ray
         for curve in self.curves_array.copy():
             cp0.x,cp0.y = curve[0]
             cp1.x,cp1.y = curve[1]
             cp2.x,cp2.y = curve[2]
             cp3.x,cp3.y = curve[3]
             #is point even in this hull?
-            #print "\nhull ",cp0
-            #print cp1
-            #print cp2
-            #print cp3
-            #print "pt in poly: ",point_in_polygon_c(ray.x,ray.y,box)
             if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
               #then, solve for t
               #print "in hull"
@@ -574,6 +564,7 @@ cdef class ExtrudedBezierFace(Face):
               cp1 = rotate2D(-theta,cp1)
               cp2 = rotate2D(-theta,cp2)
               cp3 = rotate2D(-theta,cp3)
+              #print "cp0: ",cp0.x,cp0.y
               #Setup A,B,C and D (bernstein polynomials)
               A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
               B = 3*cp2.y-6*cp1.y+3*cp0.y
@@ -581,19 +572,16 @@ cdef class ExtrudedBezierFace(Face):
               D = cp0.y
               ts = roots_of_cubic(A,B,C,D)
 
-                
-              ts.n -= 2       #make n usable as the index to x
-              #print "normal roots: ",ts.n,ts.roots[0],ts.roots[1] 
-              while ts.n < 3:
-                ts.n +=1
+              #print "normal roots: ",ts.n,ts.roots[0],ts.roots[1],ts.roots[2]
+              while ts.n > 0:
+                ts.n -=1
                 t = ts.roots[ts.n]
                 #make sure solution is within interval
-                if 0<t<1:
-                 #print "winning t: ",t
+                if 0<=t<=1:
                  #ok, then is this the t to the same point p? 
                  tmp = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
                  #I will generously allow for rounding error 
-                 #print "got here with ray: ",ray.x,ray.y
+                 #print "got here with point: ",tmp,
                  if tmp**2 - (ray.x**2+ray.y**2) < .005:
                     #this is the single solution. return the derivative dy/dx = dy/dt / dx/dt
                     
@@ -614,6 +602,7 @@ cdef class ExtrudedBezierFace(Face):
                         p.x = 1
                         p.y = -ray.x/ray.y    
                     return norm_(p)
+
 
         #how did you get here?  p was supposed to be a point on the curve!
         print "error: Bezier normal not found, point not actually on curve!"
