@@ -7,7 +7,7 @@ sys.path.append('..')
 
 
 from enthought.traits.api import Instance, Float, on_trait_change,\
-            Button
+            Button, DictStrFloat
 
 from enthought.traits.ui.api import View, Item, DropEditor
 
@@ -69,6 +69,66 @@ def get_total_intersections(raysList, face):
     print ray.end_face_idx  #'''
     idx = face.idx
     return sum(1 for ray in all_rays if ray.end_face_idx==idx)
+
+
+class RayPaths(Result):
+    ''' keep a tally of how many rays follow a particular path from face to face.  result 
+    is a dictionary where the keys are lists of face indicies like [0,3,2,3,463772762] and 
+    the values are the percentage of rays that encountered faces in that order.  The Huge
+    face_idx is infinity and is always the last "face" 
+
+    check result.keys() to see which paths were taken.'''
+
+    name = "ray paths"
+    result = DictStrFloat(label="Dictionary of ray paths")
+
+    _tracer = Instance(RayTraceModel) #to cache the tracer instance
+    
+    traits_view = View(Item('result', style="readonly"),
+                       title="Paths taken by rays",
+                       resizable=True,
+                       )
+
+    @on_trait_change("_tracer")
+    def update(self):
+        if self._tracer is not None:
+            self._calc_result()
+        
+    def calc_result(self, tracer):
+        self._tracer = tracer
+        self._calc_result()
+    
+    def _calc_result(self):
+                
+        result = {}    
+        for source in self._tracer.sources:
+            #a list of RayCollection instances
+            rays = source.get_ray_list_by_id()
+            #print "how many rays?",len(rays)
+            for ray in rays:
+                path = []
+                for segment in ray:
+                    if segment['end_face_idx'] < 4294967200:
+                        c = segment['end_face_idx']
+                    else: c = numpy.Infinity
+                    path.append(c)
+                if str(path) in result.keys():
+                    result[str(path)] += 1
+                else:
+                    result[str(path)] = 1
+        total = float(sum(result.values()))
+        for key in result.keys():
+            result[key] = result[key]/total
+        #bug check:
+        for key in result.keys():
+            path = list(key)
+            if len(path) == 1:
+                pass
+            elif path[-1] != numpy.Infinity:
+                print "result error: ray did not end at infinity"
+            elif numpy.Infinity in path[:-1] and len(path)>1:
+                print "result error: ray hit infinity and bounced back"    
+        self.result = result   
 
 
 class Ratio(Result):

@@ -2,6 +2,7 @@ from raytrace.splines import Extruded_bezier, b_spline_to_bezier_series
 from raytrace.sources import RectRaySource
 from raytrace.tracer import RayTraceModel
 from raytrace.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
+from raytrace.results import RayPaths
 import numpy as np
 
 from scipy.interpolate import splprep, splev
@@ -26,13 +27,15 @@ test = Extruded_bezier(control_points = ctrl_pts, z_height_1 = -30, z_height_2=3
 source = RectRaySource(origin=(18.02645168,-49.50970966,0),
                             direction=(-.2,1,0),
                             working_dist = 100.,
-                            number=1,
-                            length = 0,
-            			    width = 0,
+                            number=50,
+                            length = 12,
+            			    width = 12,
             			    randomness = False,
                             scale_factor=0.2)
 
+raypaths = RayPaths()
+
 model = RayTraceModel(sources=[source],
-                      optics=[test], recursion_limit=10)
+                      optics=[test], results = [raypaths], recursion_limit=10)
 model.configure_traits()
 
