@@ -112,6 +112,8 @@ class RayPaths(Result):
                         c = segment['end_face_idx']
                     else: c = numpy.Infinity
                     path.append(c)
+                #get_ray_list_by_id goes from last ray to first, which isn't as pretty as forwards in time.
+                path.reverse()      
                 if str(path) in result.keys():
                     result[str(path)] += 1
                 else:
@@ -119,15 +121,6 @@ class RayPaths(Result):
         total = float(sum(result.values()))
         for key in result.keys():
             result[key] = result[key]/total
-        #bug check:
-        for key in result.keys():
-            path = list(key)
-            if len(path) == 1:
-                pass
-            elif path[-1] != numpy.Infinity:
-                print "result error: ray did not end at infinity"
-            elif numpy.Infinity in path[:-1] and len(path)>1:
-                print "result error: ray hit infinity and bounced back"    
         self.result = result   
 
 

@@ -130,34 +130,48 @@ class BaseRaySource(BaseBase):
         seq.reverse()
         return seq
 
+
     def get_ray_list_by_id(self):
-        """return a list of lists of dictionaries where the index of the outer list is the ray id, and
-        the inner index is the recursion # (0 being the source ray, 1 is after the first
-        face, etc.) and the dictionary keys are the attributes of the ray object"""
+        """return a list of lists of dictionaries where the index of the outer list is the ray id (defined by order encountered)
+        , and the inner index is the recursion # backwards (0 being the ray that dies, 1 is its parent, and so on) 
+        and the dictionary keys are the attributes of the ray object"""
         result = []
         #keys is copy and pasted from the dtype of a ray object
         keys = ['origin','direction','normal','E_vector','refractive_index','E1_amp','E2_amp','length','wavelength','parent_idx','end_face_idx']
-        #first, use the virgin rays to fill in r[idx][0]
+        #start at the last ray collection and work backwards
+        temp = list(self.TracedRays)    #otherwise its a TraitListObject
+        raycollections = []             #make data a list of lists of lists
+        for raycollection in temp:
+            tmp = []
+            for x in raycollection.copy_as_array():
+                tmp.append(list(x))
+            raycollections.append(tmp)
 
-        for ray in self.TracedRays[0].copy_as_array():
-            r = {}
-            lst = []    #list to contain all relevant dictionaries for each ray
-            for i,att in enumerate(ray):
-                r[keys[i]] = att 
-            lst.append(r)
-            result.append(lst)
+        length = len(raycollections)-1
 
-        #now, if there are any subsequent ray collections, use the parent_idx attribute to add those rays to result 
-        children = self.TracedRays[1:]      #this is an empty list if there were no ray/face interactions
+        for i,collection in enumerate(reversed(raycollections)):
+            for ray in collection:
+                if ray:                  #rays already accounted for are set to none
+                    lst = []             #list to contain all relevant dictionaries for each ray
+                    r = {}               #the first dictionary
+                    for x,att in enumerate(ray):
+                        r[keys[x]] = att 
+                    lst.append(r)
+                    cntr = length-i
+                    cntr -= 1
+                    parent_idx = r['parent_idx']
+                    while cntr >= 0:     #iterate back through the ray collections
+                        r = {}          #and repeat what we did for the first ray
+                        arr = raycollections[cntr][parent_idx]
+                        for x,att in enumerate(arr):
+                            r[keys[x]] = att 
+                        lst.append(r.copy())
+                        raycollections[cntr][parent_idx] = None     #mark this ray done
+                        cntr -= 1
+                        parent_idx = r['parent_idx']
+                    result.append(lst)
+
         
-        #for loop will do nothing if there are no children
-        for collection in children:
-            for ray in collection.copy_as_array():
-                r = {}
-                for i,att in enumerate(ray):
-                    r[keys[i]] = att
-                parent = int(r['parent_idx']) 
-                result[parent].append(r)
         return result
 
     def eval_angular_spread(self, idx):
