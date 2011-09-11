@@ -25,7 +25,7 @@ test = Extruded_bezier(control_points = ctrl_pts, z_height_1 = -30, z_height_2=3
 		material = PECMaterial(), trace_ends= False, trace_top = False, invert_normal=False )
 
 flattest = Extruded_bezier(control_points = np.array([[[0,0],[10,0],[20,0],[30,0]]]), z_height_1 = -30, z_height_2=30, \
-		material = PECMaterial(), trace_ends= False, trace_top = False, invert_normal=True )
+		material = DielectricMaterial(), trace_ends= False, trace_top = False, invert_normal=True )
 
 
 source = RectRaySource(origin=(-10,10,0),

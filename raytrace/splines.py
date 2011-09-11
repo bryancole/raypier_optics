@@ -136,7 +136,7 @@ class Extruded_bezier(Optic):
         
         curves=[]
         #seems normal needs to be inverted.  All the time?  should there be a conditional test here?
-        curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m))
+        curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m, invert_normal = self.invert_normal))
                             
         print "One: F ->",trace_top
         if trace_ends:
