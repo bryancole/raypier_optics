@@ -130,27 +130,31 @@ class Extruded_bezier(Optic):
         z2 = self.z_height_2
         ctl_pts = self.control_points
         m = self.material
+        trace_ends = self.trace_ends
+        trace_top = self.trace_top
 
         
         curves=[]
         #seems normal needs to be inverted.  All the time?  should there be a conditional test here?
-        curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m,invert_normal=False))
+        curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m))
                             
-
-        if self.trace_ends:
-            print "traced ends"
+        print "One: F ->",trace_top
+        if trace_ends:
+            print "Two: T->",trace_ends
             """not perfect, just a polygon of the original profile"""
-            prof = self.get_real_profile()
+            profile = self.get_real_profile()
             #print "profile: ",profile
-            #prof =  np.column_stack((profile[:][0],profile[:][1]))
+            prof =  np.column_stack((profile[:][0],profile[:][1]))
             base = PolygonFace(owner=self, z_plane=z1,
                         xy_points=prof, material=m)
             top = PolygonFace(owner=self, z_plane=z2, material=m,
                         xy_points=prof, invert_normal=True)
             curves.extend([base, top])
+            print "Three: T->",trace_ends
 
-        if self.trace_top:
-            print "traced top"
+        print "Four: T->",trace_ends
+        if trace_top:
+            print "Five: F ->",trace_top
             curves.append( ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=ctl_pts[0][0][0], y1=ctl_pts[0][0][1], 
                     x2=ctl_pts[-1][-1][0], y2=ctl_pts[-1][-1][1], material=m) )
 
@@ -165,7 +169,8 @@ class Extruded_bezier(Optic):
         print "extrude factor: ",  self.extrude.scale_factor
         self.faces.faces = self.make_faces()
         self.update=True
-        
+
+    '''    
     def _trace_ends_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
@@ -173,6 +178,7 @@ class Extruded_bezier(Optic):
     def _trace_top_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
+    '''
     '''        
     def _control_points_changed(self):
         self.data_source.modified()

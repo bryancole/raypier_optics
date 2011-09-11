@@ -367,19 +367,45 @@ cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
       double R2_Q3 = R*R - Q*Q*Q
       double theta
       poly_roots x
-     #print "called looking for roots"
-     if (R2_Q3 <= 0):
-      x.n = 3
-      theta = acos(R/sqrt(Q*Q*Q))
-      x.roots[0] = -2.0*sqrt(Q)*cos(theta/3.0) - a1/3.0;
-      x.roots[1] = -2.0*sqrt(Q)*cos((theta+2.0*M_PI)/3.0) - a1/3.0
-      x.roots[2] = -2.0*sqrt(Q)*cos((theta+4.0*M_PI)/3.0) - a1/3.0
+     #print "abcd: ",a,b,c,d
+     if fabs(a) <= 0.00000000000001:
+     #seems that if spline gets rotated, a can change from 0 to 1*10-15
+     #due to rounding errors, which is still zero enough.
+      if fabs(b) <= 0.00000000000001:
+       if c == 0:
+        #our "polynomial" is a constant
+        # return a nonsense answer
+        x.n = 1
+        x.roots[0] = 0
+       else:
+        #print "solved for line"
+        #our polynomial is a line cx+d
+        x.n = 1
+        x.roots[0] = -d/c
+      else:
+        #print "solved for quadratic"
+        #our ploynomial is quadratic, bx**2+cx+d
+        a1 = c**2 - 4*b*d
+        a1 = sqrt(a1)
+        x.n = 2
+        x.roots[0] = (-c+a1)/(2*b)
+        x.roots[1] = (-c-a1)/(2*b)
+        #print "roots: ",x.roots[0],x.roots[1]
      else:
-      x.n = 1
-      x.roots[0] = pow(sqrt(R2_Q3)+fabs(R), 1/3.0)
-      x.roots[0] += Q/x.roots[0]
-      x.roots[0] *= (1 if (R < 0.0) else -1)
-      x.roots[0] -= a1/3.0
+      #our polynomial is actually cubic   
+      #original code had <= here, but if determinant is 0 then only one answer
+      if (R2_Q3 < 0):
+       x.n = 3
+       theta = acos(R/sqrt(Q*Q*Q))
+       x.roots[0] = -2.0*sqrt(Q)*cos(theta/3.0) - a1/3.0;
+       x.roots[1] = -2.0*sqrt(Q)*cos((theta+2.0*M_PI)/3.0) - a1/3.0
+       x.roots[2] = -2.0*sqrt(Q)*cos((theta+4.0*M_PI)/3.0) - a1/3.0
+      else:
+       x.n = 1
+       x.roots[0] = pow(sqrt(R2_Q3)+fabs(R), 1/3.0)
+       x.roots[0] += Q/x.roots[0]
+       x.roots[0] *= (1 if (R < 0.0) else -1)
+       x.roots[0] -= a1/3.0
      return x
 
 cdef flatvector_t rotate2D(double phi, flatvector_t p):
@@ -412,6 +438,7 @@ cdef class ExtrudedBezierFace(Face):
         #instead of convex hull, just use xy bounding box, which is quicker to construct
 
         cdef int i,j,k
+        cdef float w
 
         #if p is bigger than atleast one but not all, the it is in the box
         i = p.x > A.x or p.x>B.x or p.x>C.x or p.x>D.x
@@ -420,6 +447,23 @@ cdef class ExtrudedBezierFace(Face):
         i = p.y > A.y or p.y>B.y or p.y>C.y or p.y>D.y
         j = p.y > A.y and p.y>B.y and p.y>C.y and p.y>D.y
         i = i and not j
+
+        #maybe a bad idea, but this is incase bezier is actually a plane in x or y only:
+        w = A.x - D.x
+        w = w*w
+        if w <= .0005:
+         w = B.x - A.x
+         w=w*w
+         if w <= .0005:
+           i=k=True
+        else:
+         w = A.y - D.y
+         w = w*w
+         if w <= .0005:
+          w = B.y - A.y
+          w=w*w
+          if w <= .0005:
+           i=k=True
         return i and k
 
     def __cinit__(self,np_.ndarray[np_.float64_t ,ndim=3] beziercurves,double z_height_1=0,double z_height_2=0, **kwds):
@@ -452,13 +496,13 @@ cdef class ExtrudedBezierFace(Face):
             double A,B,C,D,t,a,b,c,d
             poly_roots ts
             vector_t    tempv
-        #print "called intersection"
+        #print "\ncalled intersection"
         origin.x = 0 
         origin.y = 0
         #first off, does ray even enter the depth of the extrusion?
         if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
             return 0    #does not
-
+        #print "ray passes z test"
         #strip useless thrid dimension from ray vector
         r.x = ar.x
         r.y = ar.y
@@ -476,7 +520,7 @@ cdef class ExtrudedBezierFace(Face):
           if not self.line_seg_overlap(r,p2,self.maxcorner,tempvector):
            if not self.line_seg_overlap(r,p2,tempvector,self.mincorner):
             return 0    #no intersections
-
+        #print "ray is in big bounding box"
         #segment intersects with gross bounding box,
         #Calc dZ and the 2D origin adjusted ray, because they will probably be used.
         tempv = subvv_ (pee2,ar) 
@@ -511,10 +555,12 @@ cdef class ExtrudedBezierFace(Face):
              C = 3*cp1.y-3*cp0.y
              D = cp0.y
              #solve for t
+             #print "ABCD: ",A,B,C,D
              ts = roots_of_cubic(A,B,C,D)
              while ts.n > 0:
                  ts.n-=1
                  t = ts.roots[ts.n]
+                 #print "root: ", t
                  #make sure solution is on valid interval
                  if 0.<t<1.:
                   #the x value will also be the length, which is the form of result
@@ -530,9 +576,10 @@ cdef class ExtrudedBezierFace(Face):
                      #print "in z: ",B,result
                      #is this the shortest length to an intersection so far?
                      b = sqrt(c**2+b**2)
+                     #print "this: ",b
                      if b < result and b > self.tolerance:
                       result = b
-                
+                      #print "b at t",b,t
             
         if result == INFINITY: result = 0
         #print "final answer:",result
@@ -557,6 +604,7 @@ cdef class ExtrudedBezierFace(Face):
             cp2.x,cp2.y = curve[2]
             cp3.x,cp3.y = curve[3]
             #is point even in this hull?
+            #print "tried at least"
             if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
               #then, solve for t
               #print "in hull"
@@ -577,14 +625,16 @@ cdef class ExtrudedBezierFace(Face):
                 ts.n -=1
                 t = ts.roots[ts.n]
                 #make sure solution is within interval
+                #print "normal t: ",t
                 if 0<=t<=1:
                  #ok, then is this the t to the same point p? 
                  tmp = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+                 #print "normal b at t: ",tmp,t
                  #I will generously allow for rounding error 
                  #print "got here with point: ",tmp,
-                 if tmp**2 - (ray.x**2+ray.y**2) < .005:
+                 if tmp**2 - (ray.x**2+ray.y**2) < .0001:
                     #this is the single solution. return the derivative dy/dx = dy/dt / dx/dt
-                    
+                    #print "that was it!"
                     ray.x = dif_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
                     ray.y = dif_bezier(t,cp0.y,cp1.y,cp2.y,cp3.y)
                     ray = rotate2D(theta,ray)
