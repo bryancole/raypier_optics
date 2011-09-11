@@ -31,11 +31,11 @@ from itertools import chain, izip, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raytrace.bases import Optic, Traceable
-from raytrace.cfaces import PolygonFace, ExtrudedBezier2Face
+from raytrace.cfaces import PolygonFace, ExtrudedBezierFace, ExtrudedPlanarFace
 from raytrace.ctracer import FaceList
 
 import numpy as np
-from scipy.interpolate import splprep, UnivariateSpline
+from scipy.interpolate import splprep, splev
 
 def b_spline_to_bezier_series(tck, per = False):
   """Convert a parametric b-spline into a sequence of Bezier curves of the same degree.
@@ -93,24 +93,26 @@ def b_spline_to_bezier_series(tck, per = False):
   # group the points into the desired bezier curves
   return split(bezier_points, len(bezier_points) / desired_multiplicity, axis = 0)
 
+def polate_3bezier(ctrl_pts,t):
+    #evaluate a 3rd order bezier spline at t[0,1] given an array of four control points
+    p0, p1,p2,p3 = ctrl_pts
+    return p0*(1-t)**3 + p1*3*t*(1-t)**2 + p2*3*(1-t)*t**2 + p3*t**3
 
-class Extruded_interpolant(Optic):
-    """a generalized extruded suface of a bezier spline approximating a surface"""
+
+class Extruded_bezier(Optic):
+    """an extrusion of a set of third order bezier curves.  Correct calculation of control point 
+    location is done outside of this object, either in subclassed optical elements or in user's
+    code."""
     
-    #The profile is best with way too many points in it, because the spline
-    #will determine the fewest number of ray tracing faces needed, but
-    #but the end caps and visualization are polygon approximations
-    #which are not speed critical use the profile directly.
-    #
-    #I haven't experiemnted to see what is excessive
-    profile = Array(shape=(2,None), dtype=numpy.double)
-    
+    control_points = Array(shape=(None,4,2), dtype=numpy.double)
+
+
     z_height_1 = Float(-30.0)   #must be smaller than z_height_2
     z_height_2 = Float(30.0)
-    smoothness = Float(.005)  #for splprep. found this number by trial and error. there are algorithms to guess better
     
-    trace_ends = Bool(False, desc="include the end-faces in tracing")
-    
+    trace_ends = Bool(True, desc="include the end-faces in tracing")
+    trace_top = Bool(True, desc="include the end-faces in tracing")
+
     data_source = Instance(tvtk.ProgrammableSource, ())
     
     extrude = Instance(tvtk.LinearExtrusionFilter, (), 
@@ -126,34 +128,40 @@ class Extruded_interpolant(Optic):
     def make_faces(self):
         z1 = self.z_height_1
         z2 = self.z_height_2
-        profile = self.profile
+        ctl_pts = self.control_points
         m = self.material
+        trace_ends = self.trace_ends
+        trace_top = self.trace_top
+
         
-        #convert profile to a list of bezier curves defined by three 2D points (knots)
-        tck, uout = splprep(profile, s=self.smoothness, k=2, per=False)
-        p2 = b_spline_to_bezier_series(tck)
-        print "splprep used ",len(p2), " faces to make this spline"
-        if len(p2) > 30:
-            print "!!! thats alot of faces.  try adjusting smoothness. /nSpline degree 2 may be too small  !!!""" 
-            tck, uout = splprep(profile, s=self.smoothness, k=3, per=False)
-            print "3rd degree spline would use ",len(tck[0])-7," faces."
-        curves = []
-        for knots in p2:
-            curves.append(ExtrudedBezier2Face(owner=self, X0=knots[0][0], Y0=knots[0][1], \
-                                X1=knots[1][0], Y1=knots[1][1], X2=knots[2][0], Y2=knots[2][1], \
-                                z_height_1 = self.z_height_1, z_height_2 = self.z_height_2))
-                                
-        
-        if self.trace_ends:
-            print "traced ends"
+        curves=[]
+        #seems normal needs to be inverted.  All the time?  should there be a conditional test here?
+        curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m))
+                            
+        print "One: F ->",trace_top
+        if trace_ends:
+            print "Two: T->",trace_ends
             """not perfect, just a polygon of the original profile"""
+            profile = self.get_real_profile()
+            #print "profile: ",profile
             prof =  np.column_stack((profile[:][0],profile[:][1]))
             base = PolygonFace(owner=self, z_plane=z1,
                         xy_points=prof, material=m)
             top = PolygonFace(owner=self, z_plane=z2, material=m,
                         xy_points=prof, invert_normal=True)
             curves.extend([base, top])
+            print "Three: T->",trace_ends
+
+        print "Four: T->",trace_ends
+        if trace_top:
+            print "Five: F ->",trace_top
+            curves.append( ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=ctl_pts[0][0][0], y1=ctl_pts[0][0][1], 
+                    x2=ctl_pts[-1][-1][0], y2=ctl_pts[-1][-1][1], material=m) )
+
         return curves
+
+
+            
     
     @on_trait_change("z_height_1, z_height_2")
     def config_pipeline(self):
@@ -161,24 +169,40 @@ class Extruded_interpolant(Optic):
         print "extrude factor: ",  self.extrude.scale_factor
         self.faces.faces = self.make_faces()
         self.update=True
-        
+
+    '''    
     def _trace_ends_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
-        
-    def _smoothness_changed(self):
+
+    def _trace_top_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
-        
-    def _profile_changed(self):
+    '''
+    '''        
+    def _control_points_changed(self):
         self.data_source.modified()
         self.faces.faces = self.make_faces()
         self.update=True
-    
+    '''
+    def get_real_profile(self):
+        #return the evaluated profile of the spline
+        ts = np.linspace(0,1,7)    #splprep is defined of 0,1 of the parameter.  100 points
+        profile = np.array([])
+        profile.shape = (0,2)   
+        for curve in self.control_points:
+            for t in ts:
+                profile = np.append(profile, [polate_3bezier(curve,t)],0)
+        #print "real profile",profile
+        return profile
+
     def _pipeline_default(self):
         source = self.data_source
         def execute():
-            xy = np.column_stack((self.profile[:][0],self.profile[:][1]))
+            xy = self.get_real_profile()
+            #print "extrude1:",profile[:3]
+            #xy = np.column_stack((profile[:][0],profile[:][1]))
+            #print "extrude2: ",xy[:3]
             z = numpy.ones(xy.shape[0]) * self.z_height_1
             points = numpy.column_stack((xy,z))
             
@@ -199,30 +223,47 @@ class Extruded_interpolant(Optic):
         t = self.transform
         transf = tvtk.TransformFilter(input=extrude.output, transform=t)
         return transf
-
-class test(Extruded_interpolant):
-    name = "test"
-    height = Float #distance from front face to apex
-    width = Float #width of front face
-    
-    traits_view = View(VGroup(
-                       Traceable.uigroup,
-                       Item('trace_ends'),
-                       Item('n_inside'),
-                       Item('length'),
-                       Item('height'),
-                       Item('width'),
-                       )
-                       )
-
-    @on_trait_change("height, width")
-    def config_profile(self):
-        h = self.height
-        w = self.width/2
-        self.profile = [(-w,0),
-                        (w,0),
-                        (0,h)]
             
+
+class Extruded_interpolant(Extruded_bezier):
+    """a generalized extruded suface of a bezier spline approximating a surface"""
+    
+    #The profile is best with way too many points in it, because the spline
+    #will determine the fewest number of ray tracing faces needed, but
+    #but the end caps and visualization are polygon approximations
+    #which are not speed critical use the profile directly.
+    #
+    #I haven't experiemnted to see what is excessive
+    profile = Array(shape=(2,None), dtype=numpy.double)
+    tck, uout = [None,None]      #the output of splprep 
+    smoothness = Float(.0005)  #for splprep. found this number by trial and error. there are algorithms to guess better
+    
+    def make_faces(self):
+        z1 = self.z_height_1
+        z2 = self.z_height_2
+        profile = self.profile
+        m = self.material
+        
+        #convert profile to a list of bezier curves defined by three 2D points (knots)
+        tck, uout = splprep(profile, s=self.smoothness, k=3, per=False)
+        self.tck, self.uout = [tck,uout]
+        self.control_points = b_spline_to_bezier_series(tck)
+        print "splprep used ",len(self.control_points), " faces to make this spline"
+        if len(self.control_points) > 30:
+            print "!!! thats alot of faces.  try adjusting smoothness."
+            #need imperfection statistics
+
+        return super(Extruded_interpolant,Extruded_interpolant).make_faces(self)                                
+        
+    def _smoothness_changed(self):
+        self.faces.faces = self.make_faces()
+        self.update=True
+'''        
+    def _profile_changed(self):
+        self.faces.faces = self.make_faces()
+        self.update=True
+'''
+
 '''
 if __name__=="__main__":
     from ray_tracer import BuildRaySet, BeamStop, RayTraceModel
