@@ -19,16 +19,14 @@
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Bool
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
-            RangeEditor, ScrubberEditor, HSplit, VGroup, Heading
+from enthought.traits.ui.api import View, Item, ArrayEditor, VGroup
+from raytrace.bases import ComplexEditor, NumEditor
 from enthought.tvtk.api import tvtk
 from enthought.tvtk.pyface.scene_model import SceneModel
 from enthought.tvtk.pyface.scene_editor import SceneEditor
 import numpy
 from itertools import chain, izip, islice, tee
 
-#from raytrace.tracer import Optic, VTKOptic, normaliseVector, RaySegment,\
-#             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raytrace.bases import Optic, Traceable
 from raytrace.cfaces import PolygonFace, ExtrudedBezierFace, ExtrudedPlanarFace
@@ -110,8 +108,10 @@ class Extruded_bezier(Optic):
     z_height_1 = Float(-30.0)   #must be smaller than z_height_2
     z_height_2 = Float(30.0)
     
+
     trace_ends = Bool(True, desc="include the end-faces in tracing")
     trace_top = Bool(True, desc="include the end-faces in tracing")
+    invert_normal = Bool(False,desc="Invert the direction of the surface normal vector")    
 
     data_source = Instance(tvtk.ProgrammableSource, ())
     
@@ -120,11 +120,30 @@ class Extruded_bezier(Optic):
                         'extrusion_type':'vector',
                         'vector': (0.,0.,1.)})
     
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('z_height_1', editor=NumEditor),
+                       Item('z_height_2', editor=NumEditor),
+                       Item('invert_normal'),
+                       Item('trace_top'),
+                       )
+                    )
+
+    def __init__(self,*args,**kwargs):
+        super(Extruded_bezier,self).__init__(*args,**kwargs)
+        fl = FaceList(owner=self)
+        fl.faces = self.make_faces()
+        print "hey"
+        self.faces = fl
+        print "hoe"
+
+    '''#This was not working.  wrote above init to bypass this.  Leaving this here for referance.
+    #enothought employee could not figure it out.
     def _faces_default(self):
         fl = FaceList(owner=self)
         fl.faces = self.make_faces()
         return fl
-    
+    '''
     def make_faces(self):
         z1 = self.z_height_1
         z2 = self.z_height_2
@@ -136,11 +155,11 @@ class Extruded_bezier(Optic):
         
         curves=[]
         #seems normal needs to be inverted.  All the time?  should there be a conditional test here?
+        print "invert normal: ",self.invert_normal
         curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m, invert_normal = self.invert_normal))
+        print curves[0].invert_normal
                             
-        print "One: F ->",trace_top
         if trace_ends:
-            print "Two: T->",trace_ends
             """not perfect, just a polygon of the original profile"""
             profile = self.get_real_profile()
             #print "profile: ",profile
@@ -150,14 +169,10 @@ class Extruded_bezier(Optic):
             top = PolygonFace(owner=self, z_plane=z2, material=m,
                         xy_points=prof, invert_normal=True)
             curves.extend([base, top])
-            print "Three: T->",trace_ends
-
-        print "Four: T->",trace_ends
+            
         if trace_top:
-            print "Five: F ->",trace_top
             curves.append( ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=ctl_pts[0][0][0], y1=ctl_pts[0][0][1], 
                     x2=ctl_pts[-1][-1][0], y2=ctl_pts[-1][-1][1], material=m) )
-
         return curves
 
 
@@ -166,20 +181,16 @@ class Extruded_bezier(Optic):
     @on_trait_change("z_height_1, z_height_2")
     def config_pipeline(self):
         self.extrude.scale_factor = self.z_height_2 - self.z_height_1
-        print "extrude factor: ",  self.extrude.scale_factor
+        #print "extrude factor: ",  self.extrude.scale_factor
+        self.faces.faces = self.make_faces()
+        self.update=True
+    
+    @on_trait_change("invert_normal,trace_ends, trace_top")
+    def trace_changed(self):
         self.faces.faces = self.make_faces()
         self.update=True
 
-    '''    
-    def _trace_ends_changed(self):
-        self.faces.faces = self.make_faces()
-        self.update=True
-
-    def _trace_top_changed(self):
-        self.faces.faces = self.make_faces()
-        self.update=True
     '''
-    '''        
     def _control_points_changed(self):
         self.data_source.modified()
         self.faces.faces = self.make_faces()

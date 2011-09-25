@@ -365,8 +365,8 @@ Traceable.uigroup = VGroup(
     
 class Optic(Traceable):
     abstract=True
-    n_inside = Complex(1.0+0.0j) #refractive
-    n_outside = Complex(1.0+0.0j)
+    n_inside = Float(1.0) #complex refractive not yet fully implemented
+    n_outside = Float(1.0) 
     
     all_rays = Bool(False, desc="trace all reflected rays")
     

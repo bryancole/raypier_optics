@@ -38,7 +38,6 @@ class BaseLens(Optic):
 
 class PlanoConvexLens(BaseLens):
     name = "Plano-Convex Lens"
-    n_inside = 1.5
     
     CT = Float(5.0, desc="centre thickness")
     diameter = Float(15.0)
@@ -55,7 +54,7 @@ class PlanoConvexLens(BaseLens):
         
     traits_view = View(VGroup(
                        Traceable.uigroup,  
-                       Item('n_inside', editor=ComplexEditor),
+                       Item('n_inside'),
                        Item('CT', editor=NumEditor),
                        Item('diameter', editor=NumEditor),
                        Item('curvature', editor=NumEditor)
