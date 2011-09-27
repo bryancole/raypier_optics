@@ -345,7 +345,7 @@ cdef double eval_bezier(double t, double cp0, double cp1, double cp2, double cp3
 
 cdef double dif_bezier(double t, double cp0, double cp1, double cp2, double cp3):
     #calc the derivative of a cubic bezier when parameter = t
-    cdef double A, B, C     #just doin this old school polynomial style
+    cdef long double A, B, C     #just doin this old school polynomial style
     A = cp3-3*cp2+3*cp1-cp0
     B = 3*cp2-6*cp1+3*cp0
     C = 3*cp1-3*cp0
@@ -360,18 +360,18 @@ cdef struct poly_roots:
 cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
      #this code is known not to work in the case of (x-c)^3 (triple zero)
      # **TODO ** fix this
+     # TODO: cubic solution explodes with small a, co quadratic is used.
+     # using newton's root finding method could quickly polish up answer.
      cdef:
       long double a1 = b/a, a2 = c/a, a3 = d/a
       long double Q = (a1*a1 - 3.0*a2)/9.0
       long double R = (2.0*a1*a1*a1 - 9.0*a1*a2 + 27.0*a3)/54.0
-      double R2_Q3 = R*R - Q*Q*Q
-      double theta
+      long double R2_Q3 = R*R - Q*Q*Q
+      long double theta
       poly_roots x
-     #print "abcd: ",a,b,c,d
-     if fabs(a) <= 0.00000000000001:
-     #seems that if spline gets rotated, a can change from 0 to 1*10-15
-     #due to rounding errors, which is still zero enough.
-      if fabs(b) <= 0.00000000000001:
+     if fabs(a) <= 0.0000000001:
+     #^this, precision is less than ideal here
+      if fabs(b) <= 0.0000000001:
        if c == 0:
         #our "polynomial" is a constant
         # return a nonsense answer
@@ -400,12 +400,15 @@ cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
        x.roots[0] = -2.0*sqrt(Q)*cos(theta/3.0) - a1/3.0;
        x.roots[1] = -2.0*sqrt(Q)*cos((theta+2.0*M_PI)/3.0) - a1/3.0
        x.roots[2] = -2.0*sqrt(Q)*cos((theta+4.0*M_PI)/3.0) - a1/3.0
+       #print "triple",x.roots[0],x.roots[1],x.roots[2]
       else:
        x.n = 1
-       x.roots[0] = pow(sqrt(R2_Q3)+fabs(R), 1/3.0)
-       x.roots[0] += Q/x.roots[0]
-       x.roots[0] *= (1 if (R < 0.0) else -1)
-       x.roots[0] -= a1/3.0
+       a2 = pow(sqrt(R2_Q3)+fabs(R), 1/3.0)
+       a2 += Q/x.roots[0]
+       a2 *= (1 if (R < 0.0) else -1)
+       a2 -= a1/3.0
+       x.roots[0] = a2 
+       #print "single: ",x.roots[0]
      return x
 
 cdef flatvector_t rotate2D(double phi, flatvector_t p):
@@ -475,6 +478,7 @@ cdef class ExtrudedBezierFace(Face):
         temp1.y = beziercurves[0,0,1]
         temp2.x = beziercurves[0,0,0]
         temp2.y = beziercurves[0,0,1]
+
         for bezierpts in beziercurves:
          for pair in bezierpts:
             if pair[0] < temp1.x: temp1.x=pair[0]
@@ -497,6 +501,7 @@ cdef class ExtrudedBezierFace(Face):
             poly_roots ts
             vector_t    tempv
         #print "\ncalled intersection"
+
         origin.x = 0 
         origin.y = 0
         #first off, does ray even enter the depth of the extrusion?
@@ -540,11 +545,13 @@ cdef class ExtrudedBezierFace(Face):
            cp1.x,cp1.y = curve[1].copy()
            cp2.x,cp2.y = curve[2].copy()
            cp3.x,cp3.y = curve[3].copy()
+
+
            #rotate ctrl points such that ray is along the x axis
            cp0 = rotate2D(-theta,cp0)
            cp1 = rotate2D(-theta,cp1)
            cp2 = rotate2D(-theta,cp2)
-           cp3 = rotate2D(-theta,cp3) 
+           cp3 = rotate2D(-theta,cp3)
            #test for intersection between ray (actually segment) and convex hull
            if self.line_seg_overlap(origin,s,cp0,cp1) or self.line_seg_overlap(origin,s,cp1,cp2) or self.line_seg_overlap(origin,s,cp2,cp3) or self.line_seg_overlap(origin,s,cp3,cp0):
              #print "inside intersect hull"
@@ -582,7 +589,7 @@ cdef class ExtrudedBezierFace(Face):
                       #print "b at t",b,t
             
         if result == INFINITY: result = 0
-        #print "final answer:",result
+
         return result
 
 
@@ -598,11 +605,12 @@ cdef class ExtrudedBezierFace(Face):
         ray.y = p.y
         theta = atan2(p.y,p.x)
         #find which curve this point is in
-        for curve in self.curves_array.copy():
-            cp0.x,cp0.y = curve[0]
-            cp1.x,cp1.y = curve[1]
-            cp2.x,cp2.y = curve[2]
-            cp3.x,cp3.y = curve[3]
+        for curve in self.curves_array.copy():            #load up control points
+            cp0.x,cp0.y = curve[0].copy()
+            cp1.x,cp1.y = curve[1].copy()
+            cp2.x,cp2.y = curve[2].copy()
+            cp3.x,cp3.y = curve[3].copy()
+
             #is point even in this hull?
             #print "tried at least"
             if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
@@ -612,7 +620,7 @@ cdef class ExtrudedBezierFace(Face):
               cp1 = rotate2D(-theta,cp1)
               cp2 = rotate2D(-theta,cp2)
               cp3 = rotate2D(-theta,cp3)
-              #print "cp0: ",cp0.x,cp0.y
+
               #Setup A,B,C and D (bernstein polynomials)
               A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
               B = 3*cp2.y-6*cp1.y+3*cp0.y
