@@ -101,7 +101,7 @@ class Extruded_bezier(Optic):
     """an extrusion of a set of third order bezier curves.  Correct calculation of control point 
     location is done outside of this object, either in subclassed optical elements or in user's
     code."""
-    
+    name = "Bezier Spline"
     control_points = Array(shape=(None,4,2), dtype=numpy.double)
 
 
@@ -109,8 +109,8 @@ class Extruded_bezier(Optic):
     z_height_2 = Float(30.0)
     
 
-    trace_ends = Bool(True, desc="include the end-faces in tracing")
-    trace_top = Bool(True, desc="include the end-faces in tracing")
+    trace_ends = Bool(False, desc="include the end-faces in tracing")
+    trace_top = Bool(False, desc="include the end-faces in tracing")
     invert_normal = Bool(False,desc="Invert the direction of the surface normal vector")    
 
     data_source = Instance(tvtk.ProgrammableSource, ())

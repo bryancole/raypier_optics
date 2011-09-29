@@ -153,7 +153,7 @@ class RectMirror(BaseMirror):
     
     def _faces_default(self):
         fl = FaceList(owner=self)
-        fl.faces = [RectangularFace(owner=self)]
+        fl.faces = [RectangularFace(owner=self, material = self.material)]
         return fl
     
     ''' #copied from cylinder, probably easy to modify for a cube

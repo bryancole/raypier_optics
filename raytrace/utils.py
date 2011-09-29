@@ -109,6 +109,8 @@ def Convert_to_SP(input_v, normal_v, E1_vector, E1_amp, E2_amp):
     return S_amp, P_amp, S_vector, P_vector
 
 def rotation(theta):
+   #this is maybe deprecated. added z_rotation() because this was rotating in all three dimensions
+   #by the same angle.  why would one want to do that?
    tx=ty=tz = theta
    cos = numpy.cos
    sin = numpy.sin
@@ -117,3 +119,12 @@ def rotation(theta):
    Rz = numpy.array([[cos(tz), -sin(tz), 0], [sin(tz), cos(tz), 0], [0,0,1]])
 
    return numpy.dot(Rx, numpy.dot(Ry, Rz))
+
+def z_rotation(theta):
+   tz = theta
+   cos = numpy.cos
+   sin = numpy.sin
+   Rz = numpy.array([[cos(tz), -sin(tz), 0], [sin(tz), cos(tz), 0], [0,0,1]])
+
+   return Rz
+

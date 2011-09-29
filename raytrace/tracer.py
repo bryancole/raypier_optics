@@ -51,9 +51,6 @@ from raytrace import ctracer
 
 counter = count()
 
-from raytrace import mirrors, prisms, corner_cubes, parabolics, ellipsoids, sources,\
-    beamstop, absorbers, apertures
-
 optics_classes = Traceable.subclasses
 
 optics_menu = Menu(name = "Components...",
