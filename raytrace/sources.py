@@ -31,7 +31,7 @@ from enthought.tvtk.api import tvtk
 from raytrace.ctracer import RayCollection, Ray, ray_dtype
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
-from raytrace.bases import Renderable, RaytraceObject
+from raytrace.bases import Renderable, RaytraceObject, NumEditor
 
 Vector = Array(shape=(3,))
 
@@ -300,8 +300,8 @@ class BaseRaySource(BaseBase):
 class ParallelRaySource(BaseRaySource):
     origin = Tuple((0.,0.,0.))
     direction = UnitTupleVector
-    number = Int(20)
-    radius = Float(10.)
+    number = Int(20, auto_set=False, enter_set=True)
+    radius = Float(10.,editor=NumEditor)
     rings = Range(1,50,3, editor_traits={'mode':'spinner'})
     E_vector = UnitVectorTrait((1.,0.,0.), editor_traits={'cols':3,
                                 'labels':['x','y','z']})
@@ -372,11 +372,11 @@ class RectRaySource(BaseRaySource):
     """ rays from a rectangular aperture """ 
     origin = Tuple((0.,0.,0.))
     direction = UnitTupleVector
-    number = Int(20)		#total rays is n^2
-    length = Float(10.)
-    width = Float(10)
+    number = Int(20,auto_set=False,enter_set=True)		#total rays is n^2
+    length = Float(10.,editor=NumEditor)
+    width = Float(10,editor=NumEditor)
     rings = Range(1,50,3, editor_traits={'mode':'spinner'})
-    theta = Float(0.)
+    theta = Float(0.,editor=NumEditor)
     randomness = Bool(False)
     
     view_ray_ids = numpy.arange(20)
@@ -406,7 +406,7 @@ class RectRaySource(BaseRaySource):
     
     @cached_property
     def _get_InputRays(self):
-        from utils import rotation
+        from utils import z_rotation
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number
@@ -443,7 +443,8 @@ class RectRaySource(BaseRaySource):
         origins = numpy.array([origin + offset for offset in offsets])
         
         dirmatrix = numpy.matrix(direction)
-        raydir = rotation(numpy.radians(self.theta))*(dirmatrix.T)
+        #print "dirmatrix: ",z_rotation(numpy.radians(self.theta))
+        raydir = z_rotation(numpy.radians(self.theta))*(dirmatrix.T)
         directions = numpy.ones_like(origins) * numpy.array(raydir.T)
 
         ray_data['origin'] = origins
@@ -462,7 +463,7 @@ class ConfocalRaySource(BaseRaySource):
     direction = UnitTupleVector
     number = Range(1,50,20, editor_traits={'mode':'spinner'})
     theta = Range(0.0,90.0,value=30)
-    working_dist = Float(100.0)
+    working_dist = Float(100.0,editor=NumEditor)
     rings = Range(1,50,3, editor_traits={'mode':'spinner'})
     reverse = -1    #-1 is converging, +1 is diverging
     principle_axes = Property(Tuple(Array,Array), depends_on="direction")
