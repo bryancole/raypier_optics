@@ -133,9 +133,7 @@ class Extruded_bezier(Optic):
         super(Extruded_bezier,self).__init__(*args,**kwargs)
         fl = FaceList(owner=self)
         fl.faces = self.make_faces()
-        print "hey"
         self.faces = fl
-        print "hoe"
 
     '''#This was not working.  wrote above init to bypass this.  Leaving this here for referance.
     #enothought employee could not figure it out.
@@ -221,7 +219,8 @@ class Extruded_bezier(Optic):
             
             output = source.poly_data_output
             output.points = points
-            output.polys = cells
+            output.lines = cells
+            print "cells: ",type(output)
         source.set_execute_method(execute)
         
         self.extrude.scale_factor = self.z_height_2 - self.z_height_1  #mm, put here because it wasn;t being initialized
@@ -230,7 +229,7 @@ class Extruded_bezier(Optic):
             self.extrude.capping = True
         extrude = self.extrude
         extrude.input = source.output
-        
+        print "extrude: ",extrude.input
         t = self.transform
         transf = tvtk.TransformFilter(input=extrude.output, transform=t)
         return transf
