@@ -70,8 +70,8 @@ K = np.array([Kx,m1*Kx+b1])
 #D,K and E are control points of our quadratic, but we have a cubic bezier to work with.
 #the formula for control points c1 and c2 of cubic bezier curve that is equal to quadratic bezier curve with control point K is:
 #
-c1 = 2./3.*K + 1./3.*D
-c2 = 2./3.*K + 1./3.*E
+c11 = 2./3.*K + 1./3.*D
+c12 = 2./3.*K + 1./3.*E
 
 #now rotate these points around the origin by theta+, and translate to the left by 1/2 the entry aperatures length (for symetry)
 
@@ -79,21 +79,76 @@ c2 = 2./3.*K + 1./3.*E
 rot_matrix = np.array([[np.cos(theta_p),-np.sin(theta_p)],[np.sin(theta_p),np.cos(theta_p)]])
 trans_vector = np.array([lea/2.,0])
 
-D = np.dot(rot_matrix,D)-trans_vector
-c1 = np.dot(rot_matrix,c1)-trans_vector
-c2 = np.dot(rot_matrix,c2)-trans_vector
-E = np.dot(rot_matrix,E)-trans_vector
+D1 = np.dot(rot_matrix,D)-trans_vector
+c11 = np.dot(rot_matrix,c11)-trans_vector
+c12 = np.dot(rot_matrix,c12)-trans_vector
+E1 = np.dot(rot_matrix,E)-trans_vector
 
 #D should now be at (.5ea,0)
 
-print "D:",D
-print "c1:",c1
-print "c2:",c2
-print "E:",E
+#print "D:",D
+#print "c1:",c1
+#print "c2:",c2
+#print "E:",E
+right_arm = Extruded_bezier(name = "right arm",control_points = np.array([[D1,c11,c12,E1]]),z_height_1 = 0, z_height_2 = system_length, material = PECMaterial())
+
 #do it for the other arm
+theta_D = np.pi/2. - theta_n
+a = (lea*(1+np.cos(theta_D)))/2.
+
+theta_E = np.pi - theta_p - theta_n
+rE = (2.*a)/(1+np.cos(theta_E))
+
+E2 = np.array([-rE*np.sin(theta_E),-rE*np.cos(theta_E)])
+
+D2 = np.array([-lea*np.sin(theta_D),-lea*np.cos(theta_D)])
+
+#determine quadratic control points:
+#http://alecmce.com/as3/parabolas-and-quadratic-bezier-curves
+
+#directrix is parallel to x axis, so line perp to directrix is paralell to y
+A = np.array([D2[0],-2*a])
+B = np.array([E2[0],-2*a])
+
+#C is at origin, so halfway points are easy to calculate
+H = A/2.
+J = B/2.
+
+#find the intersection of DH and EJ, which is control point K
+
+try:
+ m1 = (D2[1]-H[1])/(D2[0]-H[0])
+ m2 = (E2[1]-J[1])/(E2[0]-J[0])
+except ZeroDivisionError:
+ raise ZeroDivisionError("Zero divison: this is not a real CPC")
+
+b1 = D2[1] - m1*D2[0]
+b2 = E2[1] - m2*E2[0]
+
+Kx = (b2-b1)/(m1-m2)
+K = np.array([Kx,m1*Kx+b1]) 
+#D,K and E are control points of our quadratic, but we have a cubic bezier to work with.
+#the formula for control points c1 and c2 of cubic bezier curve that is equal to quadratic bezier curve with control point K is:
+#
+c21 = 2./3.*K + 1./3.*D2
+c22 = 2./3.*K + 1./3.*E2
+
+#now rotate these points around the origin by - theta_n and translate to the right by 1/2 the entry aperatures length (for symetry)
+
+
+rot_matrix = np.array([[np.cos(-theta_n),-np.sin(-theta_n)],[np.sin(-theta_n),np.cos(-theta_n)]])
+trans_vector = np.array([-lea/2.,0])
+
+D2 = np.dot(rot_matrix,D2)-trans_vector
+c21 = np.dot(rot_matrix,c21)-trans_vector
+c22 = np.dot(rot_matrix,c22)-trans_vector
+E2 = np.dot(rot_matrix,E2)-trans_vector
+
+left_arm = Extruded_bezier(name = "left arm",control_points = np.array([[D2,c21,c22,E2]]),z_height_1 = 0, z_height_2 = system_length, material = PECMaterial())
+
+
 
 target = RectTarget(width = len_exit_ap, length = system_length, elevation=90., rotation =90., centre = (0,0,system_length/2.))
-right_arm = Extruded_bezier(name = "right arm",control_points = np.array([[D,c1,c2,E]]),z_height_1 = 0, z_height_2 = system_length, material = PECMaterial())
 
 source = RectRaySource(origin=(0,100,system_length/4.),
                             direction=(0,-1,0),
@@ -107,7 +162,7 @@ source = RectRaySource(origin=(0,100,system_length/4.),
 raypaths = RayPaths()
 
 model = RayTraceModel(sources=[source],
-                      optics=[target, right_arm], results = [raypaths], recursion_limit=10)
+                      optics=[target, right_arm,left_arm], results = [raypaths], recursion_limit=10)
 
 
 model.configure_traits()
