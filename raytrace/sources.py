@@ -592,3 +592,19 @@ class ConfocalRaySource(BaseRaySource):
         rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
         #print cells.max(), rays.number, "check"
         return rays
+
+class AdHocSource(BaseRaySource):
+    '''create a source by specifying the input rays yourself''' 
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, number, rings, radius, max_ray_len")
+
+    def __init__(self,*args,**kwargs):
+        self.rays = kwargs.pop('rays')
+        super(AdHocSource,self).__init__(*args,**kwargs)
+
+    @cached_property
+    def _get_InputRays(self):
+        #i actually don't understand traits well at all.  this whole class is a hack.
+        return self.rays
+
