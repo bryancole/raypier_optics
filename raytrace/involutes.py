@@ -330,6 +330,7 @@ class Cylinder(BaseMirror):
     """
     
     name = "Cylinder"
+    abstract = False
     length = Float(100.0, desc="length of tube")
     radius = Float(50.8, desc="radius of cylinder")
     begin_angle = Float(0., desc="angle at which to start making tube")
@@ -748,6 +749,7 @@ class CylindricalInvolute(BaseMirror):
     no legitimate use of an involute would come across this.
     """
     name = "Cylindrical Involute"
+    abstract = False
     length = Float(100.0, desc="length of trough")
     width = Float(25.4, desc="radius of aperature")
     tube_radius = Float(50.8, desc="radius of cylinder involute is formed from")

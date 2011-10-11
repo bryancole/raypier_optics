@@ -43,6 +43,7 @@ class OffAxisParabloid(BaseMirror):
     An OAP mirror object
     """
     name = "OAP"
+    abstract = False
     height = Float(25.4, desc="distance between cylinder base and focus")
     EFL = Float(50.8, desc="effective focal length")
     diameter = Float(50.8, desc="outside diameter")

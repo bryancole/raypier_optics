@@ -11,6 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
    
+   introduction
    cython_branch_info
    creating_new_optics
 

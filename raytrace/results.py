@@ -21,6 +21,7 @@ import itertools
 
 class MeanOpticalPathLength(Result):
     name = "Mean optical path length"
+    abstract = False
     source = Instance(BaseRaySource)
     target = Instance(Face)
     
@@ -123,6 +124,7 @@ class RayPaths(Result):
 
 class Ratio(Result):
     name = "a ratio"
+    abstract = False
     nominator = Instance(Face)
     denominator = Instance(Face)
     

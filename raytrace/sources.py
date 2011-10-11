@@ -298,6 +298,7 @@ class BaseRaySource(BaseBase):
     
     
 class ParallelRaySource(BaseRaySource):
+    abstract = False
     origin = Tuple((0.,0.,0.))
     direction = UnitTupleVector
     number = Int(20, auto_set=False, enter_set=True)
@@ -371,6 +372,7 @@ class ParallelRaySource(BaseRaySource):
 class RectRaySource(BaseRaySource):
     """ rays from a rectangular aperture """ 
     origin = Tuple((0.,0.,0.))
+    abstract = False
     direction = UnitTupleVector
     number = Int(20,auto_set=False,enter_set=True)		#total rays is n^2
     length = Float(10.,editor=NumEditor)
@@ -459,6 +461,7 @@ class RectRaySource(BaseRaySource):
     
 
 class ConfocalRaySource(BaseRaySource):
+    abstract = False
     focus = TupleVector
     direction = UnitTupleVector
     number = Range(1,50,20, editor_traits={'mode':'spinner'})

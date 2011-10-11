@@ -7,9 +7,10 @@ new architecture performs substantially better than the previous numpy-based des
 (In a 4-mirror model, 8x faster than numpy for 60 rays, 25x faster for 1000 rays
 and 75x faster for 2500 rays).
 
-The main tracing functionality is provided by two new (compiled) modules: 
+The main tracing functionality is provided by three new (compiled) modules: 
  - ctracer
  - cfaces
+ - cmaterials
  
 "ctracer" provides the following extension types:
  - Ray

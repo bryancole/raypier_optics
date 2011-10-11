@@ -45,6 +45,7 @@ class BaseMirror(Traceable):
 
 class PECMirror(BaseMirror):
     name = "PEC Mirror"
+    abstract = False
     diameter = Float(25.4)
     thickness = Float(5.0, desc="purely for visualisation purposes")
     offset = Float(0.0)
@@ -104,6 +105,7 @@ class PECMirror(BaseMirror):
 class PlanarWindow(PECMirror, Optic):
     n_inside = 1.5
     name = "Planar window"
+    abstract = False
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
@@ -133,6 +135,7 @@ class PlanarWindow(PECMirror, Optic):
 
 class RectMirror(BaseMirror):
     name = "Rectangular Mirror"
+    abstract = False
     length = Float(25.4)
     width = Float(25.4)
     thickness = Float(5.0, desc="purely for visualisation purposes")
@@ -193,6 +196,7 @@ class RectMirror(BaseMirror):
 class RectWindow(RectMirror, Optic):
     n_inside = 1.5
     name = "Rectangular window"
+    abstract = False
     
     traits_view = View(VGroup(
                        Traceable.uigroup,

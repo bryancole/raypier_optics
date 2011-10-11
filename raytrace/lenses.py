@@ -33,10 +33,11 @@ import math, numpy
 
 
 class BaseLens(Optic):
-    pass
+    abstract = True
 
 
 class PlanoConvexLens(BaseLens):
+    abstract = False
     name = "Plano-Convex Lens"
     
     CT = Float(5.0, desc="centre thickness")

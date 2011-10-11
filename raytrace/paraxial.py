@@ -10,6 +10,7 @@ from raytrace.faces import ParaxialLensFace
 
 class ParaxialLens(Traceable):
     name = "Paraxial Lens"
+    abstract = False
     diameter = Float(25.4)
     focal_length = Float(25.4)
     offset = Float(0.0)

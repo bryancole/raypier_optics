@@ -36,6 +36,7 @@ from raytrace.ctracer import FaceList
 
 class Ellipsoid(BaseMirror):
     name = "Ellipsoid"
+    abstract = False
     focus1 = Tuple(-50.,0.,0.)
     focus2 = Tuple(0., 50., 0.)
     size = Float(100.0, desc="twice the major axis length, or the distance from one\

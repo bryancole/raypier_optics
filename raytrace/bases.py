@@ -71,7 +71,7 @@ class RaytraceObjectMetaclass(MetaHasTraits):
         cls.yaml_loader.add_constructor(cls.yaml_tag, cls.from_yaml)
         cls.yaml_dumper.add_representer(cls, cls.to_yaml)
         
-        if not kwds.get('abstract', False):
+        if not cls.abstract:
             cls.subclasses.add(cls)
 
 
@@ -365,8 +365,8 @@ Traceable.uigroup = VGroup(
     
 class Optic(Traceable):
     abstract=True
-    n_inside = Float(1.0) #complex refractive not yet fully implemented
-    n_outside = Float(1.0) 
+    n_inside = Complex(1.0+0.0j) #refractive
+    n_outside = Complex(1.0+0.0j)
     
     all_rays = Bool(False, desc="trace all reflected rays")
     

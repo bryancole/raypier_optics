@@ -349,6 +349,7 @@ class TroughParabloid(BaseMirror):
     An trough mirror object
     """
     name = "trough"
+    abstract = False
     length = Float(100.0, desc="length of trough")
     X_bounds = Tuple((-25.5, 25.5), desc="width of parabolic profile")
     EFL = Float(50.8, desc="effective focal length")
@@ -456,6 +457,7 @@ class RectMirror(BaseMirror):
     A rectangular mirror object
     """
     name = "rectangular mirror"
+    abstract = False
     length = Float(100.0, desc="length of trough")
     width = Float(-25.5, desc="width of parabolic profile")
     
