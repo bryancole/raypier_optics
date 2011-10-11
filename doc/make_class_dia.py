@@ -4,11 +4,15 @@ import itertools
 
 from raytrace import (bases, faces, ellipsoids, lenses, 
                       mirrors, parabolics, paraxial, rays,
-                      sources, tracer)
+                      sources, tracer, absorbers, apertures,
+                      beamstop, involutes, prisms, probes, 
+                      results, splines, troughs, corner_cubes)
 
 modules = (bases, faces, ellipsoids, lenses, 
                       mirrors, parabolics, paraxial, rays,
-                      sources, tracer)
+                      sources, tracer,absorbers, apertures,
+                      beamstop, involutes, prisms, probes, 
+                      results, splines, troughs, corner_cubes)
 
 roots = (bases.Renderable, faces.Face, sources.BaseRaySource,
          tracer.RayTraceModel)
@@ -42,6 +46,9 @@ for a in edges:
     print a
 
 g = pydot.graph_from_edges(edges)
-g.aspect = (1.0, 5)
+g.aspect = (8, 5)
+g.set_rankdir("LR")
+g.set_ranksep("0.1")
+#g.set_ratio("1.0")
 g.write_png("class_heirarchy.png", prog='dot')
 
