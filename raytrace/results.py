@@ -80,7 +80,7 @@ class RayPaths(Result):
     name = "ray paths"
     result = DictStrFloat(label="Dictionary of ray paths")
 
-    _tracer = Instance(RayTraceModel) #to cache the tracer instance
+    _tracer = Instance("raytrace.tracer.RayTraceModel") #to cache the tracer instance
     
     traits_view = View(Item('result', style="readonly"),
                        title="Paths taken by rays",

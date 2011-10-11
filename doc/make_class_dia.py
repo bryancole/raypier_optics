@@ -4,18 +4,18 @@ import itertools
 
 from raytrace import (bases, faces, ellipsoids, lenses, 
                       mirrors, parabolics, paraxial, rays,
-                      sources, tracer, absorbers, apertures,
+                      sources, tracer, splines,
                       beamstop, involutes, prisms, probes, 
-                      results, splines, troughs, corner_cubes)
+                      results, troughs, corner_cubes, cfaces, cmaterials, ctracer)
 
 modules = (bases, faces, ellipsoids, lenses, 
                       mirrors, parabolics, paraxial, rays,
-                      sources, tracer,absorbers, apertures,
+                      sources, tracer, splines,
                       beamstop, involutes, prisms, probes, 
-                      results, splines, troughs, corner_cubes)
+                      results, troughs, corner_cubes, cfaces, cmaterials, ctracer)
 
 roots = (bases.Renderable, faces.Face, sources.BaseRaySource,
-         tracer.RayTraceModel)
+         tracer.RayTraceModel, ctracer.Face, ctracer.InterfaceMaterial)
 
 def iterclasses(m):
     for name in dir(m):
