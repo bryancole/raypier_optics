@@ -421,7 +421,8 @@ class RayTraceModel(HasQueue):
         colors = [c for s,c in shapes_colors]
         export_shapes(shapes, fname, colorList=colors)
         
-    def _sources_changed(self, name, removed, source_list):
+    @on_trait_change("sources[]")
+    def on_sources_changed(self, obj, name, removed, source_list):
         scene = self.scene
         for source in source_list:
             for actor in source.actors:

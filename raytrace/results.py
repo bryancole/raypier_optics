@@ -10,7 +10,7 @@ from enthought.traits.ui.api import View, Item, DropEditor
 
 from raytrace.bases import Result
 from raytrace.sources import BaseRaySource
-from raytrace.tracer import RayTraceModel
+#from raytrace.tracer import RayTraceModel
 from raytrace.ctracer import Face
 from enthought.traits.ui.editors.drop_editor import DropEditor
 
@@ -133,7 +133,7 @@ class Ratio(Result):
     
     result = Float(label="Ratio of intersections")
     
-    _tracer = Instance(RayTraceModel) #to cache the tracer instance
+    _tracer = Instance("raytrace.tracer.RayTraceModel") #to cache the tracer instance
     
     traits_view = View(Item('result', style="readonly"),
                        Item('nominator', editor=DropEditor()),
