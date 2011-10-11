@@ -33,10 +33,8 @@ import threading, os, itertools
 import wx
 from itertools import chain, izip, islice, count
 import yaml
-from raytrace.rays import RayCollection, collectRays
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
-from raytrace.faces import Face
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
 from raytrace import ctracer, cmaterials

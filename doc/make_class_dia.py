@@ -2,19 +2,19 @@ import pydot
 import types
 import itertools
 
-from raytrace import (bases, faces, ellipsoids, lenses, 
-                      mirrors, parabolics, paraxial, rays,
+from raytrace import (bases, ellipsoids, lenses, 
+                      mirrors, beamstop,
                       sources, tracer, splines,
-                      beamstop, involutes, prisms, probes, 
-                      results, troughs, corner_cubes, cfaces, cmaterials, ctracer)
+                      beamstop, prisms, dielectrictroughs,
+                      results, corner_cubes, cfaces, cmaterials, ctracer)
 
-modules = (bases, faces, ellipsoids, lenses, 
-                      mirrors, parabolics, paraxial, rays,
+modules = (bases, ellipsoids, lenses, 
+                      mirrors, beamstop,
                       sources, tracer, splines,
-                      beamstop, involutes, prisms, probes, 
-                      results, troughs, corner_cubes, cfaces, cmaterials, ctracer)
+                      beamstop, prisms, dielectrictroughs,
+                      results, corner_cubes, cfaces, cmaterials, ctracer)
 
-roots = (bases.Renderable, faces.Face, sources.BaseRaySource,
+roots = (bases.Renderable, sources.BaseRaySource,
          tracer.RayTraceModel, ctracer.Face, ctracer.InterfaceMaterial)
 
 def iterclasses(m):

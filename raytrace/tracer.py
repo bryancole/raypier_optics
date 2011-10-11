@@ -39,10 +39,9 @@ import wx, os
 import yaml
 from itertools import chain, izip, islice, count
 from raytrace.sources import BaseRaySource
-from raytrace.rays import RayCollection, collectRays
+from raytrace.ctracer import Face
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
-from raytrace.faces import Face
 from raytrace.bases import Traceable, Probe, Result
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
@@ -51,7 +50,7 @@ from raytrace import ctracer
 
 counter = count()
 
-from raytrace import mirrors, prisms, corner_cubes, parabolics, ellipsoids, sources,\
+from raytrace import mirrors, prisms, corner_cubes, ellipsoids, sources,\
     results, beamstop, lenses
 
 optics_classes = Traceable.subclasses
