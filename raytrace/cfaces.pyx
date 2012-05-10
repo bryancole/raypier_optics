@@ -740,6 +740,94 @@ cdef class PolygonFace(Face):
         normal.z=-1
         return normal
     
+    
+cdef class OffAxisParabolicFace(Face):
+    cdef:
+        public double EFL, diameter, height
+                
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double max_length = sep_(p1, p2)
+            double A = 1 / (2*self.EFL), efl = self.EFL
+            double a,b,c,d
+            vector_t s, r, pt1, pt2
+            
+            
+        s = subvv_(p2,p1)
+        r = p1
+        r.z += efl/2.
+                
+        a = A*(s.x**2 + s.y**2)
+        b = 2*A*(r.x*s.x + r.y*s.y) - s.z
+        c = A*(r.x**2 + r.y**2) - r.z
+        d = b**2 - 4*a*c
+        
+        ###FIXME
+        if d<0: #no intersection ###BROKEN
+            return 0
+        
+        if a < 1e-10: #approximate to zero if we're close to the parabolic axis
+            a1 = -c/b
+            pt1 = addvv_(r, multvs_(s, a1))
+            pt1.x -= efl
+            if (pt1.x*pt1.x + pt1.y*pt1.y) > (self.diameter/2):
+                return 0
+            if a1>1.0 or a1<self.tolerance:
+                return 0
+            return a1 * sep_(p1, p2)
+        
+        else:
+            d = sqrt(d)
+           
+            #1st root
+            a1 = (-b+d)/(2*a) 
+            pt1 = addvv_(r, multvs_(s, a1))
+            #2nd root
+            a2 = (-b-d)/(2*a)
+            pt2 = addvv_(r, multvs_(s, a2))
+                           
+            pt1.x -= efl
+            pt2.x -= efl
+            
+            if (pt1.x*pt1.x + pt1.y*pt1.y) > (self.diameter/2):
+                a1 = INFINITY
+            if (pt2.x*pt2.x + pt2.y*pt2.y) > (self.diameter/2):
+                a2 = INFINITY
+            
+            if a2 < a1:
+                a1 = a2
+            
+            if a1>1.0 or a1<self.tolerance:
+                return 0
+            return a1 * sep_(p1, p2)
+#
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            vector_t normal
+            double A = 1 / (2*self.EFL)
+            double B, dz
+        
+        B = 4*(p.x*p.x + p.y*p.y)*A*A
+        dz = -sqrt( B/(B+1) )
+        
+        normal.x= -(dz * p.x)
+        normal.y= -(dz * p.y)
+        normal.z= -1 / sqrt( B+1 )
+        return normal
+    
         
 cdef class EllipsoidalFace(Face):
     cdef:
