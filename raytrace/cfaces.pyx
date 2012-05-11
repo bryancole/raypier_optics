@@ -799,9 +799,12 @@ cdef class OffAxisParabolicFace(Face):
             pt1.x -= efl
             pt2.x -= efl
             
-            if (pt1.x*pt1.x + pt1.y*pt1.y) > (self.diameter/2):
+            d = self.diameter
+            d *= d/4.
+            
+            if (pt1.x*pt1.x + pt1.y*pt1.y) > d:
                 a1 = INFINITY
-            if (pt2.x*pt2.x + pt2.y*pt2.y) > (self.diameter/2):
+            if (pt2.x*pt2.x + pt2.y*pt2.y) > d:
                 a2 = INFINITY
             
             if a2 < a1:
@@ -818,13 +821,15 @@ cdef class OffAxisParabolicFace(Face):
         cdef:
             vector_t normal
             double A = 1 / (2*self.EFL)
-            double B, dz
+            double B, dz, m2
         
-        B = 4*(p.x*p.x + p.y*p.y)*A*A
+        m2 = p.x*p.x + p.y*p.y
+        B = 4*m2*A*A
         dz = -sqrt( B/(B+1) )
+        m2 = sqrt(m2)
         
-        normal.x= -(dz * p.x)
-        normal.y= -(dz * p.y)
+        normal.x= -(dz * p.x)/m2
+        normal.y= -(dz * p.y)/m2
         normal.z= -1 / sqrt( B+1 )
         return normal
     
