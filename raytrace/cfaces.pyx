@@ -12,7 +12,7 @@ Cython module for Face definitions
 #from libc.math import INFINITY, M_PI, sqrt, pow, fabs, cos, sin, acos, atan2
 
 cdef extern from "math.h":
-    double INFINITY
+    double DBL_MAX
     double M_PI
     double sqrt(double)
     double atan2 (double y, double x )
@@ -21,6 +21,8 @@ cdef extern from "math.h":
     double cos(double)
     double sin(double)
     double acos(double)
+
+cdef INF=(DBL_MAX+DBL_MAX)
 
 from ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
@@ -218,16 +220,16 @@ cdef class SphericalFace(Face):
         pt2 = addvv_(r, multvs_(s, a2))
         
         if pt1.z < cz:
-            a1 = INFINITY
+            a1 = INF
         if pt2.z < cz:
-            a2 = INFINITY
+            a2 = INF
             
         D = self.diameter*self.diameter/4.
         
         if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
-            a1 = INFINITY
+            a1 = INF
         if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
-            a2 = INFINITY
+            a2 = INF
         
         if a2 < a1:
             a1 = a2
@@ -495,7 +497,7 @@ cdef class ExtrudedBezierFace(Face):
             flatvector_t tempvector
             flatvector_t r, p2, s, origin
             flatvector_t cp0,cp1,cp2,cp3  #holds control points for spline segment under scrutiny
-            double result = INFINITY            #length of ray before it intersects surface. 0 if no valid intersection
+            double result = INF            #length of ray before it intersects surface. 0 if no valid intersection
             double dZ                       #rate of change of z. dZ*result+Z0 gives Z coordinate
             double A,B,C,D,t,a,b,c,d
             poly_roots ts
@@ -588,7 +590,7 @@ cdef class ExtrudedBezierFace(Face):
                       result = b
                       #print "b at t",b,t
             
-        if result == INFINITY: result = 0
+        if result == INF: result = 0
 
         return result
 
@@ -803,9 +805,9 @@ cdef class OffAxisParabolicFace(Face):
             d *= d/4.
             
             if (pt1.x*pt1.x + pt1.y*pt1.y) > d:
-                a1 = INFINITY
+                a1 = INF
             if (pt2.x*pt2.x + pt2.y*pt2.y) > d:
-                a2 = INFINITY
+                a2 = INF
             
             if a2 < a1:
                 a1 = a2

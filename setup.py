@@ -25,7 +25,7 @@ from Cython.Distutils import build_ext
 
 ###Cython.Distutils and Distribute don't play nice so we'll create the
 ###C-modules explicitly
-import subprocess, os
+import subprocess, os, sys
 
 def create_module(pyx_name):
     cname = os.path.splitext(pyx_name)[0] + ".c"
@@ -40,14 +40,22 @@ for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
     create_module("raytrace/%s"%fname)
     
 import numpy
-np_include = numpy.get_include()
+includes = [numpy.get_include()]
+
+if sys.platform.startswith('win32'):
+    os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
+    includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
+    libpath = [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
 ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"],
-                        include_dirs=[np_include]),
+                        include_dirs=includes,
+                        library_dirs=libpath),
             Extension("cfaces", ["raytrace/cfaces.pyx"],
-                        include_dirs=[np_include]),
+                        include_dirs=includes,
+                        library_dirs=libpath),
             Extension("cmaterials", ["raytrace/cmaterials.pyx"],
-                        include_dirs=[np_include])
+                        include_dirs=includes,
+                        library_dirs=libpath)
             ]
 
 setup(

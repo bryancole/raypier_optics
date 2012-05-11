@@ -2,9 +2,13 @@
 
 cdef extern from "math.h":
     double sqrt(double arg)
-    double INFINITY
+    #double INFINITY
+    double DBL_MAX
     
-from stdlib cimport malloc, free
+cdef double INF
+    
+    
+from libc.stdlib cimport malloc, free
 
 ############################################
 ### C type declarations for internal use ###

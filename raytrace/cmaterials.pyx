@@ -2,7 +2,9 @@
 cdef extern from "math.h":
     double sqrt(double arg)
     double fabs(double arg)
-    double INFINITY
+    double DBL_MAX
+    
+cdef double INF=(DBL_MAX+DBL_MAX)
 
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
@@ -220,7 +222,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = reflected
-            sp_ray.length = INFINITY
+            sp_ray.length = INF
             sp_ray.E1_amp.real *= -1
             sp_ray.E1_amp.imag *= -1
             sp_ray.E2_amp.real *= -1
@@ -246,7 +248,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = transmitted
-            sp_ray.length = INFINITY
+            sp_ray.length = INF
             sp_ray.E1_amp.real *= T_s
             sp_ray.E1_amp.imag *= T_s
             sp_ray.E2_amp.real *= T_p
