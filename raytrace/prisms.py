@@ -69,13 +69,13 @@ class Extrusion(Optic):
         z2 = self.z_height_2
         profile = self.profile
         m = self.material
-	#a plane is extruded differently from a 2d profile
-	if profile.shape == (2,2):
-		sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=profile[0,0], y1=profile[0,1], 
-                    x2=profile[1,0], y2=profile[1,1], material=m)]
-	else:
-        	sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=x1, y1=y1, 
-                	    x2=x2, y2=y2, material=m) for ((x2,y2),(x1,y1)) 
+        #a plane is extruded differently from a 2d profile
+        if profile.shape == (2,2):
+            sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=profile[0,0], y1=profile[0,1], 
+                        x2=profile[1,0], y2=profile[1,1], material=m)]
+        else:
+            sides = [ExtrudedPlanarFace(owner=self, z1=z1, z2=z2, x1=x1, y1=y1, 
+                        x2=x2, y2=y2, material=m) for ((x2,y2),(x1,y1)) 
                                             in pairwise(profile)]
         if self.trace_ends:
             base = PolygonFace(owner=self, z_plane=z1,
@@ -193,6 +193,8 @@ class TruncatedRightanglePrism(Extrusion):
                        Item('n_inside'),
                        Item('depth'),
                        Item('width'),
+                       Item('z_height_1', label="Z top"),
+                       Item('z_height_2', label="Z bottom"),
                        )
                        )
 

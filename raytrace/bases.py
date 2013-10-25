@@ -232,7 +232,7 @@ class ModelObject(Renderable):
         return False, None
         
         
-class Probe(Renderable):
+class Probe(ModelObject):
     pass
         
     

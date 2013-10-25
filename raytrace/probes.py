@@ -25,7 +25,7 @@ import numpy
 
 from raytrace.bases import Probe, Traceable, NumEditor, Vector
 from raytrace.sources import RayCollection
-from raytrace.rays import collectRays
+
 from raytrace.utils import normaliseVector
 
 try:
@@ -35,6 +35,7 @@ except ImportError:
 
 
 class PolarisationProbe(Probe):
+    name = "Polarisation Probe"
     size = Float(25.0)
     
     update = Event() #request re-tracing
@@ -85,7 +86,8 @@ class PolarisationProbe(Probe):
         """
         @param rays: a RayCollection instance
         """
-        raise NotImplementedError
+        #raise NotImplementedError
+        pass
       
 if PSF is not None:
     class PointSpreadFunction(Probe):

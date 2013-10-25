@@ -43,7 +43,7 @@ class BaseBase(HasTraits, RaytraceObject):
 class BaseRaySource(BaseBase):
     abstract=True
     subclasses = set()
-    name = Title("Ray Source")
+    name = Title("Ray Source", allow_selection=False)
     update = Event()
     display = Enum("pipes", "wires", "hidden")
     render = Event()
@@ -467,8 +467,8 @@ class ConfocalRaySource(BaseRaySource):
     number = Range(1,50,20, editor_traits={'mode':'spinner'})
     theta = Range(0.0,90.0,value=30)
     working_dist = Float(100.0,editor=NumEditor)
-    rings = Range(1,50,3, editor_traits={'mode':'spinner'})
-    reverse = -1    #-1 is converging, +1 is diverging
+    rings = Range(0,50,3, editor_traits={'mode':'spinner'})
+    reverse = 1    #-1 is converging, +1 is diverging
     principle_axes = Property(Tuple(Array,Array), depends_on="direction")
     
     #view_ray_ids = numpy.arange(20)

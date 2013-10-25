@@ -19,7 +19,8 @@ a module for parabolic optics e.g. OAPs
 """
 from enthought.traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, \
-            Tuple, Event, cached_property, Set, Int, Trait, Bool, PrototypedFrom
+            Tuple, Event, cached_property, Set, Int, Trait, Bool, \
+            PrototypedFrom, BaseTuple
 from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
 from enthought.tvtk.api import tvtk
@@ -33,6 +34,15 @@ from raytrace.cfaces import EllipsoidalFace
 from raytrace.ctracer import FaceList
 
 
+class MinMax(BaseTuple):
+    def validate(self, obj, name, value):
+        valid = super(MinMax,self).validate(obj, name, value)
+        a,b = valid
+        if a>b:
+            valid = (b,a)
+        return valid
+        
+
 
 class Ellipsoid(BaseMirror):
     name = "Ellipsoid"
@@ -41,9 +51,9 @@ class Ellipsoid(BaseMirror):
     focus2 = Tuple(0., 50., 0.)
     size = Float(100.0, desc="twice the major axis length, or the distance from one\
  focus to the ellipsoid edge to the other focus")
-    X_bounds = Tuple(-25., 25.)
-    Y_bounds = Tuple(-25., 25.)
-    Z_bounds = Tuple(0., 50.)
+    X_bounds = MinMax(-25., 25.)
+    Y_bounds = MinMax(-25., 25.)
+    Z_bounds = MinMax(0., 50.)
     
     show_foci = Bool(True)
     foci_Actors = Instance(tvtk.ActorCollection, ())
