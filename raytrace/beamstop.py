@@ -1,6 +1,6 @@
 from raytrace.mirrors import PECMirror, RectMirror
 from raytrace.cmaterials import OpaqueMaterial
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 
 
 class BeamStop(PECMirror):

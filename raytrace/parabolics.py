@@ -1,7 +1,7 @@
-from enthought.traits.api import Float, Instance, on_trait_change
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traits.api import Float, Instance, on_trait_change
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 
 from raytrace.bases import NumEditor, Traceable
 from raytrace.mirrors import BaseMirror

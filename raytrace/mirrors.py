@@ -15,11 +15,11 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from enthought.traits.api import Float, Instance, on_trait_change
+from traits.api import Float, Instance, on_trait_change
 
-from enthought.traits.ui.api import View, Item, VGroup
+from traitsui.api import View, Item, VGroup
 
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
@@ -95,9 +95,11 @@ class PECMirror(BaseMirror):
     
     def _pipeline_default(self):
         cyl = self.vtk_cylinder
-        norms = tvtk.PolyDataNormals(input=cyl.output)
-        transF1 = tvtk.TransformFilter(input=norms.output, transform=self.cyl_trans)
-        transF2 = tvtk.TransformFilter(input=transF1.output, transform=self.transform)
+        norms = tvtk.PolyDataNormals(input_connection=cyl.output_port)
+        transF1 = tvtk.TransformFilter(input_connection=norms.output_port, 
+                                       transform=self.cyl_trans)
+        transF2 = tvtk.TransformFilter(input_connection=transF1.output_port, 
+                                       transform=self.transform)
         self.config_pipeline()
         return transF2
     

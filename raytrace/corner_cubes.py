@@ -16,14 +16,14 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Bool
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Heading
-from enthought.tvtk.api import tvtk
-from enthought.tvtk.pyface.scene_model import SceneModel
-from enthought.tvtk.pyface.scene_editor import SceneEditor
+from tvtk.api import tvtk
+from tvtk.pyface.scene_model import SceneModel
+from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 from itertools import chain, izip, islice, tee
 
@@ -38,6 +38,7 @@ from raytrace.cmaterials import PECMaterial
 
 
 class HollowRetroreflector(BaseMirror):
+    abstract = False
     name = "Hollow Retroreflector"
     diameter = Float(25.4)
 
@@ -105,6 +106,7 @@ class HollowRetroreflector(BaseMirror):
     
     
 class SolidRetroreflector(Optic, HollowRetroreflector):
+    abstract = False
     yaml_tag = u"!SolidRetroreflector"
     n_inside = 1.5
     name = "Solid Retroreflector"
@@ -167,7 +169,9 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
     def _pipeline_default(self):
         grid = self.vtk_grid
         grid.set_execute_method(self.create_grid)
+        grid.structured_points_output
         grid.modified()
+        
         
         sqrt2 = numpy.sqrt(2)
         x = sqrt2*numpy.cos(numpy.pi*2./3)
@@ -185,15 +189,16 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
         union.add_function(planes)
         union.add_function(cyl)
         
-        clip = tvtk.ClipVolume(input=grid.structured_points_output,
+        clip = tvtk.ClipVolume(input_connection=grid.output_port,
                                  clip_function=union,
                                  inside_out=True,
                                  mixed3d_cell_generation=True)
         
-        topoly = tvtk.GeometryFilter(input=clip.output)
+        topoly = tvtk.GeometryFilter(input_connection=clip.output_port)
         
-        norm = tvtk.PolyDataNormals(input=topoly.output)
-        transF = tvtk.TransformFilter(input=norm.output, transform=self.transform)
+        norm = tvtk.PolyDataNormals(input_connection=topoly.output_port)
+        transF = tvtk.TransformFilter(input_connection=norm.output_port, 
+                                      transform=self.transform)
         self.config_pipeline()
         grid.modified()
         return transF

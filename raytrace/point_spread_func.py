@@ -1,5 +1,5 @@
 """routines used in the evaluation of the point-spread-function probes"""
-from enthought.traits.api import HasTraits, Instance, Property, Float
+from traits.api import HasTraits, Instance, Property, Float
 
 from raytrace.bases import normaliseVector, dotprod
 from raytrace.rays import collectRays

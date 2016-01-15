@@ -10,7 +10,7 @@ from raytrace.tracer import RayTraceModel
 from raytrace.prisms import LDLF
 from raytrace.cmaterials import PECMaterial, OpaqueMaterial
 from raytrace.constraints import BaseConstraint
-from enthought.traits.api import Instance, on_trait_change, Tuple, Float
+from traits.api import Instance, on_trait_change, Tuple, Float
 import numpy
 
 

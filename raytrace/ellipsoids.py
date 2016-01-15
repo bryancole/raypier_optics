@@ -17,13 +17,13 @@
 """
 a module for parabolic optics e.g. OAPs
 """
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, \
             Tuple, Event, cached_property, Set, Int, Trait, Bool, \
             PrototypedFrom, BaseTuple
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 import numpy
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\

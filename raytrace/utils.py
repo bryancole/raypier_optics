@@ -16,10 +16,10 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy
-from enthought.tvtk.api import tvtk
-from enthought.traits.api import Range as _Range, Tuple as _Tuple,\
+from tvtk.api import tvtk
+from traits.api import Range as _Range, Tuple as _Tuple,\
             BaseTuple
-from enthought.traits.ui.api import TupleEditor
+from traitsui.api import TupleEditor
 
 
 class EditorTraits(object):

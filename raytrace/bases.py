@@ -16,18 +16,18 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from enthought.traits.api import HasTraits, Array, BaseFloat, Complex,\
+from traits.api import HasTraits, Array, BaseFloat, Complex,\
             Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
             self, Str, Bool, PythonValue, Enum, MetaHasTraits
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
             ShellEditor
             
-from enthought.traits.ui.file_dialog import save_file
+from traitsui.file_dialog import save_file
             
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 import numpy
 import threading, os, itertools
 import wx
@@ -260,7 +260,7 @@ class Traceable(ModelObject):
     def _actors_default(self):
         pipeline = self.pipeline
         
-        map = tvtk.PolyDataMapper(input=pipeline.output)
+        map = tvtk.PolyDataMapper(input_connection=pipeline.output_port)
         act = tvtk.Actor(mapper=map)
         act.property = self.vtkproperty
         actors = tvtk.ActorCollection()

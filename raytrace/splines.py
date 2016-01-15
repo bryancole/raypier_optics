@@ -16,14 +16,14 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Bool
-from enthought.traits.ui.api import View, Item, ArrayEditor, VGroup
+from traitsui.api import View, Item, ArrayEditor, VGroup
 from raytrace.bases import ComplexEditor, NumEditor
-from enthought.tvtk.api import tvtk
-from enthought.tvtk.pyface.scene_model import SceneModel
-from enthought.tvtk.pyface.scene_editor import SceneEditor
+from tvtk.api import tvtk
+from tvtk.pyface.scene_model import SceneModel
+from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 from itertools import chain, izip, islice, tee
 

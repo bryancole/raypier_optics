@@ -19,14 +19,14 @@
 import numpy
 import itertools
 
-from enthought.traits.api import HasTraits, Int, Float, \
+from traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
      Instance, on_trait_change, Trait, Enum, Title
 
-from enthought.traits.ui.api import View, Item, Tabbed, VGroup, Include, \
+from traitsui.api import View, Item, Tabbed, VGroup, Include, \
     Group
 
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 
 from raytrace.ctracer import RayCollection, Ray, ray_dtype
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \

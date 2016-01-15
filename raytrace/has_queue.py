@@ -1,7 +1,7 @@
-from enthought.traits.has_traits import HasTraits, \
+from traits.has_traits import HasTraits, \
         on_trait_change as _on_trait_change
         
-from enthought.traits.trait_notifiers import TraitChangeNotifyWrapper
+from traits.trait_notifiers import TraitChangeNotifyWrapper
 
 from collections import deque
 from threading import currentThread
@@ -139,7 +139,7 @@ HasQueue.set_trait_dispatch_handler("queued", QueuedTraitChangeNotifyWrapper)
 
 
 if __name__=="__main__":
-    from enthought.traits.api import Float, Bool
+    from traits.api import Float, Bool
     class test(HasQueue):
         """
         A simple test object with a diamond-shape trait dependency

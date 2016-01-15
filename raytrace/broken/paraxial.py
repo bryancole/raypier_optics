@@ -1,8 +1,8 @@
-from enthought.traits.api import Float, Instance, on_trait_change
+from traits.api import Float, Instance, on_trait_change
 
-from enthought.traits.ui.api import View, Item, VGroup
+from traitsui.api import View, Item, VGroup
 
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 
 from raytrace.bases import Traceable, NumEditor
 from raytrace.faces import ParaxialLensFace

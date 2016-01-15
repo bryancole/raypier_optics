@@ -17,7 +17,7 @@
 
 import numpy
 from utils import normaliseVector, transformPoints
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 
 def transform_pts(centre, direction, points):
     #take a point from the global referance frame and transform it into the 

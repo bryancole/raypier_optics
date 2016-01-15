@@ -181,7 +181,7 @@ class TestTransform(unittest.TestCase):
     """
     def test_trans(self):
         print "loading tvtk"
-        from enthought.tvtk.api import tvtk
+        from tvtk.api import tvtk
         print "complete"
         t = tvtk.Transform()
         t.rotate_x(10)

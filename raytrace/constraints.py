@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from enthought.traits.api import HasTraits, Event, Str
+from traits.api import HasTraits, Event, Str
 
 from raytrace.has_queue import HasQueue, on_trait_change
 

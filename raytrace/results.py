@@ -3,16 +3,16 @@ A module for Results subclasses
 """
 
 
-from enthought.traits.api import Instance, Float, on_trait_change,\
+from traits.api import Instance, Float, on_trait_change,\
             Button, DictStrFloat
 
-from enthought.traits.ui.api import View, Item, DropEditor
+from traitsui.api import View, Item, DropEditor
 
 from raytrace.bases import Result
 from raytrace.sources import BaseRaySource
 #from raytrace.tracer import RayTraceModel
 from raytrace.ctracer import Face
-from enthought.traits.ui.editors.drop_editor import DropEditor
+from traitsui.editors.drop_editor import DropEditor
 
 import numpy
 import itertools

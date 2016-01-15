@@ -17,22 +17,22 @@
 
 from __future__ import with_statement
 
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Button,\
             self, Str, Bool, PythonValue, Enum, File
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
             ShellEditor, Controller
             
-from enthought.traits.ui.menu import Menu, MenuBar, Action, Separator
+from traitsui.menu import Menu, MenuBar, Action, Separator
             
-from enthought.traits.ui.file_dialog import save_file
+from traitsui.file_dialog import save_file
             
-from enthought.tvtk.api import tvtk
-from enthought.tvtk.pyface.scene_model import SceneModel
-from enthought.tvtk.pyface.scene_editor import SceneEditor
+from tvtk.api import tvtk
+from tvtk.pyface.scene_model import SceneModel
+from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 import threading, os, itertools
 import wx, os

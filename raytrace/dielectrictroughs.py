@@ -1,12 +1,12 @@
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, Bool
 
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Heading
-from enthought.tvtk.api import tvtk
-from enthought.tvtk.pyface.scene_model import SceneModel
-from enthought.tvtk.pyface.scene_editor import SceneEditor
+from tvtk.api import tvtk
+from tvtk.pyface.scene_model import SceneModel
+from tvtk.pyface.scene_editor import SceneEditor
 
 from raytrace.cmaterials import OpaqueMaterial
 

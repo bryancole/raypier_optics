@@ -18,12 +18,12 @@
 """
 Maths for a cylinder and also its involute.
 """
-from enthought.traits.api import HasTraits, Array, Float, Complex,\
+from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
             Tuple, Event, cached_property, Set, Int, Trait, PrototypedFrom
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
 import numpy
 import math
 from itertools import izip

@@ -15,12 +15,12 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from enthought.traits.api import Float, Instance, on_trait_change
+from traits.api import Float, Instance, on_trait_change
 
-from enthought.traits.ui.api import View, Item, ListEditor, VSplit,\
+from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
 
-from enthought.tvtk.api import tvtk
+from tvtk.api import tvtk
      
 from raytrace.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals
