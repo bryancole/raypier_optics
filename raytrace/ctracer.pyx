@@ -7,9 +7,12 @@
 cdef extern from "math.h":
     double sqrt(double arg)
     double fabs(double arg)
-    double INFINITY
+    #double INFINITY
+    double DBL_MAX
+
+cdef INF=(DBL_MAX+DBL_MAX)
     
-from stdlib cimport malloc, free, realloc
+from libc.stdlib cimport malloc, free, realloc
 
 cdef extern from "stdlib.h" nogil:
     void *memcpy(void *str1, void *str2, size_t n)
@@ -446,7 +449,7 @@ cdef class RayCollection:
         """
         cdef int i
         for i in xrange(self.n_rays):
-            self.rays[i].length = INFINITY
+            self.rays[i].length = INF
         
     def add_ray(self, Ray r):
         """Adds the given Ray instance to this collection
