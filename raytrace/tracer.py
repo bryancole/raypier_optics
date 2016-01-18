@@ -225,7 +225,7 @@ class RayTraceModel(HasQueue):
     def _rays_changed(self, rayList):
         scene = self.scene
         sources = [o.pipeline for o in rayList]
-        mappers = [tvtk.PolyDataMapper(input=s.output) for s in sources]
+        mappers = [tvtk.PolyDataMapper(input_connection=s.output_port) for s in sources]
         actors = [tvtk.Actor(mapper=m) for m in mappers]
         for actor in actors:
             property = actor.property

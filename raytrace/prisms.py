@@ -47,7 +47,7 @@ class Extrusion(Optic):
     profile = Array(shape=(None,2), dtype=numpy.double, transient=True)
     
     z_height_1 = Float(0.0)
-    z_height_2 = Float(5.0)
+    z_height_2 = Float(20.0)
     
     trace_ends = Bool(True, desc="include the end-faces in tracing")
     
@@ -115,18 +115,19 @@ class Extrusion(Optic):
         source.set_execute_method(execute)
         
         extrude = self.extrude
-        extrude.input = source.output
+        extrude.input_connection = source.output_port
         
         t = self.transform
-        transf = tvtk.TransformFilter(input=extrude.output, transform=t)
+        transf = tvtk.TransformFilter(input_connection=extrude.output_port, 
+                                      transform=t)
         return transf
 
 
 class Prism(Extrusion):
     name = "prism"
     abstract = False
-    height = Float #distance from front face to apex
-    width = Float #width of front face
+    height = Float(20.0) #distance from front face to apex
+    width = Float(20.0) #width of front face
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
@@ -151,9 +152,9 @@ class Prism(Extrusion):
 class Rhomboid(Extrusion):
     name = "rhomboid"
     abstract = False
-    height = Float #distance between parallel faces
-    width = Float #width of parallel faces
-    slant = Float #angle of the oblique faces
+    height = Float(15.0) #distance between parallel faces
+    width = Float(15.0) #width of parallel faces
+    slant = Float(45.0) #angle of the oblique faces
     
     traits_view = View(VGroup(
                        Traceable.uigroup,

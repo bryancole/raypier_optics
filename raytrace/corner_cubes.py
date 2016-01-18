@@ -87,20 +87,23 @@ class HollowRetroreflector(BaseMirror):
         for p in (p1,p2,p3):
             p.set_resolution(32,32)
         append = tvtk.AppendPolyData()
-        append.add_input(p1.output)
-        append.add_input(p2.output)
-        append.add_input(p3.output)
+        append.add_input_connection(p1.output_port)
+        append.add_input_connection(p2.output_port)
+        append.add_input_connection(p3.output_port)
         
-        scale_f = tvtk.TransformFilter(input=append.output, transform=self.scale)
+        scale_f = tvtk.TransformFilter(input_connection=append.output_port, 
+                                       transform=self.scale)
         
         trans = tvtk.Transform()
         trans.rotate_x(90.0)
         self.imp_cyl.transform = trans
         
-        clip = tvtk.ClipPolyData(input=scale_f.output, clip_function = self.imp_cyl,
+        clip = tvtk.ClipPolyData(input_connection=scale_f.output_port, 
+                                 clip_function = self.imp_cyl,
                                  inside_out=True)
                                
-        transF2 = tvtk.TransformFilter(input=clip.output, transform=self.transform)
+        transF2 = tvtk.TransformFilter(input_connection=clip.output_port, 
+                                       transform=self.transform)
         self.config_pipeline()
         return transF2
     
@@ -115,8 +118,8 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
     
     thickness = Float(20.0, desc="distance from input face to apex")
     
-    vtk_grid = Instance(tvtk.ProgrammableSource, (), transient=True)
-    cyl = Instance(tvtk.Cylinder, (), transient=True)
+    cyl = Instance(tvtk.CylinderSource, (), transient=True)
+    cube = Instance(tvtk.CubeSource, (), transient=True)
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
@@ -140,67 +143,60 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
         face = self.faces.faces[-1]
         print "setting thickness", face, face.z_plane
         face.z_plane = new_t
-        self.vtk_grid.modified()
+        thickness = new_t
+        size = max(thickness, self.diameter)*2
+        cube = self.cube
+        cube.set_bounds(0,size,0,size,0,size)
+        
+        cyl=self.cyl
+        cyl.height = thickness
+        cyl.center = (0, thickness/2,0)
         self.update=True
         
     def _diameter_changed(self, d):
-        self.vtk_grid.modified()
         self.cyl.radius = d/2.
+        size = max(self.thickness, d)*2
+        cube = self.cube
+        cube.set_bounds(0,size,0,size,0,size)
         self.update=True
         
-    def create_grid(self):
-        r = 1.1*self.diameter/2.
-        xmin, xmax = -r,r
-        ymin, ymax = -r,r
-        zmin, zmax = 0, self.thickness
-        
-        source = self.vtk_grid
-        sp = source.structured_points_output
-        size = 50
-        dx = (xmax-xmin) / (size-1)
-        dy = (ymax-ymin) / (size-1)
-        dz = (zmax-zmin) / (size-1)
-        sp.dimensions = (size,size,size)
-        sp.whole_extent=(0,size,0,size,0,size)
-        sp.origin = (xmin, ymin, zmin)
-        sp.spacing = (dx, dy, dz)
-        sp.set_update_extent_to_whole_extent()
-        
     def _pipeline_default(self):
-        grid = self.vtk_grid
-        grid.set_execute_method(self.create_grid)
-        grid.structured_points_output
-        grid.modified()
-        
-        
-        sqrt2 = numpy.sqrt(2)
-        x = sqrt2*numpy.cos(numpy.pi*2./3)
-        y = sqrt2*numpy.sin(numpy.pi*2./3)
-        
-        t = self.thickness
-        planes = tvtk.Planes(points=[[0,0,0],[0,0,0],[0,0,0]],
-                             normals=[[sqrt2,0,-1],[x,y,-1],[x,-y,-1]])
-        tr = tvtk.Transform()
-        tr.rotate_x(90.0)
         cyl = self.cyl
-        cyl.transform = tr
-        cyl.radius = self.diameter/2.
-        union = tvtk.ImplicitBoolean(operation_type="intersection")
-        union.add_function(planes)
-        union.add_function(cyl)
+        cyl.resolution = 64
+        cyl.height = self.thickness
+        cyl.radius = self.diameter/2.0
+        cyl.center = (0, self.thickness/2,0)
         
-        clip = tvtk.ClipVolume(input_connection=grid.output_port,
-                                 clip_function=union,
-                                 inside_out=True,
-                                 mixed3d_cell_generation=True)
+        size = max(self.thickness, self.diameter)*2
+        cube = self.cube
+        cube.set_bounds(0,size,0,size,0,size)
         
-        topoly = tvtk.GeometryFilter(input_connection=clip.output_port)
+        tf = tvtk.Transform()
+        tf.post_multiply()
+        tf.rotate_x(-45.0)
+        tf.rotate_wxyz(35.26438968275, 0,0,1)
         
-        norm = tvtk.PolyDataNormals(input_connection=topoly.output_port)
+        tfilt = tvtk.TransformFilter(input_connection=cube.output_port)
+        tfilt.transform=tf
+        
+        tri1 = tvtk.TriangleFilter(input_connection=cyl.output_port)
+        tri2 = tvtk.TriangleFilter(input_connection=tfilt.output_port)
+        
+        intersect = tvtk.BooleanOperationPolyDataFilter()
+        intersect.operation = "intersection"
+        intersect.add_input_connection(0, tri1.output_port)
+        intersect.add_input_connection(1, tri2.output_port)
+        
+        tf2=tvtk.Transform()
+        tf2.rotate_x(90.0)
+        tf2.rotate_y(60.0)
+        orient = tvtk.TransformFilter(input_connection=intersect.output_port,
+                                      transform=tf2)
+        
+        norm = tvtk.PolyDataNormals(input_connection=orient.output_port)
         transF = tvtk.TransformFilter(input_connection=norm.output_port, 
                                       transform=self.transform)
         self.config_pipeline()
-        grid.modified()
         return transF
     
     def _material_default(self):

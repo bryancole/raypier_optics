@@ -189,9 +189,11 @@ class RectMirror(BaseMirror):
     
     def _pipeline_default(self):
         cube = self.vtk_cube
-        norms = tvtk.PolyDataNormals(input=cube.output)
-        transF1 = tvtk.TransformFilter(input=norms.output, transform=self.cube_trans)
-        transF2 = tvtk.TransformFilter(input=transF1.output, transform=self.transform)
+        norms = tvtk.PolyDataNormals(input_connection=cube.output_port)
+        transF1 = tvtk.TransformFilter(input_connection=norms.output_port, 
+                                       transform=self.cube_trans)
+        transF2 = tvtk.TransformFilter(input_connection=transF1.output_port, 
+                                       transform=self.transform)
         self.config_pipeline()
         return transF2
 

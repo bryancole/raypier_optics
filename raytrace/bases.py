@@ -261,6 +261,7 @@ class Traceable(ModelObject):
         pipeline = self.pipeline
         
         map = tvtk.PolyDataMapper(input_connection=pipeline.output_port)
+        map.scalar_visibility = False
         act = tvtk.Actor(mapper=map)
         act.property = self.vtkproperty
         actors = tvtk.ActorCollection()
@@ -433,8 +434,9 @@ class VTKOptic(Optic):
             output.shallow_copy(polydata)
         source.set_execute_method(execute)
         t = self.transform
-        transf = tvtk.TransformFilter(input=source.output, transform=t)
-        tri = tvtk.TriangleFilter(input=transf.output)
+        transf = tvtk.TransformFilter(input_connection=source.output_port, 
+                                      transform=t)
+        tri = tvtk.TriangleFilter(input_connection=transf.output_port)
         return tri
         
     def trace_segment(self, seg, last_optic=None, last_cell=None):

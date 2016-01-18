@@ -228,12 +228,12 @@ class BaseRaySource(BaseBase):
     def _normals_actor_default(self):
         source = self.normals_source
         glyph = tvtk.ArrowSource()
-        glyph_filter = tvtk.Glyph3D(source=glyph.output,
-                                    input = source.output,
+        glyph_filter = tvtk.Glyph3D(input_connection = source.output_port,
                                     scale_factor=10.0,
                                     vector_mode='use_normal'
                                     )
-        map = tvtk.PolyDataMapper(input=glyph_filter.output)
+        glyph_filter.set_source_connection(glyph.output_port)
+        map = tvtk.PolyDataMapper(input_connection=glyph_filter.output_port)
         act = tvtk.Actor(mapper=map)
         act.property.color = (0.0,1.0,0.0)
         return act
@@ -260,7 +260,7 @@ class BaseRaySource(BaseBase):
     
     def _ray_actor_default(self):
         tube = self.tube
-        tube.input=self.data_source.output
+        tube.input_connection=self.data_source.output_port
         tube.number_of_sides = 20
         
         map = self.mapper
@@ -268,9 +268,9 @@ class BaseRaySource(BaseBase):
         act.visibility = True
         display = self.display
         if display=="pipes":
-            map.input=tube.output
+            map.input_connection=tube.output_port
         elif display=="wires":
-            map.input = self.data_source.output
+            map.input_connection = self.data_source.output_port
         else:
             act.visibility = False
         prop = self.vtkproperty
@@ -283,16 +283,16 @@ class BaseRaySource(BaseBase):
         for act in actors:
             act.visibility = True
         if vnew=="pipes":
-            self.mapper.input = self.tube.output
+            self.mapper.input_connection = self.tube.output_port
         elif vnew=="wires":
-            self.mapper.input = self.data_source.output
+            self.mapper.input_connection = self.data_source.output_port
         elif vnew=="hidden":
             for act in actors:
                 act.visibility = False
         self.render = True
     
     def _start_actor_default(self):
-        map = tvtk.PolyDataMapper(input=self.sphere.output)
+        map = tvtk.PolyDataMapper(input_connection=self.sphere.output_port)
         act = tvtk.Actor(mapper=map)
         return act
     

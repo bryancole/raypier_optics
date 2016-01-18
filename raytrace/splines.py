@@ -231,7 +231,8 @@ class Extruded_bezier(Optic):
         extrude.input = source.output
         print "extrude: ",extrude.input
         t = self.transform
-        transf = tvtk.TransformFilter(input=extrude.output, transform=t)
+        transf = tvtk.TransformFilter(input_connection=extrude.output_port, 
+                                      transform=t)
         return transf
             
 

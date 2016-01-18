@@ -212,7 +212,7 @@ class Ellipsoid(BaseMirror):
         quad = self.vtk_quadric
         quad.transform = self.ellipse_trans
         
-        clip = tvtk.ClipVolume(input=grid.structured_points_output,
+        clip = tvtk.ClipVolume(input_connection=grid.structured_points_output,
                                  clip_function=quad,
                                  inside_out=0)
         

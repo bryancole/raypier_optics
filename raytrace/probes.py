@@ -67,9 +67,9 @@ class PolarisationProbe(Probe):
     
     def _actors_default(self):
         source = self.plane_src
-        trans_f = tvtk.TransformFilter(input=source.output,
+        trans_f = tvtk.TransformFilter(input_connection=source.output_port,
                         transform = self.transform)
-        map = tvtk.PolyDataMapper(input=trans_f.output)
+        map = tvtk.PolyDataMapper(input_connection=trans_f.output_port)
         act = tvtk.Actor(mapper=map)
         actors = tvtk.ActorCollection()
         actors.append(act)
@@ -160,7 +160,7 @@ if PSF is not None:
                 #print "PSF", cells, points
             source.set_execute_method(execute)
             
-            map = tvtk.PolyDataMapper(input=source.output)
+            map = tvtk.PolyDataMapper(input_connection=source.output_port)
             act = tvtk.Actor(mapper=map)
             act.property.representation="wireframe"
             actors = tvtk.ActorCollection()

@@ -159,7 +159,8 @@ class CylindricalLDLF(Extruded_interpolant):
         extrude.input = source.output
         
         t = self.transform
-        transf = tvtk.TransformFilter(input=extrude.output, transform=t)
+        transf = tvtk.TransformFilter(input_connection=extrude.output_port, 
+                                      transform=t)
         return transf
 
 
