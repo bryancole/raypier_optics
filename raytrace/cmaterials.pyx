@@ -29,17 +29,19 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     
     E1_amp = ray.E1_amp
     E2_amp = ray.E2_amp
-    E1_vector = ray.E_vector
-    E2_vector = cross_(ray.direction, E1_vector)
-    v = cross_(ray.direction, normal)
-    if v.x==0. and v.y==0. and v.z==0:
-        S_vector = norm_(E1_vector)
+    E2_vector = norm_(cross_(ray.direction, ray.E_vector))
+    E1_vector = norm_(cross_(ray.direction, E2_vector))
+    normal = norm_(normal)
+    ###check for near normal incidence
+    if fabs(dotprod_(normal, norm_(ray.direction)))>0.7:
+        S_vector = norm_(cross_(E2_vector, normal))
     else:
-        S_vector = norm_(v)
+        S_vector = norm_(cross_(ray.direction, normal))
+        
     v = cross_(ray.direction, S_vector)
     P_vector = norm_(v)
     
-    A = dotprod_(E1_vector,S_vector)
+    A = dotprod_(E1_vector, S_vector)
     B = dotprod_(E2_vector, S_vector)
     
     S_amp.real = E1_amp.real*A + E2_amp.real*B
@@ -47,7 +49,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     
     A = dotprod_(E1_vector, P_vector)
     B = dotprod_(E2_vector, P_vector)
-    
+
     P_amp.real = E1_amp.real*A + E2_amp.real*B
     P_amp.imag = E1_amp.imag*A + E2_amp.imag*B
     
@@ -290,7 +292,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             vector_t tangent, tg2, in_direction
             ray_t sp_ray
             complex_t cpx
-            double complex n1, n2, cos2, sin2, R_p, R_s, T_p, T_s
+            double complex n1, n2, cos2, sin2, R_p, R_s, T_p, T_s, E1_amp, E2_amp
             double cosTheta, cos1, P_in
             double tan_mag_sq, c2
             double Two_n1_cos1, aspect
@@ -299,6 +301,8 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         normal = norm_(normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
+        E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
         sin1 = sqrt(1 - cos1*cos1)
@@ -310,35 +314,37 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             #ray incident from outside going inwards
             n1 = self.n_outside_.real + 1.0j*self.n_outside_.imag
             n2 = self.n_inside_.real + 1.0j*self.n_inside_.imag
-            sp_ray.refractive_index = self.n_inside_
             flip = 1
             #print "out to in", n1, n2
         else:
             n1 = self.n_inside_.real + 1.0j*self.n_inside_.imag
             n2 = self.n_outside_.real + 1.0j*self.n_outside_.imag
-            sp_ray.refractive_index = self.n_outside_
             flip = -1
             #print "in to out", n1, n2
             
         #apply Snell's law. These become complex.
         sin2 = (n1*sin1/n2)
         cos2 = csqrt(1 - sin2*sin2)
+        print "cos1", cos1
+        print "cos2", cos2
         
         #print "TIR", N2_sin2, cosTheta, N2, cos1
         #print (normal.x, normal.y, normal.z), in_direction
         cosThetaNormal = multvs_(normal, cosTheta)
         
         #incoming power
-        P_in = sp_ray.E1_amp.real**2 + sp_ray.E1_amp.imag**2 +\
-                sp_ray.E2_amp.real**2 + sp_ray.E2_amp.imag**2
+        P_in =  E1_amp.real**2 + E1_amp.imag**2 + E2_amp.real**2 + E2_amp.imag**2
             
         #Fresnel equations for reflection
         R_p = -(n2*cos1 - n1*cos2)/(n2*cos1 + n1*cos2)
         R_s = -(n2*cos2 - n1*cos1)/(n2*cos2 + n1*cos1)
         
         #modify in place to get reflected amplitudes
-        R_s *= (sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag)
-        R_p *= (sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag)
+        R_s *= E1_amp
+        R_p *= E2_amp
+        
+        print "P_in:", P_in
+        print "P_R:", (cabs(R_s)**2 + cabs(R_p)**2)
         
         if ((cabs(R_s)**2 + cabs(R_p)**2) / P_in) > self.reflection_threshold:
             reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
@@ -351,6 +357,8 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.E2_amp.real = R_p.real
             sp_ray.E2_amp.imag = R_p.imag
             sp_ray.parent_idx = idx
+            sp_ray.refractive_index.real = n1.real
+            sp_ray.refractive_index.imag = n1.imag
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -360,28 +368,31 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         c2 = sqrt(1-tan_mag_sq)
         transmitted = subvv_(tg2, multvs_(normal, c2*flip))
         
-        #Already calculated this
-        #cos2 = fabs(dotprod_(transmitted, normal))
+        aspect = 1.0#sqrt(cos2.real/cos1)
         
-        Two_n1_cos1 = (2*n1.real)*cos1 #more approximation
-        aspect = sqrt(cos2.real/cos1) * Two_n1_cos1
+        print "aspect", aspect
         
         #Fresnel equations for transmission
-        T_p = aspect / ( n2*cos1 + n1*cos2 )
-        T_s = aspect / ( n2*cos2 + n1*cos1 )
-        #print "T_s", T_s, "T_p", T_p
+        T_p = aspect * (2.0*cos1*n1) / ( n2*cos1 + n1*cos2 )
+        T_s = aspect * (2.0*cos1*n1) / ( n2*cos2 + n1*cos1 )
+        print "T_s", T_s, "T_p", T_p
         
         #modify in place to get reflected amplitudes
-        T_s *= (sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag)
-        T_p *= (sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag)
+        T_s *= E1_amp
+        T_p *= E2_amp
         
-        sp_ray.origin = point
-        sp_ray.normal = normal
-        sp_ray.direction = transmitted
-        sp_ray.length = INF
-        sp_ray.E1_amp.real = T_s.real
-        sp_ray.E1_amp.imag = T_s.imag
-        sp_ray.E2_amp.real = T_p.real
-        sp_ray.E2_amp.imag = T_p.imag
-        sp_ray.parent_idx = idx
-        new_rays.add_ray_c(sp_ray)
+        print "P_T:", (cabs(T_s)**2 + cabs(T_p)**2)
+        
+        if ((cabs(T_s)**2 + cabs(T_p)**2) / P_in) > self.transmission_threshold:
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = transmitted
+            sp_ray.length = INF
+            sp_ray.E1_amp.real = T_s.real
+            sp_ray.E1_amp.imag = T_s.imag
+            sp_ray.E2_amp.real = T_p.real
+            sp_ray.E2_amp.imag = T_p.imag
+            sp_ray.parent_idx = idx
+            sp_ray.refractive_index.real = n2.real
+            sp_ray.refractive_index.imag = n2.imag
+            new_rays.add_ray_c(sp_ray)

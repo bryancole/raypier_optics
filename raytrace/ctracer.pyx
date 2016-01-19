@@ -436,6 +436,9 @@ cdef class RayCollection:
     def __dealloc__(self):
         free(self.rays)
         
+    def __len__(self):
+        return self.n_rays
+        
     cdef add_ray_c(self, ray_t r):
         if self.n_rays == self.max_size:
             if self.max_size == 0:
