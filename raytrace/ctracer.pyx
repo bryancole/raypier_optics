@@ -8,6 +8,8 @@ cdef extern from "math.h":
     double sqrt(double arg)
     double fabs(double arg)
     #double INFINITY
+    
+cdef extern from "float.h":
     double DBL_MAX
 
 cdef INF=(DBL_MAX+DBL_MAX)

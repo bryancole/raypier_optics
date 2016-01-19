@@ -303,7 +303,7 @@ class ParallelRaySource(BaseRaySource):
     direction = UnitTupleVector
     number = Int(20, auto_set=False, enter_set=True)
     radius = Float(10.,editor=NumEditor)
-    rings = Range(1,50,3, editor_traits={'mode':'spinner'})
+    rings = Range(0,50,3, editor_traits={'mode':'spinner'})
     E_vector = UnitVectorTrait((1.,0.,0.), editor_traits={'cols':3,
                                 'labels':['x','y','z']})
 
@@ -311,7 +311,7 @@ class ParallelRaySource(BaseRaySource):
     view_ray_ids = numpy.arange(20)
     
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, number, rings, radius, max_ray_len")
+                         depends_on="origin, direction, number, rings, radius, max_ray_len, E_vector")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -348,17 +348,17 @@ class ParallelRaySource(BaseRaySource):
         d2 = numpy.cross(direction, d1)
         d2 = normaliseVector(d2)
 
-        ray_data = numpy.zeros((rings*count)+1, dtype=ray_dtype)
-        
-        radii = ((numpy.arange(rings)+1)*(radius/rings))[:,None,None]
-        angles = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
-        offsets = radii*(d1*numpy.sin(angles) + d2*numpy.cos(angles)) 
-        offsets.shape = (-1,3)
-        
         E_vector = numpy.cross(self.E_vector, direction)
         E_vector = numpy.cross(E_vector, direction)
 
-        ray_data['origin'][1:] = offsets
+        ray_data = numpy.zeros((rings*count)+1, dtype=ray_dtype)
+        if rings:
+            radii = ((numpy.arange(rings)+1)*(radius/rings))[:,None,None]
+            angles = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
+            offsets = radii*(d1*numpy.sin(angles) + d2*numpy.cos(angles)) 
+            offsets.shape = (-1,3)
+            
+            ray_data['origin'][1:] = offsets
         ray_data['origin'] += origin
         ray_data['direction'] = direction
         ray_data['E_vector'] = [normaliseVector(E_vector)]

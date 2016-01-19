@@ -41,11 +41,12 @@ for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
     
 import numpy
 includes = [numpy.get_include()]
+libpath = []
 
 if sys.platform.startswith('win32'):
     os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
     includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
-    libpath = [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
+    libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
 ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"],
                         include_dirs=includes,

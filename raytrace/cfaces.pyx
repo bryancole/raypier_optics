@@ -12,7 +12,6 @@ Cython module for Face definitions
 #from libc.math import INFINITY, M_PI, sqrt, pow, fabs, cos, sin, acos, atan2
 
 cdef extern from "math.h":
-    double DBL_MAX
     double M_PI
     double sqrt(double)
     double atan2 (double y, double x )
@@ -21,6 +20,9 @@ cdef extern from "math.h":
     double cos(double)
     double sin(double)
     double acos(double)
+
+cdef extern from "float.h":
+    double DBL_MAX
 
 cdef INF=(DBL_MAX+DBL_MAX)
 
