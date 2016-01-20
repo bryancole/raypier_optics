@@ -102,6 +102,37 @@ class TestPECMaterial(unittest.TestCase):
         self.assertEquals(out_ray.direction, (1,0,-1))
         
         
+class TestPolarisation(unittest.TestCase):
+    def test_ellipticity_RHS(self):
+        phase = (8.53 + 2.75j)
+        in_ray = ctracer.Ray(origin=(-1,0,-1), 
+                             direction=(1,0,1),
+                             E_vector=(1.,2.,3.),
+                             E1_amp=phase*(1.0+0.0j)/numpy.sqrt(2),
+                             E2_amp=phase*(0.0+1.0j)/numpy.sqrt(2))
+        
+        self.assertEquals(in_ray.ellipticity, 1.0)
+        
+    def test_ellipticity_LHS(self):
+        phase = (1.23 + 3.45j)
+        in_ray = ctracer.Ray(origin=(-1,0,-1), 
+                             direction=(1,0,1),
+                             E_vector=(1.,2.,3.),
+                             E1_amp=phase*(2.0+0.0j)/numpy.sqrt(2),
+                             E2_amp=phase*(0.0-2.0j)/numpy.sqrt(2))
+        
+        self.assertEquals(in_ray.ellipticity, -1.0)
+        
+    def test_linear(self):
+        in_ray = ctracer.Ray(origin=(-1,0,-1), 
+                             direction=(1,0,1),
+                             E_vector=(1.,2.,3.),
+                             E1_amp=(1.0+2.0j)/numpy.sqrt(2),
+                             E2_amp=(2.0+4.0j)/numpy.sqrt(2))
+        
+        self.assertAlmostEquals(in_ray.ellipticity, 0.0)
+        
+        
 class TestRay(unittest.TestCase):
     def test_termination(self):
         a = (1,2,3)

@@ -133,4 +133,4 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list all_faces,
                                     float max_length)
 
-                                
+cdef double ray_power_(ray_t ray)

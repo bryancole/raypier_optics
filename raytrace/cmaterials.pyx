@@ -14,7 +14,7 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
-        complex_t, mag_sq_, Ray, cross_, set_v
+        complex_t, mag_sq_, Ray, cross_, set_v, ray_power_
 
 
 cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
@@ -325,15 +325,16 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         #apply Snell's law. These become complex.
         sin2 = (n1*sin1/n2)
         cos2 = csqrt(1 - sin2*sin2)
-        print "cos1", cos1
-        print "cos2", cos2
+        #print "cos1", cos1
+        #print "cos2", cos2
         
         #print "TIR", N2_sin2, cosTheta, N2, cos1
         #print (normal.x, normal.y, normal.z), in_direction
         cosThetaNormal = multvs_(normal, cosTheta)
         
         #incoming power
-        P_in =  E1_amp.real**2 + E1_amp.imag**2 + E2_amp.real**2 + E2_amp.imag**2
+        P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
+                         E2_amp.real**2 + E2_amp.imag**2)
             
         #Fresnel equations for reflection
         R_p = -(n2*cos1 - n1*cos2)/(n2*cos1 + n1*cos2)
@@ -343,10 +344,10 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         R_s *= E1_amp
         R_p *= E2_amp
         
-        print "P_in:", P_in
-        print "P_R:", (cabs(R_s)**2 + cabs(R_p)**2)
+        #print "P_in:", P_in
+        #print "P_R:", (cabs(R_s)**2 + cabs(R_p)**2)
         
-        if ((cabs(R_s)**2 + cabs(R_p)**2) / P_in) > self.reflection_threshold:
+        if ( n1.real*(cabs(R_s)**2 + cabs(R_p)**2)/P_in ) > self.reflection_threshold:
             reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
             sp_ray.origin = point
             sp_ray.normal = normal
@@ -368,22 +369,18 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         c2 = sqrt(1-tan_mag_sq)
         transmitted = subvv_(tg2, multvs_(normal, c2*flip))
         
-        aspect = 1.0#sqrt(cos2.real/cos1)
-        
-        print "aspect", aspect
+        aspect = sqrt(cos2.real/cos1)
         
         #Fresnel equations for transmission
         T_p = aspect * (2.0*cos1*n1) / ( n2*cos1 + n1*cos2 )
         T_s = aspect * (2.0*cos1*n1) / ( n2*cos2 + n1*cos1 )
-        print "T_s", T_s, "T_p", T_p
+        #print "T_s", T_s, "T_p", T_p
         
         #modify in place to get reflected amplitudes
         T_s *= E1_amp
         T_p *= E2_amp
         
-        print "P_T:", (cabs(T_s)**2 + cabs(T_p)**2)
-        
-        if ((cabs(T_s)**2 + cabs(T_p)**2) / P_in) > self.transmission_threshold:
+        if ( n2.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = transmitted

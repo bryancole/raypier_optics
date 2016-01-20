@@ -34,7 +34,7 @@ from raytrace.bases import Optic, Traceable, NumEditor, RaytraceObject
 from raytrace.cfaces import ElipticalPlaneFace, CircularFace
 from raytrace.ctracer import FaceList
 from raytrace.mirrors import BaseMirror
-from raytrace.cmaterials import PECMaterial
+from raytrace.cmaterials import PECMaterial, FullDielectricMaterial
 
 
 class HollowRetroreflector(BaseMirror):
@@ -129,6 +129,13 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
                         ),
                    )
     
+    def _material_default(self):
+        print "Making full dielectric material"
+        m = FullDielectricMaterial(n_inside = self.n_inside,
+                                  n_outside = self.n_outside,
+                                  reflection_threshold=0.5,
+                                  transmission_threshold=0.5)
+        return m
     
     def _faces_default(self):
         fl = super(SolidRetroreflector, self)._faces_default()
@@ -199,5 +206,3 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
         self.config_pipeline()
         return transF
     
-    def _material_default(self):
-        return Optic._material_default(self)

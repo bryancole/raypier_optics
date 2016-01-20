@@ -12,7 +12,9 @@ cdef extern from "math.h":
 cdef extern from "float.h":
     double DBL_MAX
 
-cdef INF=(DBL_MAX+DBL_MAX)
+cdef:
+    INF=(DBL_MAX+DBL_MAX)
+    double root2 = sqrt(2.0)
     
 from libc.stdlib cimport malloc, free, realloc
 
@@ -424,6 +426,38 @@ cdef class Ray:
         
         def __set__(self, int v):
             self.ray.end_face_idx = v
+            
+    property power:
+        """Optical power for the ray"""
+        def __get__(self):
+            return ray_power_(self.ray)
+        
+    property amplitude:
+        """E field amplitude"""
+        def __get__(self):
+            cdef ray_t ray=self.ray
+            return sqrt(ray.E1_amp.real**2 + ray.E1_amp.imag**2 +\
+                        ray.E2_amp.real**2 + ray.E2_amp.imag**2)
+            
+    property jones_vector:
+        """Jones polarisation vector expressed as a tuple (alpha, beta)
+        where alpha and beta are complex"""
+        def __get__(self):
+            cdef double amp = self.amplitude
+            return (self.E1_amp/amp, self.E2_amp/amp)
+        
+    property ellipticity:
+        """Provide the ratio of power in the RH circular polarisation
+        to the LH circular polarisation. A value of zero indicates 
+        linear polarisation. +1 indicate RH polarisation, -1 is
+        LH polarisation. Or maybe the other way round."""
+        def __get__(self):
+            alpha, beta = self.jones_vector
+            R = (alpha - 1j*beta)/root2
+            L = (alpha + 1j*beta)/root2
+            PR = R.real**2 + R.imag**2
+            PL = L.real**2 + L.imag**2
+            return (PR - PL)/(PR + PL)
 
 
 cdef class RayCollection:
@@ -704,6 +738,16 @@ cdef class FaceList(object):
 ##################################
 ### Python module functions
 ##################################
+
+cdef double ray_power_(ray_t ray):
+    cdef double P1, P2
+    
+    P1 = (ray.E1_amp.real**2 + ray.E1_amp.imag**2)*ray.refractive_index.real
+    P2 = (ray.E2_amp.real**2 + ray.E2_amp.imag**2)*ray.refractive_index.real
+    ### We don't need to handle incident aspect area here as the ray already compensate for this
+    #aspect = abs(dotprod(norm(ray.direction), normal))
+    return (P1+P2) 
+
 
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 

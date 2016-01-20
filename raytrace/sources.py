@@ -21,7 +21,7 @@ import itertools
 
 from traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
-     Instance, on_trait_change, Trait, Enum, Title
+     Instance, on_trait_change, Trait, Enum, Title, Complex
 
 from traitsui.api import View, Item, Tabbed, VGroup, Include, \
     Group
@@ -306,6 +306,8 @@ class ParallelRaySource(BaseRaySource):
     rings = Range(0,50,3, editor_traits={'mode':'spinner'})
     E_vector = UnitVectorTrait((1.,0.,0.), editor_traits={'cols':3,
                                 'labels':['x','y','z']})
+    E1_amp = Complex(1.0+0.0j)
+    E2_amp = Complex(0.0+0.0j)
 
     
     view_ray_ids = numpy.arange(20)
@@ -362,8 +364,8 @@ class ParallelRaySource(BaseRaySource):
         ray_data['origin'] += origin
         ray_data['direction'] = direction
         ray_data['E_vector'] = [normaliseVector(E_vector)]
-        ray_data['E1_amp'] = 1.0 + 0.0j
-        ray_data['E2_amp'] = 0.0
+        ray_data['E1_amp'] = self.E1_amp
+        ray_data['E2_amp'] = self.E2_amp
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
         rays = RayCollection.from_array(ray_data)

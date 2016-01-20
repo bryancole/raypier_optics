@@ -6,7 +6,7 @@ pyximport.install()
 import sys
 sys.path.append('..')
 from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP
-from raytrace.ctracer import Ray, RayCollection, norm, dotprod
+from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv
 import unittest
 from math import sqrt
 import random
@@ -15,13 +15,13 @@ import numpy
 
 P = lambda z: z.real**2 + z.imag**2
 
-def ray_power(ray, normal):
+def ray_power(ray):
     """incident power per unit area"""
-    normal = norm(normal)
     P1 = (ray.E1_amp.real**2 + ray.E1_amp.imag**2)*ray.refractive_index.real
     P2 = (ray.E2_amp.real**2 + ray.E2_amp.imag**2)*ray.refractive_index.real
-    aspect = abs(dotprod(norm(ray.direction), normal))
-    return (P1+P2) * aspect
+    ### We don't need to handle incident aspect area here as the ray already compensate for this
+    #aspect = abs(dotprod(norm(ray.direction), normal))
+    return (P1+P2) 
 
 
 class TestConvertToSP(unittest.TestCase):
@@ -129,7 +129,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
         self.assertAlmostEqual(P_in, refl_pow+trans_pow)
         
     def test_brewster_angle(self):
-        n_out = 1.0
+        n_out = 1.2
         n_in = 2.0
         
         theta_B = numpy.arctan2(n_in, n_out)
@@ -138,6 +138,11 @@ class TestFullDielectricMaterial(unittest.TestCase):
         y = numpy.sin(theta_B)
         z = numpy.cos(theta_B)
         
+        #angle inside dielectric (for transmitted ray)
+        theta_inside = numpy.arcsin( n_out * numpy.sin(theta_B) / n_in )
+        trans_direction = norm((0.0, numpy.sin(theta_inside), numpy.cos(theta_inside)))
+        
+        ###input ray is directed into object
         ray_in = Ray(origin=(0.0,-y,-z),
                      direction=(0.0,y,z),
                      E_vector=(0.0,1.0,0.0),
@@ -155,7 +160,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
         point = (0.0,0.0,0.0)
         normal = (0.0,0.0,-1.0)
         
-        P_in = ray_power(ray_in, normal)
+        P_in = ray_power(ray_in)
         
         mat.eval_child_ray(ray_in, 
                            ray_idx,
@@ -165,9 +170,20 @@ class TestFullDielectricMaterial(unittest.TestCase):
         
         self.assertEquals(len(out),2)
         
-        refl_pow = ray_power(out[0], normal)
-        trans_pow = ray_power(out[1], normal)
-        print "Reflected power:", refl_pow, P_in
+        refl_pow = ray_power(out[0])
+        trans_pow = ray_power(out[1])
+        
         self.assertAlmostEquals(0.0, refl_pow)
+        self.assertAlmostEquals(refl_pow, out[0].power)
         
         self.assertAlmostEquals(P_in, trans_pow)
+        
+        ###check relfected ray direction
+        self.assertAlmostEquals(abs(dotprod(norm(subvv(ray_in.direction, 
+                                                       out[0].direction)),
+                                            normal)),
+                                1)
+        
+        ###check transmitted ray direction
+        self.assertAlmostEquals(abs(dotprod(out[1].direction,
+                                            trans_direction)), 1)
