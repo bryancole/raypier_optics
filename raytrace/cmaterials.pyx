@@ -142,6 +142,58 @@ cdef class PECMaterial(InterfaceMaterial):
         sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
         sp_ray.parent_idx = idx
         new_rays.add_ray_c(sp_ray)
+        
+        
+cdef class LinearPolarisingMaterial(InterfaceMaterial):
+    """Simulates a perfect polarising beam splitter. P-polarisation
+    is 100% transmitted while S- is reflected"""
+    
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            vector_t normal,
+                            RayCollection new_rays):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected
+            vector_t tangent, tg2, in_direction
+            ray_t sp_ray, sp_ray2
+            double cosTheta
+            
+        normal = norm_(normal)
+        in_direction = norm_(in_ray.direction)
+        sp_ray = sp_ray2 = convert_to_sp(in_ray[0], normal)
+        cosTheta = dotprod_(normal, in_direction)            
+        cosThetaNormal = multvs_(normal, cosTheta)
+        
+        #Reflect the S-polarisation
+        reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.direction = reflected
+        sp_ray.length = INF
+        #set P-polarisation to zero
+        sp_ray.E2_amp.real = 0.0
+        sp_ray.E2_amp.imag = 0.0
+        sp_ray.parent_idx = idx
+        new_rays.add_ray_c(sp_ray)
+            
+        #Transmit the P-polarisation
+        sp_ray2.origin = point
+        sp_ray2.normal = normal
+        sp_ray2.direction = reflected
+        sp_ray2.length = INF
+        #set S-polarisation to zero
+        sp_ray2.E1_amp.real = 0.0
+        sp_ray2.E1_amp.imag = 0.0
+        sp_ray2.parent_idx = idx
+        new_rays.add_ray_c(sp_ray2)
     
     
 cdef class DielectricMaterial(InterfaceMaterial):

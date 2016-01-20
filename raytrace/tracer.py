@@ -51,7 +51,7 @@ from raytrace import ctracer
 counter = count()
 
 from raytrace import mirrors, prisms, corner_cubes, ellipsoids, sources,\
-    results, beamstop, lenses
+    results, beamstop, lenses, beamsplitters
 
 optics_classes = Traceable.subclasses
 
