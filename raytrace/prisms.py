@@ -101,6 +101,8 @@ class Extrusion(Optic):
         self.update=True
     
     def _pipeline_default(self):
+        self.config_profile()
+        self.config_pipeline()
         source = self.data_source
         def execute():
             xy = self.profile
@@ -113,6 +115,7 @@ class Extrusion(Optic):
             output.points = points
             output.polys = cells
         source.set_execute_method(execute)
+        print "Made PIPELINE"
         
         extrude = self.extrude
         extrude.input_connection = source.output_port
@@ -121,6 +124,10 @@ class Extrusion(Optic):
         transf = tvtk.TransformFilter(input_connection=extrude.output_port, 
                                       transform=t)
         return transf
+    
+    def config_profile(self):
+        """abstract method to set the profile data"""
+        pass
 
 
 class Prism(Extrusion):
