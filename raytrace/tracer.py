@@ -51,22 +51,22 @@ from raytrace import ctracer
 counter = count()
 
 from raytrace import mirrors, prisms, corner_cubes, ellipsoids, sources,\
-    results, beamstop, lenses, beamsplitters
+    results, beamstop, lenses, beamsplitters, waveplates
 
-optics_classes = Traceable.subclasses
+optics_classes = sorted(Traceable.subclasses, key=lambda c: c.__name__)
 
 optics_menu = Menu(name = "Components...",
                    *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
                     for cls in optics_classes]
                     )
 
-source_classes = BaseRaySource.subclasses
+source_classes = sorted(BaseRaySource.subclasses, key=lambda c:c.__name__)
 sources_menu = Menu(name = "Sources...",
                    *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
                     for cls in source_classes]
                     )
 
-results_classes = Result.subclasses
+results_classes = sorted(Result.subclasses, key=lambda c:c.__name__)
 results_menu = Menu(name = "Results...",
                    *[Action(name=cls.__name__, action="insert_"+cls.__name__)\
                     for cls in results_classes]

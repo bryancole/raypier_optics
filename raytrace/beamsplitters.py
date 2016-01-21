@@ -9,6 +9,8 @@ from raytrace.cfaces import ExtrudedPlanarFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import FullDielectricMaterial, \
             LinearPolarisingMaterial
+            
+import numpy
 
 
 class BaseBeamsplitterCube(Extrusion):
@@ -47,5 +49,10 @@ class PolarisingBeamsplitterCube(BaseBeamsplitterCube):
                                     material=m)
         faces.append( p_face )
         return faces
+    
+    def _vtk_profile(self):
+        h = self.size/2
+        profile = numpy.concatenate([ self.profile, [(-h,-h), (h,h)] ])
+        return profile
     
     

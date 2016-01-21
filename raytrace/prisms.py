@@ -99,13 +99,16 @@ class Extrusion(Optic):
         self.data_source.modified()
         self.faces.faces = self.make_faces()
         self.update=True
+        
+    def _vtk_profile(self):
+        return self.profile
     
     def _pipeline_default(self):
         self.config_profile()
         self.config_pipeline()
         source = self.data_source
         def execute():
-            xy = self.profile
+            xy = self._vtk_profile()
             z = numpy.ones(xy.shape[0]) * self.z_height_1
             points = numpy.column_stack((xy,z))
             

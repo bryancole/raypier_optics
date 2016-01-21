@@ -2,6 +2,10 @@
 cdef extern from "math.h":
     double sqrt(double arg)
     double fabs(double arg)
+    double sin(double arg)
+    double cos(double arg)
+    double atan2(double y, double x)
+    double M_PI
     
 cdef extern from "float.h":
     double DBL_MAX
@@ -187,13 +191,84 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         #Transmit the P-polarisation
         sp_ray2.origin = point
         sp_ray2.normal = normal
-        sp_ray2.direction = reflected
+        sp_ray2.direction = in_direction
         sp_ray2.length = INF
         #set S-polarisation to zero
         sp_ray2.E1_amp.real = 0.0
         sp_ray2.E1_amp.imag = 0.0
         sp_ray2.parent_idx = idx
         new_rays.add_ray_c(sp_ray2)
+        
+        
+cdef class WaveplateMaterial(InterfaceMaterial):
+    """An idealised optical retarder"""
+    cdef complex_t retardance_
+    cdef vector_t fast_axis_
+    
+    property retardance:
+        def __get__(self):
+            cdef double val
+            val = atan2(self.retardance_.imag, 
+                         self.retardance_.real)/(2*M_PI)
+            if val < 0:
+                val += 1.0
+            return val
+            
+        def __set__(self, val):
+            self.retardance_.real = cos(val*2*M_PI)
+            self.retardance_.imag = sin(val*2*M_PI)
+    
+    property fast_axis:
+        def __get__(self):
+            cdef vector_t ax = self.fast_axis_
+            return (ax.x, ax.y, ax.z)
+        
+        def __set__(self, ax):
+            self.fast_axis_.x = ax[0]
+            self.fast_axis_.y = ax[1]
+            self.fast_axis_.z = ax[2]
+            
+            
+    def __cinit__(self, **kwds):
+        self.retardance = kwds.get("retardance", 0.25)
+        self.fast_axis = kwds.get("fast_axis", (1.0,0,0))
+            
+    
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            vector_t normal,
+                            RayCollection new_rays):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            ray_t out_ray
+            complex_t E1, retard
+            
+        normal = norm_(normal)
+        in_direction = norm_(in_ray.direction)
+        ###The "P" output of convert_to_sp with be aligned with the fast_axis
+        ###The "S" output will thus be orthogonal to the fast axis
+        out_ray = convert_to_sp(in_ray[0], self.fast_axis)
+        
+        E1 = out_ray.E1_amp
+        retard = self.retardance_
+        
+        out_ray.origin = point
+        out_ray.normal = normal
+        out_ray.direction = in_direction
+        out_ray.length = INF
+        out_ray.E1_amp.real = E1.real*retard.real - E1.imag*retard.imag
+        out_ray.E1_amp.imag = E1.imag*retard.real + E1.real*retard.imag
+        #Leave E2_amp untouched.
+        out_ray.parent_idx = idx
+        
+        new_rays.add_ray_c(out_ray)
     
     
 cdef class DielectricMaterial(InterfaceMaterial):
