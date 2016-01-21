@@ -8,7 +8,7 @@ from traits.api import Instance, Float, on_trait_change,\
 
 from traitsui.api import View, Item, DropEditor
 
-from raytrace.bases import Result
+from raytrace.bases import Result, Traceable
 from raytrace.sources import BaseRaySource
 #from raytrace.tracer import RayTraceModel
 from raytrace.ctracer import Face
@@ -67,6 +67,12 @@ def get_total_intersections(raysList, face):
     print ray.end_face_idx  #'''
     idx = face.idx
     return sum(1 for ray in all_rays if ray.end_face_idx==idx)
+
+
+def get_total_power(raysList, face):
+    all_rays = itertools.chain(*raysList)
+    idx = face.idx
+    return sum(ray.power for ray in all_rays if ray.end_face_idx==idx)
 
 
 class RayPaths(Result):
@@ -179,3 +185,36 @@ class Ratio(Result):
         except ZeroDivisionError:
             self.result = numpy.Infinity
         
+        
+class IncidentPower(Ratio):
+    name = "Incident power"
+    abstract = False
+    object = Instance(Traceable)
+    
+    traits_view = View(Item('result', style="readonly"),
+                       Item('object', editor=DropEditor()),
+                       title="Incident power on object",
+                       resizable=True,
+                       )
+    
+    def _calc_result(self):
+        nom = self.object
+        if not nom:
+            return
+        
+        nom_count = 0.0
+        power_in = 0.0
+        #just sum result from multiple sources?
+        #maybe a dictionary or something would be better?
+        for source in self._tracer.sources:
+            #a list of RayCollection instances
+            raysList = source.TracedRays
+            
+            power_in += sum(ray.power for ray in source.TracedRays[0])
+            nom_count += sum(get_total_power(raysList, f) for f in nom.faces.faces)
+            
+    #print "nom and denom counts", nom_count, denom_count
+        try:
+            self.result = float(nom_count)/float(power_in)
+        except ZeroDivisionError:
+            self.result = numpy.Infinity

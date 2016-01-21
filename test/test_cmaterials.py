@@ -5,8 +5,9 @@ pyximport.install()
 
 import sys
 sys.path.append('..')
-from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP
-from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv
+from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP, \
+    TransparentMaterial
+from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
 import unittest
 from math import sqrt
 import random
@@ -24,7 +25,53 @@ def ray_power(ray):
     return (P1+P2) 
 
 
+class TestTransparentMaterial(unittest.TestCase):
+    def test_preserve_polariasation(self):
+        m = TransparentMaterial
+        ray_idx = 123
+        ray_in = Ray(origin=(0.0,0.0,0.0),
+                     direction=(0.0,0.0,1.0),
+                     E_vector=(1.0,0.0,0.0),
+                     E1_amp = (1.0+2.0j),
+                     E2_amp = (3.0+4.0j))
+        
+        out = RayCollection(1)
+        point = (0.0,0.0,0.0)
+        normal = (0.0,0.0,-1.0)
+        
+        
+        
+
+
 class TestConvertToSP(unittest.TestCase):
+    def test_cross(self):
+        v1 = (1.0,0.0,0.0)
+        v2 = (0.0,1.0,0.0)
+        self.assertEquals(cross(cross(v1,v2),v1), v2)
+        
+    
+    def test_project_E(self):
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(1.0,2.0,3.0),
+                     E_vector=(1.0,-2.0,0.0),
+                     E1_amp = (1.0+2.0j),
+                     E2_amp = (3.0+4.0j))
+        ray_in.project_E(1.0,-2.0,0.0)
+        
+        E_vector = ray_in.E_vector
+        E1_amp = ray_in.E1_amp
+        E2_amp = ray_in.E2_amp
+        
+        ray_in.project_E(0.3,.7,0)
+        ray_in.project_E(-0.8,0.235,0)
+        ray_in.project_E(1.0,-2.0,0.0)
+        
+        self.assertEquals(E_vector, ray_in.E_vector)
+        self.assertAlmostEquals(E1_amp, ray_in.E1_amp)
+        self.assertAlmostEquals(E2_amp, ray_in.E2_amp)
+        
+        
+    
     def test_conserve_power(self):
         ray_in = Ray(origin=(-1.0,-2.0,-3.0),
                      direction=(1.0,2.0,3.0),
@@ -41,6 +88,34 @@ class TestConvertToSP(unittest.TestCase):
         P_out = P(ray_out.E1_amp) + P(ray_out.E2_amp)
         
         self.assertAlmostEqual(P_in, P_out)
+        
+        ray_out.project_E(1.0,-2.0,0.0)
+        
+        self.assertAlmostEquals(ray_out.E1_amp, ray_in.E1_amp)
+        
+    def test_normal_incidence(self):
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(1.0,2.0,3.0),
+                     E_vector=(1.0,-2.0,0.0),
+                     E1_amp = (1.0+2.0j),
+                     E2_amp = (3.0+4.0j))
+        
+        P_in = P(ray_in.E1_amp) + P(ray_in.E2_amp)
+        
+        normal = (1.0,2.0,3.0)
+        
+        ray_out = Convert_to_SP(ray_in, normal)
+        
+        P_out = P(ray_out.E1_amp) + P(ray_out.E2_amp)
+        
+        self.assertAlmostEqual(P_in, P_out)
+        
+        ray_in.project_E(1.0,-2.0,0.0)
+        ray_out.project_E(1.0,-2.0,0.0)
+        
+        self.assertEquals(ray_out.E_vector, ray_in.E_vector)
+        self.assertAlmostEquals(ray_out.E1_amp, ray_in.E1_amp)
+        self.assertAlmostEquals(ray_out.E2_amp, ray_in.E2_amp)
 
 
 class TestFullDielectricMaterial(unittest.TestCase):

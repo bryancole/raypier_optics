@@ -38,6 +38,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     normal = norm_(normal)
     ###check for near normal incidence
     if fabs(dotprod_(normal, norm_(ray.direction)))>0.7:
+        ###This is near normal incidence
         S_vector = norm_(cross_(E2_vector, normal))
     else:
         S_vector = norm_(cross_(ray.direction, normal))
@@ -254,9 +255,11 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         in_direction = norm_(in_ray.direction)
         ###The "P" output of convert_to_sp with be aligned with the fast_axis
         ###The "S" output will thus be orthogonal to the fast axis
-        out_ray = convert_to_sp(in_ray[0], self.fast_axis)
+        out_ray = convert_to_sp(in_ray[0], self.fast_axis_)
         
         E1 = out_ray.E1_amp
+        #print "E1_amp:", out_ray.E1_amp.real, out_ray.E1_amp.imag
+        #print "E2_amp:", out_ray.E2_amp.real, out_ray.E2_amp.imag
         retard = self.retardance_
         
         out_ray.origin = point

@@ -35,6 +35,9 @@ class Waveplate(Optic):
     
     line = Instance(tvtk.LineSource, (), transient=True)
     
+    def _retardance_changed(self, val):
+        self.material.retardance = val
+    
     def _faces_default(self):
         m = self.material
         fl = FaceList(owner=self)

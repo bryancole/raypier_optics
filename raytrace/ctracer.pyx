@@ -458,7 +458,37 @@ cdef class Ray:
             PR = R.real**2 + R.imag**2
             PL = L.real**2 + L.imag**2
             return (PR - PL)/(PR + PL)
-
+        
+    def project_E(self, *axis):
+        cdef:
+            complex_t E1, E2
+            vector_t v=set_v(axis)
+            vector_t E_vector, E_vector2bar, E_vector2, direction
+            double A, B
+            
+        E1 = self.ray.E1_amp
+        E2 = self.ray.E2_amp
+        direction = self.ray.direction
+        
+        #initial E_vector
+        E_vector = norm_(cross_(cross_(direction, self.ray.E_vector), direction))
+        #new E_vector
+        E_vector2bar = norm_(cross_(direction, v))
+        E_vector2 = norm_(cross_(E_vector2bar, direction))
+        
+        A = dotprod_(E_vector, E_vector2)
+        B = dotprod_(E_vector, E_vector2bar)
+        
+        #print "A,B,AB^2:", A, B, A**2 + B**2
+        
+        self.ray.E1_amp.real = -(E2.real*B - E1.real*A)
+        self.ray.E2_amp.real = (E2.real*A + E1.real*B)
+        
+        self.ray.E1_amp.imag = -(E2.imag*B - E1.imag*A)
+        self.ray.E2_amp.imag = E2.imag*A + E1.imag*B
+        
+        self.ray.E_vector = E_vector2
+        
 
 cdef class RayCollection:
     
