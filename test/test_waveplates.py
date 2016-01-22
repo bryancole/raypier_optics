@@ -6,6 +6,7 @@ from raytrace.waveplates import Waveplate
 from raytrace.sources import ParallelRaySource
 
 from numpy import pi
+import numpy
 
 
 class TestWaveplate(unittest.TestCase):
@@ -42,17 +43,22 @@ class TestWaveplate(unittest.TestCase):
         
         ray_in = self.src.InputRays[0]
         ray_out = self.src.TracedRays[-1][0]
-        print "power:", ray_in.power, ray_out.power
-        print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
-        print ray_out.E_vector, ray_out.E1_amp, ray_out.E2_amp
-        ray_in.project_E(1,0,0)
-        ray_out.project_E(1,0,0)
-        print "power:", ray_in.power, ray_out.power
-        print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
-        print ray_out.E_vector, ray_out.E1_amp, ray_out.E2_amp
-        print ray_in.jones_vector, ray_out.jones_vector
+
+        ray_in.project_E(1,1,0)
+        ray_out.project_E(1,1,0)
         
         self.assertEquals(ray_in.E_vector, ray_out.E_vector)
-        self.assertEquals(ray_in.E1_amp, ray_out.E1_amp)
-        self.assertEquals(ray_in.E2_amp, ray_out.E2_amp)
+        self.assertAlmostEquals(ray_in.E1_amp, ray_out.E1_amp)
+        self.assertAlmostEquals(ray_in.E2_amp, ray_out.E2_amp)
         
+    def test_half_wave_plate(self):
+        wp = self.wp
+        wp.retardance = 0.5
+        for rot in numpy.linspace(-180,180,20):
+            wp.rotation = rot
+            self.model.trace_all()
+            
+            ray_in = self.src.InputRays[0]
+            ray_out = self.src.TracedRays[-1][0]
+    
+            self.assertAlmostEquals(ray_in.ellipticity, ray_out.ellipticity)

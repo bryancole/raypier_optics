@@ -297,18 +297,73 @@ class BaseRaySource(BaseBase):
         return act
     
     
-class ParallelRaySource(BaseRaySource):
+class SingleRaySource(BaseRaySource):
     abstract = False
     origin = Tuple((0.,0.,0.))
     direction = UnitTupleVector
-    number = Int(20, auto_set=False, enter_set=True)
-    radius = Float(10.,editor=NumEditor)
-    rings = Range(0,50,3, editor_traits={'mode':'spinner'})
+    
     E_vector = UnitVectorTrait((1.,0.,0.), editor_traits={'cols':3,
                                 'labels':['x','y','z']})
     E1_amp = Complex(1.0+0.0j)
     E2_amp = Complex(0.0+0.0j)
+    
+    view_ray_ids = numpy.arange(1)
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, max_ray_len, E_vector, E1_amp, E2_amp")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       label="Geometry")
+    
+    @on_trait_change("focus, direction, max_ray_len")
+    def on_update(self):
+        self.data_source.modified()
+        self.update=True
+    
+    @cached_property
+    def _get_InputRays(self):
+        origin = numpy.array(self.origin)
+        direction = numpy.array(self.direction)
+        max_axis = numpy.abs(direction).argmax()
+        if max_axis==0:
+            v = numpy.array([0.,1.,0.])
+        else:
+            v = numpy.array([1.,0.,0.])
+        d1 = numpy.cross(direction, v)
+        d1 = normaliseVector(d1)
+        d2 = numpy.cross(direction, d1)
+        d2 = normaliseVector(d2)
 
+        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(E_vector, direction)
+
+        rays = RayCollection(1)
+        ray = Ray()
+        ray.origin = origin
+        ray.direction = direction
+        ray.E_vector = E_vector
+        ray.E1_amp = self.E1_amp
+        ray.E2_amp = self.E2_amp
+        ray.refractive_index = 1.0
+        ray.normals = (0.,1.,0.) #What is this for?
+        ray.parent_idx = -1
+        ray.end_face_idx = -1
+        
+        rays.add_ray(ray)
+        return rays
+    
+    
+class ParallelRaySource(SingleRaySource):
+    
+    number = Int(20, auto_set=False, enter_set=True)
+    radius = Float(10.,editor=NumEditor)
+    rings = Range(0,50,3, editor_traits={'mode':'spinner'})
     
     view_ray_ids = numpy.arange(20)
     

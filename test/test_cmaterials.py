@@ -6,7 +6,7 @@ pyximport.install()
 import sys
 sys.path.append('..')
 from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP, \
-    TransparentMaterial
+    TransparentMaterial, WaveplateMaterial
 from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
 import unittest
 from math import sqrt
@@ -48,7 +48,6 @@ class TestConvertToSP(unittest.TestCase):
         v1 = (1.0,0.0,0.0)
         v2 = (0.0,1.0,0.0)
         self.assertEquals(cross(cross(v1,v2),v1), v2)
-        
     
     def test_project_E(self):
         ray_in = Ray(origin=(-1.0,-2.0,-3.0),
@@ -70,6 +69,26 @@ class TestConvertToSP(unittest.TestCase):
         self.assertAlmostEquals(E1_amp, ray_in.E1_amp)
         self.assertAlmostEquals(E2_amp, ray_in.E2_amp)
         
+    def test_convert_to_sp(self):
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(1.0,2.0,3.0),
+                     E_vector=(1.0,-2.0,0.0),
+                     E1_amp = (1.0+2.0j),
+                     E2_amp = (3.0+4.0j))
+        ray_in.project_E(1.5,-2.0,0.0)
+        
+        E_vector = ray_in.E_vector
+        E1_amp = ray_in.E1_amp
+        E2_amp = ray_in.E2_amp
+        
+        normal = (1.0, -1.0, 0.0)
+        ray_out = Convert_to_SP(ray_in, normal)
+        
+        ray_out.project_E(1.5,-2.0,0.0)
+        
+        self.assertEquals(E_vector, ray_out.E_vector)
+        self.assertAlmostEquals(E1_amp, ray_out.E1_amp)
+        self.assertAlmostEquals(E2_amp, ray_out.E2_amp)
         
     
     def test_conserve_power(self):
@@ -116,6 +135,75 @@ class TestConvertToSP(unittest.TestCase):
         self.assertEquals(ray_out.E_vector, ray_in.E_vector)
         self.assertAlmostEquals(ray_out.E1_amp, ray_in.E1_amp)
         self.assertAlmostEquals(ray_out.E2_amp, ray_in.E2_amp)
+        
+        
+class TestWaveplateMaterial(unittest.TestCase):
+    def test_apply_zero_retardance(self):
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(1.0,2.0,3.0),
+                     E_vector=(1.0,-2.0,0.3),
+                     E1_amp = (1.0+1.0j),
+                     E2_amp = (2.0+-3.0j),
+                     refractive_index=1.5)
+        
+        m = WaveplateMaterial(retardance=0.0)
+        
+        ray_out = m.apply_retardance(ray_in)
+        
+        self.assertEquals(ray_in.E1_amp, ray_out.E1_amp)
+        self.assertEquals(ray_in.E2_amp, ray_out.E2_amp)
+        
+    def test_apply_quarter_wave_retardance(self):
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(1.0,2.0,3.0),
+                     E_vector=(1.0,-2.0,0.3),
+                     E1_amp = (2.0+2.0j),
+                     E2_amp = (2.0+2.0j),
+                     refractive_index=1.5)
+        
+        m = WaveplateMaterial(retardance=0.25)
+        
+        ray_out = m.apply_retardance(ray_in)
+        
+        self.assertEquals(ray_in.ellipticity, 0.0)
+        self.assertEquals(abs(ray_out.ellipticity), 1.0)
+        
+        
+    def test_apply_half_wave_retardance(self):
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(0.0,0.0,3.0),
+                     E_vector=(1.0,0.0,0.3),
+                     E1_amp = (1.0+1.0j),
+                     E2_amp = (-1.0-1.0j),
+                     refractive_index=1.5)
+        
+        m = WaveplateMaterial(retardance=0.5)
+        
+        ray_out = m.apply_retardance(ray_in)
+        
+        self.assertAlmostEquals(0.0, ray_out.ellipticity)
+        
+        ray_out.project_E(1.0,1.0,0.0)
+        ray_in.project_E(1.0,1.0,0.0)
+        print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
+        print ray_out.E_vector, ray_out.E1_amp, ray_out.E2_amp
+        self.assertAlmostEquals(ray_in.E1_amp, ray_out.E2_amp)
+        self.assertAlmostEquals(ray_in.E2_amp, ray_out.E1_amp)
+        
+        ray_in = Ray(origin=(-1.0,-2.0,-3.0),
+                     direction=(1.0,2.0,3.0),
+                     E_vector=(1.0,-2.0,0.3),
+                     E1_amp = (1.0+1.0j),
+                     E2_amp = (2.0+-3.0j),
+                     refractive_index=1.5)
+        
+        m = WaveplateMaterial(retardance=0.5)
+        
+        ray_out = m.apply_retardance(ray_in)
+        
+        self.assertAlmostEquals(abs(ray_in.ellipticity), 
+                          abs(ray_out.ellipticity))
+        #self.assertEquals(ray_in.E2_amp, ray_out.E2_amp)
 
 
 class TestFullDielectricMaterial(unittest.TestCase):

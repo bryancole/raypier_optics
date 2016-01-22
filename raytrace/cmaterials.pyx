@@ -34,14 +34,13 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     E1_amp = ray.E1_amp
     E2_amp = ray.E2_amp
     E2_vector = norm_(cross_(ray.direction, ray.E_vector))
-    E1_vector = norm_(cross_(ray.direction, E2_vector))
+    E1_vector = norm_(cross_(E2_vector, ray.direction))
     normal = norm_(normal)
-    ###check for near normal incidence
-    if fabs(dotprod_(normal, norm_(ray.direction)))>0.7:
-        ###This is near normal incidence
-        S_vector = norm_(cross_(E2_vector, normal))
-    else:
-        S_vector = norm_(cross_(ray.direction, normal))
+        
+    S_vector = cross_(ray.direction, normal)
+    if S_vector.x==0 and S_vector.y==0 and S_vector.z==0:
+        return ray
+    S_vector = norm_(S_vector)
         
     v = cross_(ray.direction, S_vector)
     P_vector = norm_(v)
@@ -52,11 +51,11 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     S_amp.real = E1_amp.real*A + E2_amp.real*B
     S_amp.imag = E1_amp.imag*A + E2_amp.imag*B
     
-    A = dotprod_(E1_vector, P_vector)
-    B = dotprod_(E2_vector, P_vector)
+    B = dotprod_(E1_vector, P_vector)
+    A = dotprod_(E2_vector, P_vector)
 
-    P_amp.real = E1_amp.real*A + E2_amp.real*B
-    P_amp.imag = E1_amp.imag*A + E2_amp.imag*B
+    P_amp.real = E1_amp.real*B + E2_amp.real*A
+    P_amp.imag = E1_amp.imag*B + E2_amp.imag*A
     
     ray.E_vector = S_vector
     ray.E1_amp = S_amp
@@ -234,6 +233,21 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         self.retardance = kwds.get("retardance", 0.25)
         self.fast_axis = kwds.get("fast_axis", (1.0,0,0))
             
+            
+    cdef ray_t apply_retardance_c(self, ray_t r):
+        cdef:
+            complex_t E1=r.E1_amp, retard=self.retardance_
+        r.E1_amp.real = E1.real*retard.real - E1.imag*retard.imag
+        r.E1_amp.imag = E1.imag*retard.real + E1.real*retard.imag
+        #Leave E2_amp untouched.
+        return r
+    
+    def apply_retardance(self, Ray r):
+        cdef Ray out
+        out = Ray()
+        out.ray = self.apply_retardance_c(r.ray)
+        return out
+            
     
     cdef eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -257,19 +271,13 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         ###The "S" output will thus be orthogonal to the fast axis
         out_ray = convert_to_sp(in_ray[0], self.fast_axis_)
         
-        E1 = out_ray.E1_amp
-        #print "E1_amp:", out_ray.E1_amp.real, out_ray.E1_amp.imag
-        #print "E2_amp:", out_ray.E2_amp.real, out_ray.E2_amp.imag
-        retard = self.retardance_
-        
         out_ray.origin = point
         out_ray.normal = normal
         out_ray.direction = in_direction
         out_ray.length = INF
-        out_ray.E1_amp.real = E1.real*retard.real - E1.imag*retard.imag
-        out_ray.E1_amp.imag = E1.imag*retard.real + E1.real*retard.imag
-        #Leave E2_amp untouched.
         out_ray.parent_idx = idx
+        
+        out_ray = self.apply_retardance_c(out_ray)
         
         new_rays.add_ray_c(out_ray)
     

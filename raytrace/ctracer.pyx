@@ -7,6 +7,10 @@
 cdef extern from "math.h":
     double sqrt(double arg)
     double fabs(double arg)
+    double atan2(double y, double x)
+    double atan(double arg)
+    double sin(double arg)
+    double cos(double arg)
     #double INFINITY
     
 cdef extern from "float.h":
@@ -459,7 +463,42 @@ cdef class Ray:
             PL = L.real**2 + L.imag**2
             return (PR - PL)/(PR + PL)
         
+    property major_minor_axes:
+        """Find the vector giving the major and minor axes of the polarisation ellipse.
+        For fully circularly polarised light, the current E_vector will be
+        returned"""
+        def __get__(self):
+            cdef:
+                vector_t E1_vector, E2_vector
+                
+            E2_vector = norm_(cross_(self.ray.direction, self.ray.E_vector))
+            E1_vector = norm_(cross_(E2_vector, self.ray.direction))
+            
+            E1 = sqrt(self.ray.E1_amp.real**2 + self.ray.E1_amp.imag**2)
+            E2 = sqrt(self.ray.E2_amp.real**2 + self.ray.E2_amp.imag**2)
+            phi1 = atan2(self.ray.E1_amp.imag, self.ray.E1_amp.real)
+            phi2 = atan2(self.ray.E2_amp.imag, self.ray.E2_amp.real)
+            
+            A = E1*E1*sin(2*phi1) + E2*E2*sin(2*phi2)
+            B = E1*E1*cos(2*phi1) + E2*E2*cos(2*phi2)
+            
+            mag = sqrt(A*A + B*B)
+            t1 = atan( (B - mag)/A )
+            t2 = atan( (B + mag)/A )
+            
+            axis1 = addvv_(multvs_(E1_vector, E1*cos(phi1+t1)),
+                           multvs_(E2_vector, E2*cos(phi2+t1)))
+            
+            axis2 = addvv_(multvs_(E1_vector, E1*cos(phi1+t2)),
+                           multvs_(E2_vector, E2*cos(phi2+t2)))
+            
+            return ( (axis1.x, axis1.y, axis1.z), 
+                     (axis2.x, axis2.y, axis2.z) )
+            
+        
     def project_E(self, *axis):
+        """Rotate the E_vector onto the given axis, projecting
+        E1_amp and E2_amp as necessary."""
         cdef:
             complex_t E1, E2
             vector_t v=set_v(axis)

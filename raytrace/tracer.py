@@ -420,6 +420,39 @@ class RayTraceModel(HasQueue):
         colors = [c for s,c in shapes_colors]
         export_shapes(shapes, fname, colorList=colors)
         
+    def render_bitmap(self, width, height, filename=None,
+                      azimuth=15.0, elevation=30.0):
+        renderer = tvtk.Renderer()
+        for actor in self.scene.actor_list:
+            renderer.add_actor(actor)
+        renderer.background = (1,1,0.8)
+        
+        renderer.reset_camera()
+        camera = renderer.active_camera
+        camera.elevation(elevation)
+        camera.azimuth(azimuth)
+        
+        renderWindow = tvtk.RenderWindow()
+        renderWindow.off_screen_rendering = True
+        renderWindow.add_renderer(renderer)
+        renderWindow.size = (width, height)
+        renderWindow.render()
+         
+        windowToImageFilter = tvtk.WindowToImageFilter()
+        windowToImageFilter.input = renderWindow
+        windowToImageFilter.update()
+         
+        writer = tvtk.PNGWriter()
+        if filename is not None:
+            writer.file_name = filename
+            writer.write_to_memory = False
+        else:
+            writer.write_to_memory = True
+        writer.input_connection = windowToImageFilter.output_port
+        writer.write()
+        #data = numpy.asarray(writer.result).tostring()
+        return writer.result
+        
     @on_trait_change("sources[]")
     def on_sources_changed(self, obj, name, removed, source_list):
         scene = self.scene
