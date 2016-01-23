@@ -39,7 +39,9 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
         
     S_vector = cross_(ray.direction, normal)
     if S_vector.x==0 and S_vector.y==0 and S_vector.z==0:
+        print "Normal incidence!"
         return ray
+    print "Not normal incidence", S_vector.x, S_vector.y, S_vector.z
     S_vector = norm_(S_vector)
         
     v = cross_(ray.direction, S_vector)
@@ -142,8 +144,8 @@ cdef class PECMaterial(InterfaceMaterial):
         sp_ray.direction = reflected
         sp_ray.E1_amp.real = -sp_ray.E1_amp.real
         sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag
-        sp_ray.E2_amp.real = -sp_ray.E2_amp.real
-        sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+        #sp_ray.E2_amp.real = -sp_ray.E2_amp.real
+        #sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
         sp_ray.parent_idx = idx
         new_rays.add_ray_c(sp_ray)
         

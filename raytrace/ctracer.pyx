@@ -450,6 +450,18 @@ cdef class Ray:
             cdef double amp = self.amplitude
             return (self.E1_amp/amp, self.E2_amp/amp)
         
+    property E_left:
+        def __get__(self):
+            E1_amp = self.E1_amp
+            E2_amp = self.E2_amp
+            return (E1_amp + 1.0j*E2_amp)/sqrt(2)
+        
+    property E_right:
+        def __get__(self):
+            E1_amp = self.E1_amp
+            E2_amp = self.E2_amp
+            return (E1_amp - 1.0j*E2_amp)/sqrt(2)
+        
     property ellipticity:
         """Provide the ratio of power in the RH circular polarisation
         to the LH circular polarisation. A value of zero indicates 
