@@ -627,6 +627,147 @@ cdef class RayCollection:
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
     
+    property origin:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                int i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].origin
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property direction:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                int i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].direction
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property normal:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                int i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].normal
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property E_vector:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                int i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].E_vector
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property refractive_index:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
+                np_.ndarray rr,ii
+                int i
+                complex_t n
+            rr = out.real
+            ii = out.imag
+            for i in xrange(self.n_rays):
+                n = self.rays[i].refractive_index
+                rr[i] = n.real
+                ii[i] = n.imag
+            return out
+        
+    property E1_amp:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
+                np_.ndarray rr,ii
+                int i
+                complex_t n
+            rr = out.real
+            ii = out.imag
+            for i in xrange(self.n_rays):
+                n = self.rays[i].E1_amp
+                rr[i] = n.real
+                ii[i] = n.imag
+            return out
+        
+    property E2_amp:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
+                np_.ndarray rr,ii
+                int i
+                complex_t n
+            rr = out.real
+            ii = out.imag
+            for i in xrange(self.n_rays):
+                n = self.rays[i].E2_amp
+                rr[i] = n.real
+                ii[i] = n.imag
+            return out
+        
+    property length:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype='d')
+                int i
+                double v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].length
+                out[i] = v
+            return out
+        
+    property wavelength:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype='d')
+                int i
+                double v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].wavelength
+                out[i] = v
+            return out
+        
+    property parent_idx:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
+                int i
+                unsigned int v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].parent_idx
+                out[i] = v
+            return out
+        
+    property end_face_idx:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
+                int i
+                unsigned int v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].end_face_idx
+                out[i] = v
+            return out
+    
     @classmethod
     def from_array(cls, np_.ndarray data):
         """Creates a new RayCollection from the given numpy array. The array

@@ -39,9 +39,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
         
     S_vector = cross_(ray.direction, normal)
     if S_vector.x==0 and S_vector.y==0 and S_vector.z==0:
-        print "Normal incidence!"
         return ray
-    print "Not normal incidence", S_vector.x, S_vector.y, S_vector.z
     S_vector = norm_(S_vector)
         
     v = cross_(ray.direction, S_vector)
@@ -171,6 +169,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
             vector_t tangent, tg2, in_direction
             ray_t sp_ray, sp_ray2
             double cosTheta
+            complex_t P
             
         normal = norm_(normal)
         in_direction = norm_(in_ray.direction)
@@ -475,7 +474,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         #incoming power
         P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
                          E2_amp.real**2 + E2_amp.imag**2)
-            
+        #print "P Incoming:", P_in
         #Fresnel equations for reflection
         R_p = -(n2*cos1 - n1*cos2)/(n2*cos1 + n1*cos2)
         R_s = -(n2*cos2 - n1*cos1)/(n2*cos2 + n1*cos1)
@@ -495,8 +494,8 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.length = INF
             sp_ray.E1_amp.real = R_s.real
             sp_ray.E1_amp.imag = R_s.imag
-            sp_ray.E2_amp.real = R_p.real
-            sp_ray.E2_amp.imag = R_p.imag
+            sp_ray.E2_amp.real = -R_p.real
+            sp_ray.E2_amp.imag = -R_p.imag
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag

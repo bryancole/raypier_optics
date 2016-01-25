@@ -421,7 +421,7 @@ class RayTraceModel(HasQueue):
         export_shapes(shapes, fname, colorList=colors)
         
     def render_bitmap(self, width, height, filename=None,
-                      azimuth=15.0, elevation=30.0):
+                      azimuth=15.0, elevation=30.0, roll=0.0):
         renderer = tvtk.Renderer()
         for actor in self.scene.actor_list:
             renderer.add_actor(actor)
@@ -429,6 +429,7 @@ class RayTraceModel(HasQueue):
         
         renderer.reset_camera()
         camera = renderer.active_camera
+        camera.roll(roll)
         camera.elevation(elevation)
         camera.azimuth(azimuth)
         

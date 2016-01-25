@@ -373,7 +373,7 @@ class Optic(Traceable):
                              color = (0.8,0.8,1.0))
                              
     def _material_default(self):
-        m = cmaterials.DielectricMaterial(n_inside = self.n_inside,
+        m = cmaterials.FullDielectricMaterial(n_inside = self.n_inside,
                                     n_outside = self.n_outside)
         return m
     

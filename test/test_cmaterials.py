@@ -267,7 +267,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
         point = (0.0,0.0,0.0)
         normal = (0.0,0.0,-1.0)
         
-        P_in = ray_power(ray_in, normal)
+        P_in = ray_power(ray_in)
         
         mat.eval_child_ray(ray_in, 
                            ray_idx,
@@ -283,13 +283,81 @@ class TestFullDielectricMaterial(unittest.TestCase):
         
         self.assertAlmostEquals(1, T+R)
     
-        refl_pow = ray_power(out[0], normal)
+        refl_pow = ray_power(out[0])
         self.assertAlmostEquals(R, refl_pow/P_in)
         
-        trans_pow = ray_power(out[1], normal)
+        trans_pow = ray_power(out[1])
         self.assertAlmostEquals(T, trans_pow/P_in)
         
         self.assertAlmostEqual(P_in, refl_pow+trans_pow)
+        
+        print ray_in.E_left, ray_in.E_right
+        
+    def test_circular_polarisation(self):
+        n_out = 1.3
+        n_in = 2.0
+        
+        ray_in = Ray(origin=(0.0,0.0,-1.0),
+                     direction=(0.0,0.0,3.0),
+                     E_vector=(5.0,0.0,0.0),
+                     E1_amp = (2.0+2.0j),
+                     E2_amp = (2.0-2.0j),
+                     refractive_index=n_out)
+        
+        mat = FullDielectricMaterial(n_inside=n_in,
+                                     n_outside=n_out,
+                                     reflection_threshold=-0.01,
+                                     transmission_threshold=-0.01)
+        
+        out = RayCollection(8)
+        ray_idx = 123
+        point = (0.0,0.0,0.0)
+        normal = (0.0,0.0,-1.0)
+        
+        P_in = ray_power(ray_in)
+        
+        mat.eval_child_ray(ray_in, 
+                           ray_idx,
+                           point,
+                           normal,
+                           out)
+        
+        self.assertEquals(len(out),2)
+        
+        #textbook reflection and transmission coefficients
+        R = ((n_in - n_out)/(n_in + n_out))**2
+        T = (n_in/n_out)*((2*n_out/(n_out+n_in))**2)
+        
+        self.assertAlmostEquals(1, T+R)
+    
+        refl_pow = ray_power(out[0])
+        self.assertAlmostEquals(R, refl_pow/P_in)
+        
+        trans_pow = ray_power(out[1])
+        self.assertAlmostEquals(T, trans_pow/P_in)
+        
+        self.assertAlmostEqual(P_in, refl_pow+trans_pow)
+        
+        refl = out[0]
+        trans = out[1]
+        
+        pwr = lambda x: (x*x.conjugate()).real
+        P_left_in = pwr(ray_in.E_left)*ray_in.refractive_index
+        P_right_in = pwr(ray_in.E_right)*ray_in.refractive_index
+        
+        P_left_refl = pwr(refl.E_left)*refl.refractive_index
+        P_right_refl = pwr(refl.E_right)*refl.refractive_index
+        
+        P_left_trans = pwr(trans.E_left)*trans.refractive_index
+        P_right_trans = pwr(trans.E_right)
+        
+        self.assertEquals(P_right_in, 0)
+        self.assertEquals(P_left_refl, 0)
+        self.assertEquals(P_right_trans, 0)
+        
+        #check for conservation of total power
+        self.assertEquals(P_left_in, P_left_trans+P_right_refl)
+        
         
     def test_brewster_angle(self):
         n_out = 1.2

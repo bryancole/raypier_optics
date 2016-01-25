@@ -340,7 +340,7 @@ class SingleRaySource(BaseRaySource):
         d2 = numpy.cross(direction, d1)
         d2 = normaliseVector(d2)
 
-        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(direction, self.E_vector)
         E_vector = numpy.cross(E_vector, direction)
 
         rays = RayCollection(1)

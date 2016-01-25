@@ -172,7 +172,10 @@ class TestRayCollection(unittest.TestCase):
     def make_ray():
         rnd = random.random
         r = ctracer.Ray(origin=(rnd(), rnd(), rnd()),
-                        direction=(rnd(), rnd(), rnd())
+                        direction=(rnd(), rnd(), rnd()),
+                        E1_amp = (rnd() + 1j*rnd()),
+                        E2_amp = (rnd() + 1j*rnd()),
+                        refractive_index = (rnd() + 1j*rnd())
                         )
         return r
     
@@ -197,6 +200,16 @@ class TestRayCollection(unittest.TestCase):
         for i in xrange(len(a)):
             self.assertEquals(tuple(a[i]['origin']), tuple(rc[i].origin))
             self.assertEquals(tuple(a[i]['direction']), tuple(rc[i].direction))
+        
+    def test_properties(self):
+        rc = ctracer.RayCollection(10)
+        rays = [self.make_ray() for i in xrange(7)]
+        for ray in rays:
+            rc.add_ray(ray)
+        data = rc.copy_as_array()
+        self.assertTrue( numpy.alltrue( rc.E1_amp==data['E1_amp'] ) )
+        self.assertTrue( numpy.alltrue( rc.E2_amp==data['E2_amp'] ) )
+        self.assertTrue( numpy.alltrue( rc.refractive_index==data['refractive_index'] ) )
         
         
 class AnOwner(object):
