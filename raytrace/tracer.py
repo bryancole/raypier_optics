@@ -420,8 +420,115 @@ class RayTraceModel(HasQueue):
         colors = [c for s,c in shapes_colors]
         export_shapes(shapes, fname, colorList=colors)
         
+    def ipython_view(self, width, height):
+        from IPython.html import widgets
+        from IPython.display import Image, display, clear_output
+        
+        renderer = tvtk.Renderer()
+        for actor in self.scene.actor_list:
+            renderer.add_actor(actor)
+        renderer.background = (1,1,0.8)
+#         
+        renderer.reset_camera()
+        camera = renderer.active_camera
+        init_pos = camera.position
+        init_view_up = camera.view_up
+#         
+        renderWindow = tvtk.RenderWindow()
+        renderWindow.off_screen_rendering = True
+        renderWindow.add_renderer(renderer)
+        renderWindow.size = (width, height)
+        renderWindow.render()
+        
+        windowToImageFilter = tvtk.WindowToImageFilter()
+        windowToImageFilter.input = renderWindow
+        windowToImageFilter.update()
+#          
+        filename = "/dev/shm/temp_vtk_put.png"
+        writer = tvtk.PNGWriter()
+        writer.file_name = filename
+        writer.write_to_memory = False
+        writer.input_connection = windowToImageFilter.output_port
+        writer.write()
+        
+        def show():       
+            clear_output(wait=True)                 
+            renderer.modified()
+            renderWindow.render()
+            windowToImageFilter.input = renderWindow
+            windowToImageFilter.modified()
+            windowToImageFilter.update()
+            writer.write()
+            return display(Image(filename))
+        
+        def r_up(arg):
+            camera.orthogonalize_view_up()
+            camera.elevation(10)
+            return show()
+        
+        def r_down(arg):
+            camera.orthogonalize_view_up()
+            camera.elevation(-10)
+            return show()
+        
+        def r_left(arg):
+            camera.orthogonalize_view_up()
+            camera.azimuth(10)
+            return show()
+        
+        def r_right(arg):
+            camera.orthogonalize_view_up()
+            camera.azimuth(-10)
+            return show()
+        
+        def roll_left(arg):
+            camera.roll(10)
+            return show()
+        
+        def roll_right(arg):
+            camera.roll(-10)
+            return show()
+        
+        def zoom_in(arg):
+            camera.dolly(0.8)
+            return show()
+            
+        def zoom_out(arg):
+            camera.dolly(1.2)
+            return show()
+        
+        
+        b1 = widgets.ButtonWidget(description = 'Up')
+        b1.on_click(r_up)
+        b2 = widgets.ButtonWidget(description = 'Down')
+        b2.on_click(r_down)
+        b3 = widgets.ButtonWidget(description = 'Left')
+        b3.on_click(r_left)
+        b4 = widgets.ButtonWidget(description = 'Right')
+        b4.on_click(r_right)
+        b5 = widgets.ButtonWidget(description = 'Roll+')
+        b5.on_click(roll_left)
+        b6 = widgets.ButtonWidget(description = 'Roll-')
+        b6.on_click(roll_right)
+        b7 = widgets.ButtonWidget(description = 'Zoom+')
+        b7.on_click(zoom_in)
+        b8 = widgets.ButtonWidget(description = 'Zoom-')
+        b8.on_click(zoom_out)
+        
+        grp = widgets.ContainerWidget()
+        grp.children=[b1,b2,b3,b4,b5,b6,b7,b8]
+        display(grp)
+        
+        grp.remove_class("vbox")
+        grp.add_class("hbox")
+        
+        show()
+        
+        
     def render_bitmap(self, width, height, filename=None,
-                      azimuth=15.0, elevation=30.0, roll=0.0):
+                      azimuth=15.0, elevation=30.0, roll=0.0,
+                      zoom=1.0, pan_h=0.0, pan_v=0.0
+                      ):
         renderer = tvtk.Renderer()
         for actor in self.scene.actor_list:
             renderer.add_actor(actor)
@@ -432,6 +539,9 @@ class RayTraceModel(HasQueue):
         camera.roll(roll)
         camera.elevation(elevation)
         camera.azimuth(azimuth)
+        camera.dolly(zoom)
+        camera.yaw(pan_h)
+        camera.pitch(pan_v)
         
         renderWindow = tvtk.RenderWindow()
         renderWindow.off_screen_rendering = True

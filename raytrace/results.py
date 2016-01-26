@@ -209,9 +209,21 @@ class IncidentPower(Ratio):
         for source in self._tracer.sources:
             #a list of RayCollection instances
             raysList = source.TracedRays
+            input = source.TracedRays[0]
+            E1_amp = input.E1_amp
+            E2_amp = input.E2_amp
+            n = input.refractive_index.real
+            power_in += (n*E1_amp*E1_amp.conjugate()).real.sum() + (n*E2_amp*E2_amp.conjugate()).real.sum()
             
-            power_in += sum(ray.power for ray in source.TracedRays[0])
-            nom_count += sum(get_total_power(raysList, f) for f in nom.faces.faces)
+            for f in nom.faces.faces:
+                for rc in raysList:
+                    rca = rc.copy_as_array()
+                    selected = rca[rca['end_face_idx']==f.idx]
+                    E1_amp = selected['E1_amp']
+                    E2_amp = selected['E2_amp']
+                    n = selected['refractive_index'].real
+                    nom_count += (n*E1_amp*E1_amp.conjugate()).real.sum() +\
+                                (n*E2_amp*E2_amp.conjugate()).real.sum()
             
     #print "nom and denom counts", nom_count, denom_count
         try:
