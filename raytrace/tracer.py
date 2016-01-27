@@ -420,7 +420,7 @@ class RayTraceModel(HasQueue):
         colors = [c for s,c in shapes_colors]
         export_shapes(shapes, fname, colorList=colors)
         
-    def ipython_view(self, width, height):
+    def ipython_view(self, width, height, view={}):
         from IPython.html import widgets
         from IPython.display import Image, display, clear_output
         
@@ -431,8 +431,12 @@ class RayTraceModel(HasQueue):
 #         
         renderer.reset_camera()
         camera = renderer.active_camera
-        init_pos = camera.position
-        init_view_up = camera.view_up
+        if "position" in view:
+            camera.position = view['position']
+        if "focal_point" in view:
+            camera.focal_point = view['focal_point']
+        if "view_up" in view:
+            camera.view_up = view['view_up']
 #         
         renderWindow = tvtk.RenderWindow()
         renderWindow.off_screen_rendering = True
@@ -451,6 +455,8 @@ class RayTraceModel(HasQueue):
         writer.input_connection = windowToImageFilter.output_port
         writer.write()
         
+        view_out = {}
+        
         def show():       
             clear_output(wait=True)                 
             renderer.modified()
@@ -459,6 +465,9 @@ class RayTraceModel(HasQueue):
             windowToImageFilter.modified()
             windowToImageFilter.update()
             writer.write()
+            view_out.update({"position": tuple(camera.position), 
+                             "view_up": tuple(camera.view_up),
+                             "focal_point": tuple(camera.focal_point)})
             return display(Image(filename))
         
         def r_up(arg):
@@ -523,6 +532,7 @@ class RayTraceModel(HasQueue):
         grp.add_class("hbox")
         
         show()
+        return view_out
         
         
     def render_bitmap(self, width, height, filename=None,

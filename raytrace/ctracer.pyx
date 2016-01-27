@@ -368,6 +368,14 @@ cdef class Ray:
         def __set__(self, double v):
             self.ray.length = v
             
+    property wavelength:
+        """The wavelength of the ray in vacuum, in microns"""
+        def __get__(self):
+            return self.ray.wavelength
+        
+        def __set__(self, double v):
+            self.ray.wavelength = v
+            
     property termination:
         """the end-point of the ray (read only)
         """

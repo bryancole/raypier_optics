@@ -306,6 +306,7 @@ class SingleRaySource(BaseRaySource):
                                 'labels':['x','y','z']})
     E1_amp = Complex(1.0+0.0j)
     E2_amp = Complex(0.0+0.0j)
+    wavelength = Float(0.78)
     
     view_ray_ids = numpy.arange(1)
     
@@ -347,6 +348,7 @@ class SingleRaySource(BaseRaySource):
         ray = Ray()
         ray.origin = origin
         ray.direction = direction
+        ray.wavelength = self.wavelength
         ray.E_vector = E_vector
         ray.E1_amp = self.E1_amp
         ray.E2_amp = self.E2_amp
@@ -418,6 +420,7 @@ class ParallelRaySource(SingleRaySource):
             ray_data['origin'][1:] = offsets
         ray_data['origin'] += origin
         ray_data['direction'] = direction
+        ray_data['wavelength'] = self.wavelength
         ray_data['E_vector'] = [normaliseVector(E_vector)]
         ray_data['E1_amp'] = self.E1_amp
         ray_data['E2_amp'] = self.E2_amp
@@ -425,6 +428,7 @@ class ParallelRaySource(SingleRaySource):
         ray_data['normal'] = [[0,1,0]]
         rays = RayCollection.from_array(ray_data)
         return rays
+    
     
 class RectRaySource(BaseRaySource):
     """ rays from a rectangular aperture """ 
@@ -486,13 +490,15 @@ class RectRaySource(BaseRaySource):
         X_range = numpy.linspace(-a, a, count)
         Y_range = numpy.linspace(-b, b, count)
 
-	ray_data = numpy.zeros(count**2, dtype=ray_dtype)
-	offsets = numpy.zeros([X_range.size*Y_range.size,3])
+        ray_data = numpy.zeros(count**2, dtype=ray_dtype)
+        offsets = numpy.zeros([X_range.size*Y_range.size,3])
+        
+        if randomness:
+            from random import uniform
         
         for i,x in enumerate(X_range):
             for j,y in enumerate(Y_range):
                 if randomness:
-		    from random import uniform
                     x = x + uniform(-a/count, a/count)
                     y = y + uniform(-b/count, b/count)
                 point = d1 * x + d2 * y
@@ -517,7 +523,7 @@ class RectRaySource(BaseRaySource):
         return rays
     
 
-class ConfocalRaySource(BaseRaySource):
+class ConfocalRaySource(SingleRaySource):
     abstract = False
     focus = TupleVector
     direction = UnitTupleVector
@@ -590,9 +596,10 @@ class ConfocalRaySource(BaseRaySource):
         ray_data['direction'][0] = normaliseVector(rev*direction)
         ray_data['direction'][1:] = normaliseVector((rev*direction*working_dist) - offsets)
         ray_data['length'] = self.max_ray_len
-        ray_data['E_vector'] = [1,0,0]
-        ray_data['E1_amp'] = 1.0 + 0.0j
-        ray_data['E2_amp'] = 0.0
+        ray_data['E_vector'] = self.E_vector
+        ray_data['E1_amp'] = self.E1_amp
+        ray_data['E2_amp'] = self.E2_amp
+        ray_data['wavelength'] = self.wavelength
         ray_data['refractive_index'] = 1.0
         ray_data['normal'] = [0,1,0]
         rays = RayCollection.from_array(ray_data)
