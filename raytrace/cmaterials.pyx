@@ -1,3 +1,4 @@
+cimport cython
 
 cdef extern from "math.h":
     double sqrt(double arg)
@@ -13,6 +14,8 @@ cdef extern from "float.h":
 cdef extern from "complex.h":
     double complex csqrt(double complex)
     double cabs(double complex)
+    double complex cexp(double complex)
+    double complex I
     
 cdef double INF=(DBL_MAX+DBL_MAX)
 
@@ -408,12 +411,26 @@ cdef class FullDielectricMaterial(DielectricMaterial):
     """Model for dielectric using full Fresnel equations 
     to give true phase and amplitude response
     """
-    cdef public double reflection_threshold, transmission_threshold
+    cdef:
+        public double reflection_threshold, transmission_threshold
+        public double thickness #in microns
+        complex_t n_coating_
+        
+    property n_coating:
+        def __get__(self):
+            return complex(self.n_coating_.real, self.n_coating_.imag)
+        
+        def __set__(self, v):
+            v = complex(v)
+            self.n_coating_.real = v.real
+            self.n_coating_.imag = v.imag
     
     def __cinit__(self, **kwds):
+        self.n_coating = kwds.get("n_coating", 1.0)
         self.reflection_threshold = kwds.get('reflection_threshold', 0.1)
         self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
     
+    @cython.cdivision(True)
     cdef eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
@@ -432,7 +449,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             ray_t sp_ray
             complex_t cpx
             double complex n1, n2, cos2, sin2, R_p, R_s, T_p, T_s, E1_amp, E2_amp
-            double cosTheta, cos1, P_in
+            double cosTheta, cos1, sin1, P_in
             double tan_mag_sq, c2
             double Two_n1_cos1, aspect
             int flip
@@ -474,6 +491,9 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         #incoming power
         P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
                          E2_amp.real**2 + E2_amp.imag**2)
+        
+        if P_in==0.0:
+            return
         #print "P Incoming:", P_in
         #Fresnel equations for reflection
         R_p = -(n2*cos1 - n1*cos2)/(n2*cos1 + n1*cos2)
@@ -532,3 +552,161 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
             new_rays.add_ray_c(sp_ray)
+            
+            
+cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
+            
+    @cython.cdivision(True)
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            vector_t normal,
+                            RayCollection new_rays):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected, transmitted
+            vector_t tangent, tg2, in_direction
+            ray_t sp_ray
+            complex_t cpx
+            double complex n1, n2, n3, cos2, sin2, cos3, sin3, R_p, R_s, T_p, T_s, E1_amp, E2_amp
+            double complex n1cos1, n2cos2, n3cos3, n1cos2, n2cos1, n2cos3, n3cos2, ep1, ep2
+            double complex M00, M01, M10, M11, phi
+            double cosTheta, cos1, P_in
+            double tan_mag_sq, c2
+            double Two_n1_cos1, aspect
+            int flip
+            
+        normal = norm_(normal)
+        in_direction = norm_(in_ray.direction)
+        sp_ray = convert_to_sp(in_ray[0], normal)
+        E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
+        E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
+        cosTheta = dotprod_(normal, in_direction)
+        cos1 = fabs(cosTheta)
+        sin1 = sqrt(1 - cos1*cos1)
+        
+        n2 = self.n_coating_.real + 1.0j*self.n_coating_.imag
+        
+        if cosTheta < 0.0: 
+            #ray incident from outside going inwards
+            n1 = self.n_outside_.real + 1.0j*self.n_outside_.imag
+            n3 = self.n_inside_.real + 1.0j*self.n_inside_.imag
+            flip = 1
+            #print "out to in", n1, n2
+        else:
+            n1 = self.n_inside_.real + 1.0j*self.n_inside_.imag
+            n3 = self.n_outside_.real + 1.0j*self.n_outside_.imag
+            flip = -1
+            #print "in to out", n1, n2
+            
+        #apply Snell's law. These become complex.
+        sin2 = (n1*sin1/n2)
+        cos2 = csqrt(1 - sin2*sin2)
+        
+        sin3 = (n1*sin1/n3)
+        cos3 = csqrt(1 - sin3*sin3)
+        
+        cosThetaNormal = multvs_(normal, cosTheta)
+        
+        #incoming power
+        P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
+                         E2_amp.real**2 + E2_amp.imag**2)
+        
+        if P_in==0.0:
+            return
+
+        #Fresnel equations for reflection and transmission
+        n1cos1 = n1*cos1
+        n2cos2 = n2*cos2
+        n3cos3 = n3*cos3
+        dwc = 2*M_PI*self.thickness/sp_ray.wavelength
+        phi = -I*dwc*(n2 - sin2*sin2)/cos2
+        ep1 = cexp(phi)/(4*n2cos2*n3cos3)
+        ep2 = cexp(-2*phi)
+        M00 = -ep1*( (n1cos1-n2cos2)*(n2cos2+n3cos3) + 
+                     (n1cos1+n2cos2)*(n2cos2-n3cos3)*ep2 )
+                     
+        M01 = -ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3) + 
+                     (n1cos1+n2cos2)*(n2cos2+n3cos3)*ep2 )
+        
+        M10 = -ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3)*ep2 + 
+                     (n1cos1+n2cos2)*(n2cos2+n3cos3) )
+        
+        M11 = -ep1*( (n1cos1-n2cos2)*(n2cos2+n3cos3)*ep2 + 
+                     (n1cos1+n2cos2)*(n2cos2-n3cos3) )
+        
+        R_s = -M00/M01
+        T_s = M10 - M11*R_s
+        
+        n1cos2 = n1*cos2
+        n2cos1 = n2*cos1
+        n2cos3 = n2*cos3
+        n3cos2 = n3*cos2
+        M00 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2)*ep2 +
+                      (n1cos2+n2cos1)*(n2cos3-n3cos2) )
+        
+        M01 = -ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2) +
+                      (n1cos2+n2cos1)*(n2cos3+n3cos2)*ep2 )
+        
+        M10 = -ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2)*ep1 +
+                      (n1cos2+n2cos1)*(n2cos3+n3cos2) )
+        
+        M11 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2) +
+                      (n1cos2+n2cos1)*(n2cos3-n3cos2)*ep2 )
+        
+        R_p = -M00/M01
+        T_p = M10 - M11*R_p
+        
+        #modify in place to get reflected amplitudes
+        R_s *= E1_amp
+        R_p *= E2_amp
+        
+        
+        if ( n1.real*(cabs(R_s)**2 + cabs(R_p)**2)/P_in ) > self.reflection_threshold:
+            reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = reflected
+            sp_ray.length = INF
+            sp_ray.E1_amp.real = R_s.real
+            sp_ray.E1_amp.imag = R_s.imag
+            sp_ray.E2_amp.real = -R_p.real
+            sp_ray.E2_amp.imag = -R_p.imag
+            sp_ray.parent_idx = idx
+            sp_ray.refractive_index.real = n1.real
+            sp_ray.refractive_index.imag = n1.imag
+            new_rays.add_ray_c(sp_ray)
+            
+        #normal transmission            
+        tangent = subvv_(in_direction, cosThetaNormal)
+        tg2 = multvs_(tangent, n1.real/n2.real) #This is an approximation for complex N
+        tan_mag_sq = mag_sq_(tg2)
+        c2 = sqrt(1-tan_mag_sq)
+        transmitted = subvv_(tg2, multvs_(normal, c2*flip))
+        
+        aspect = sqrt(cos3.real/cos1)
+        
+        #modify in place to get transmitted amplitudes
+        T_s *= (E1_amp*aspect)
+        T_p *= (E2_amp*aspect)
+        
+        if ( n2.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = transmitted
+            sp_ray.length = INF
+            sp_ray.E1_amp.real = T_s.real
+            sp_ray.E1_amp.imag = T_s.imag
+            sp_ray.E2_amp.real = T_p.real
+            sp_ray.E2_amp.imag = T_p.imag
+            sp_ray.parent_idx = idx
+            sp_ray.refractive_index.real = n2.real
+            sp_ray.refractive_index.imag = n2.imag
+            new_rays.add_ray_c(sp_ray)
+            
