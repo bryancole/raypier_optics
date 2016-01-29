@@ -458,7 +458,8 @@ class RayTraceModel(HasQueue):
         view_out = {}
         
         def show():       
-            clear_output(wait=True)                 
+            clear_output(wait=True)
+            renderer.reset_camera_clipping_range()
             renderer.modified()
             renderWindow.render()
             windowToImageFilter.input = renderWindow
@@ -490,6 +491,26 @@ class RayTraceModel(HasQueue):
             camera.azimuth(-10)
             return show()
         
+        def pan_left(arg):
+            camera.orthogonalize_view_up()
+            camera.yaw(-2)
+            return show()
+        
+        def pan_right(arg):
+            camera.orthogonalize_view_up()
+            camera.yaw(2)
+            return show()
+        
+        def pan_up(arg):
+            camera.orthogonalize_view_up()
+            camera.pitch(-2)
+            return show()
+        
+        def pan_down(arg):
+            camera.orthogonalize_view_up()
+            camera.pitch(2)
+            return show()
+        
         def roll_left(arg):
             camera.roll(10)
             return show()
@@ -515,17 +536,26 @@ class RayTraceModel(HasQueue):
         b3.on_click(r_left)
         b4 = widgets.ButtonWidget(description = 'Right')
         b4.on_click(r_right)
-        b5 = widgets.ButtonWidget(description = 'Roll+')
+        b5 = widgets.ButtonWidget(description = u'\u21ba')
         b5.on_click(roll_left)
-        b6 = widgets.ButtonWidget(description = 'Roll-')
+        b6 = widgets.ButtonWidget(description = u'\u21bb')
         b6.on_click(roll_right)
-        b7 = widgets.ButtonWidget(description = 'Zoom+')
+        b7 = widgets.ButtonWidget(description = '+')
         b7.on_click(zoom_in)
-        b8 = widgets.ButtonWidget(description = 'Zoom-')
+        b8 = widgets.ButtonWidget(description = '-')
         b8.on_click(zoom_out)
         
+        b9 = widgets.ButtonWidget(description = u'\u2190')
+        b9.on_click(pan_left)
+        b10 = widgets.ButtonWidget(description = u'\u2192')
+        b10.on_click(pan_right)
+        b11 = widgets.ButtonWidget(description = u'\u2191')
+        b11.on_click(pan_up)
+        b12 = widgets.ButtonWidget(description = u'\u2193')
+        b12.on_click(pan_down)
+        
         grp = widgets.ContainerWidget()
-        grp.children=[b1,b2,b3,b4,b5,b6,b7,b8]
+        grp.children=[b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12]
         display(grp)
         
         grp.remove_class("vbox")
