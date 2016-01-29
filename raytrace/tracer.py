@@ -421,7 +421,7 @@ class RayTraceModel(HasQueue):
         export_shapes(shapes, fname, colorList=colors)
         
     def ipython_view(self, width, height, view={}):
-        from IPython.html import widgets
+        import ipywidgets as widgets
         from IPython.display import Image, display, clear_output
         
         renderer = tvtk.Renderer()
@@ -520,46 +520,57 @@ class RayTraceModel(HasQueue):
             return show()
         
         def zoom_in(arg):
-            camera.dolly(0.8)
+            camera.dolly(1.2)
             return show()
             
         def zoom_out(arg):
-            camera.dolly(1.2)
+            camera.dolly(0.8)
             return show()
         
         
-        b1 = widgets.ButtonWidget(description = 'Up')
+        b1 = widgets.Button(description = u'\u2191')
         b1.on_click(r_up)
-        b2 = widgets.ButtonWidget(description = 'Down')
+        b2 = widgets.Button(description = u'\u2193')
         b2.on_click(r_down)
-        b3 = widgets.ButtonWidget(description = 'Left')
+        b3 = widgets.Button(description = u'\u2190')
         b3.on_click(r_left)
-        b4 = widgets.ButtonWidget(description = 'Right')
+        b4 = widgets.Button(description = u'\u2192')
         b4.on_click(r_right)
-        b5 = widgets.ButtonWidget(description = u'\u21ba')
+        b5 = widgets.Button(description = u'\u21ba')
         b5.on_click(roll_left)
-        b6 = widgets.ButtonWidget(description = u'\u21bb')
+        b6 = widgets.Button(description = u'\u21bb')
         b6.on_click(roll_right)
-        b7 = widgets.ButtonWidget(description = '+')
-        b7.on_click(zoom_in)
-        b8 = widgets.ButtonWidget(description = '-')
-        b8.on_click(zoom_out)
         
-        b9 = widgets.ButtonWidget(description = u'\u2190')
+        b7 = widgets.Button(description = '+')
+        b7.on_click(zoom_in)
+        b8 = widgets.Button(description = '-')
+        b8.on_click(zoom_out)
+        b9 = widgets.Button(description = u'\u2190')
         b9.on_click(pan_left)
-        b10 = widgets.ButtonWidget(description = u'\u2192')
+        b10 = widgets.Button(description = u'\u2192')
         b10.on_click(pan_right)
-        b11 = widgets.ButtonWidget(description = u'\u2191')
+        b11 = widgets.Button(description = u'\u2191')
         b11.on_click(pan_up)
-        b12 = widgets.ButtonWidget(description = u'\u2193')
+        b12 = widgets.Button(description = u'\u2193')
         b12.on_click(pan_down)
         
-        grp = widgets.ContainerWidget()
-        grp.children=[b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12]
-        display(grp)
+        grp1 = widgets.HBox(border_style="solid",
+                            border_width=1,
+                            border_radius=5,
+                            padding=2,
+                            margin=1)
+        grp1.children=[b1,b2,b3,b4,b5,b6]
         
-        grp.remove_class("vbox")
-        grp.add_class("hbox")
+        grp2 = widgets.HBox(border_style="solid",
+                            border_width=1,
+                            border_radius=5,
+                            padding=2,
+                            margin=1)
+        grp2.children=[b7,b8,b9,b10,b11,b12]
+        
+        
+        grp = widgets.HBox(children=[grp1,grp2])
+        display(grp)
         
         show()
         return view_out
