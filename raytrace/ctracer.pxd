@@ -29,9 +29,9 @@ cdef struct ray_t:
     #complex attribs
     complex_t refractive_index, E1_amp, E2_amp
     #simple attribs
-    double length, wavelength
+    double length
     #reference ids to related objects
-    unsigned int parent_idx, end_face_idx
+    unsigned int parent_idx, end_face_idx, wavelength_idx
     ##objects
     #object face, end_face, child_refl, child_trans
     
@@ -46,22 +46,22 @@ cdef struct ray_pair_t:
 ### Vector maths functions ###
 ##############################
 
-cdef inline vector_t transform_c(transform_t t, vector_t p)
-cdef inline vector_t rotate_c(transform_t t, vector_t p)
-cdef inline vector_t set_v(object O)
-cdef inline double sep_(vector_t p1, vector_t p2)
-cdef inline vector_t multvv_(vector_t a, vector_t b)
-cdef inline vector_t multvs_(vector_t a, double b)
-cdef inline vector_t addvv_(vector_t a, vector_t b)
-cdef inline vector_t addvs_(vector_t a, double b)
-cdef inline vector_t subvv_(vector_t a, vector_t b)
-cdef inline vector_t subvs_(vector_t a, double b)
-cdef inline double dotprod_(vector_t a, vector_t b)
-cdef inline vector_t cross_(vector_t a, vector_t b)
-cdef inline vector_t norm_(vector_t a)
-cdef inline double mag_(vector_t a)
-cdef inline double mag_sq_(vector_t a)
-cdef inline vector_t invert_(vector_t v)
+cdef  vector_t transform_c(transform_t t, vector_t p)
+cdef  vector_t rotate_c(transform_t t, vector_t p)
+cdef  vector_t set_v(object O)
+cdef  double sep_(vector_t p1, vector_t p2)
+cdef  vector_t multvv_(vector_t a, vector_t b)
+cdef  vector_t multvs_(vector_t a, double b)
+cdef  vector_t addvv_(vector_t a, vector_t b)
+cdef  vector_t addvs_(vector_t a, double b)
+cdef  vector_t subvv_(vector_t a, vector_t b)
+cdef  vector_t subvs_(vector_t a, double b)
+cdef  double dotprod_(vector_t a, vector_t b)
+cdef  vector_t cross_(vector_t a, vector_t b)
+cdef  vector_t norm_(vector_t a)
+cdef  double mag_(vector_t a)
+cdef  double mag_sq_(vector_t a)
+cdef  vector_t invert_(vector_t v)
 
 
 ##################################
@@ -91,11 +91,14 @@ cdef class InterfaceMaterial(object):
     """Abstract base class for objects describing
     the materials characterics of a Face
     """
+    cdef double[:] _wavelengths
+    
     cdef eval_child_ray_c(self, ray_t *old_ray, 
                             unsigned int ray_idx, 
                             vector_t point, vector_t normal,
                             RayCollection new_rays)
-                                
+    
+    cdef on_set_wavelengths(self)       
                                 
 
 cdef class Face(object):

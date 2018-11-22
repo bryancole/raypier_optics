@@ -344,6 +344,9 @@ class RayTraceModel(HasQueue):
         count = 0
         face_sets = list(self.face_sets)
         all_faces = list(self.all_faces)
+        wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
+        for face in all_faces:
+            face.material.set_wavelengths(wavelengths)
         while rays.n_rays>0 and count<limit:
             #print "count", count
             traced_rays.append(rays)

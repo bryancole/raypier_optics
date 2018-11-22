@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-#import pyximport
-#pyximport.install()
+import pyximport
+pyximport.install()
 
 import sys
 sys.path.append('..')
@@ -269,6 +269,16 @@ class TestTraceSegment(unittest.TestCase):
         out_ray = out_rays[0]
         
         self.assertEquals(out_ray.direction, (1,0,-1))
+        
+        
+class TestInterfaceMaterial(unittest.TestCase):
+    def test_wavelengths(self):
+        m = ctracer.InterfaceMaterial()
+        a = [1.,2.,3.]
+        m.wavelengths = numpy.array(a)
+        b = list(m.wavelengths)
+        
+        self.assertEqual(a,b)
         
 if __name__=="__main__":
     unittest.main()

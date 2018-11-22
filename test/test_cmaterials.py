@@ -6,7 +6,7 @@ pyximport.install()
 import sys
 sys.path.append('..')
 from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP, \
-    TransparentMaterial, WaveplateMaterial
+    TransparentMaterial, WaveplateMaterial, CoatedDispersiveMaterial
 from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
 import unittest
 from math import sqrt
@@ -418,3 +418,9 @@ class TestFullDielectricMaterial(unittest.TestCase):
         ###check transmitted ray direction
         self.assertAlmostEquals(abs(dotprod(out[1].direction,
                                             trans_direction)), 1)
+        
+        
+class TestDispersionMaterial(unittest.TestCase):
+    def test_instantiate(self):
+        m = CoatedDispersiveMaterial()
+        

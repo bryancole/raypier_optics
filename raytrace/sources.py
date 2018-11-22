@@ -49,6 +49,8 @@ class BaseRaySource(BaseBase):
     render = Event()
     mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
     
+    wavelength_list = List() #List of wavelengths (floats) given in microns
+    
     InputRays = Property(Instance(RayCollection), depends_on="max_ray_len")
     TracedRays = List(RayCollection, transient=True)
     
@@ -322,6 +324,10 @@ class SingleRaySource(BaseRaySource):
                             label="Direction"),
                        label="Geometry")
     
+    @on_trait_change("wavelength")
+    def _do_wavelength_changed(self):
+        self.wavelength_list = [self.wavelength]
+    
     @on_trait_change("focus, direction, max_ray_len")
     def on_update(self):
         self.data_source.modified()
@@ -348,7 +354,7 @@ class SingleRaySource(BaseRaySource):
         ray = Ray()
         ray.origin = origin
         ray.direction = direction
-        ray.wavelength = self.wavelength
+        ray.wavelength_idx = 0
         ray.E_vector = E_vector
         ray.E1_amp = self.E1_amp
         ray.E2_amp = self.E2_amp
@@ -420,7 +426,7 @@ class ParallelRaySource(SingleRaySource):
             ray_data['origin'][1:] = offsets
         ray_data['origin'] += origin
         ray_data['direction'] = direction
-        ray_data['wavelength'] = self.wavelength
+        ray_data['wavelength_idx'] = 0
         ray_data['E_vector'] = [normaliseVector(E_vector)]
         ray_data['E1_amp'] = self.E1_amp
         ray_data['E2_amp'] = self.E2_amp
@@ -599,7 +605,7 @@ class ConfocalRaySource(SingleRaySource):
         ray_data['E_vector'] = self.E_vector
         ray_data['E1_amp'] = self.E1_amp
         ray_data['E2_amp'] = self.E2_amp
-        ray_data['wavelength'] = self.wavelength
+        ray_data['wavelength_idx'] = 0
         ray_data['refractive_index'] = 1.0
         ray_data['normal'] = [0,1,0]
         rays = RayCollection.from_array(ray_data)

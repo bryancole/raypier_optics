@@ -36,7 +36,7 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('E1_amp', np.complex128),
                         ('E2_amp', np.complex128),
                         ('length', np.double),
-                        ('wavelength', np.double),
+                        ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
                         ('end_face_idx', np.uint32)
                         ])
@@ -61,9 +61,9 @@ cdef struct ray_t:
     #complex attribs
     complex_t refractive_index, E1_amp, E2_amp
     #simple attribs
-    double length, wavelength
+    double length
     #reference ids to related objects
-    unsigned int parent_idx, end_face_idx
+    unsigned int parent_idx, end_face_idx, wavelength_idx
     ##objects
     #object face, end_face, child_refl, child_trans
     
@@ -368,13 +368,13 @@ cdef class Ray:
         def __set__(self, double v):
             self.ray.length = v
             
-    property wavelength:
+    property wavelength_idx:
         """The wavelength of the ray in vacuum, in microns"""
         def __get__(self):
-            return self.ray.wavelength
+            return self.ray.wavelength_idx
         
-        def __set__(self, double v):
-            self.ray.wavelength = v
+        def __set__(self, unsigned int v):
+            self.ray.wavelength_idx = v
             
     property termination:
         """the end-point of the ray (read only)
@@ -743,14 +743,14 @@ cdef class RayCollection:
                 out[i] = v
             return out
         
-    property wavelength:
+    property wavelength_idx:
         def __get__(self):
             cdef:
-                np_.ndarray out = np.empty(self.n_rays, dtype='d')
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
                 int i
                 double v
             for i in xrange(self.n_rays):
-                v = self.rays[i].wavelength
+                v = self.rays[i].wavelength_idx
                 out[i] = v
             return out
         
@@ -795,6 +795,9 @@ cdef class InterfaceMaterial(object):
     the materials characterics of a Face
     """
     
+    def __cinit__(self):
+        self.wavelengths = np.array([], dtype=np.double)
+    
     cdef eval_child_ray_c(self, ray_t *old_ray, 
                                 unsigned int ray_idx, 
                                 vector_t p, vector_t normal,
@@ -812,6 +815,17 @@ cdef class InterfaceMaterial(object):
         n = set_v(normal)
         self.eval_child_ray_c(&old_ray.ray, ray_idx, 
                                         p, n, new_rays)
+        
+    property wavelengths:
+        def __set__(self, double[:] wavelengths):
+            self._wavelengths = wavelengths
+            self.on_set_wavelengths()
+            
+        def __get__(self):
+            return self._wavelengths
+        
+    cdef on_set_wavelengths(self):
+        pass
     
     
 cdef class Face(object):
