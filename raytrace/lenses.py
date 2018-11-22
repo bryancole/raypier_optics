@@ -29,6 +29,8 @@ from raytrace.cfaces import CircularFace, SphericalFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 
+from raytrace.custom_sources import EmptyGridSource
+
 import math, numpy
 
 
@@ -47,7 +49,7 @@ class PlanoConvexLens(BaseLens):
     
     #vtkproperty = tvtk.Property(representation="wireframe")
     
-    vtk_grid = Instance(tvtk.ProgrammableSource, ())
+    vtk_grid = Instance(EmptyGridSource, ())
     vtk_cylinder = Instance(tvtk.Cylinder, ())
     vtk_sphere = Instance(tvtk.Sphere, ())
     
@@ -81,7 +83,8 @@ class PlanoConvexLens(BaseLens):
                                    self.centre, self.direction, self.x_axis)
         return shape, "blue1"
     
-    def create_grid(self):        
+    def create_grid(self):
+        """NOT USED"""        
         ct = self.CT
         r = self.diameter/2
         curve = self.curvature
@@ -108,6 +111,19 @@ class PlanoConvexLens(BaseLens):
         ct = self.CT
         rad = self.diameter/2
         curve = self.curvature
+        
+        size = 41
+        spacing = 2*rad / (size-1)
+        if curve >= 0.0:
+            extra=0.0
+        else:
+            extra = - curve - math.sqrt(curve**2 - rad**2)
+        lsize = int((ct+extra)/spacing) + 2
+        
+        grid = self.vtk_grid
+        grid.dimensions = (size,size,lsize)
+        grid.origin = (-rad, -rad, 0)
+        grid.spacing = (spacing, spacing, spacing)
                       
         cyl = self.vtk_cylinder
         cyl.center = (0,0,0)
@@ -125,7 +141,7 @@ class PlanoConvexLens(BaseLens):
                                          
     def _pipeline_default(self):
         grid = self.vtk_grid
-        grid.set_execute_method(self.create_grid)
+        #grid.set_execute_method(self.create_grid)
         grid.modified()
         
         trans = tvtk.Transform()
@@ -133,18 +149,19 @@ class PlanoConvexLens(BaseLens):
         cyl = self.vtk_cylinder
         cyl.transform = trans
         
-        clip1 = tvtk.ClipVolume(input=grid.structured_points_output,
+        clip1 = tvtk.ClipVolume(input_connection=grid.output_port,
                                  clip_function=self.vtk_cylinder,
                                  inside_out=1)
         
-        self.clip2.set(input = clip1.output,
+        self.clip2.set(input_connection = clip1.output_port,
                       clip_function=self.vtk_sphere,
                       inside_out=1)
         
-        topoly = tvtk.GeometryFilter(input=self.clip2.output)
-        norms = tvtk.PolyDataNormals(input=topoly.output)
+        topoly = tvtk.GeometryFilter(input_connection=self.clip2.output_port)
+        norms = tvtk.PolyDataNormals(input_connection=topoly.output_port)
         
-        transF = tvtk.TransformFilter(input=norms.output, transform=self.transform)
+        transF = tvtk.TransformFilter(input_connection=norms.output_port, 
+                                      transform=self.transform)
         self.config_pipeline()
         grid.modified()
         return transF

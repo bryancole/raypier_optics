@@ -27,7 +27,7 @@ source = ConfocalRaySource(focus=(0,0,0),
 l1 = PlanoConvexLens(diameter=25.4,
                 thickness=6.0,
                 centre=(0,-20,0),
-                direction=(0,1,1),
+                direction=(0,1,0),
                 n_inside = 3.4,
                 curvature = 20,
                 name="l1")
