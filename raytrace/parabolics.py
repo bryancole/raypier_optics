@@ -8,6 +8,8 @@ from raytrace.mirrors import BaseMirror
 from raytrace.cfaces import OffAxisParabolicFace
 from raytrace.ctracer import FaceList
 
+from raytrace.custom_sources import EmptyGridSource
+
 
 class OffAxisParabloid(BaseMirror):
     name = "Off Axis Parabolic"
@@ -18,7 +20,7 @@ class OffAxisParabloid(BaseMirror):
     
     max_length=Float(200.0) #what does this do?
     
-    vtk_grid = Instance(tvtk.ProgrammableSource, ())
+    vtk_grid = Instance(EmptyGridSource, ())
     vtk_cylinder = Instance(tvtk.Cylinder, ())
     vtk_quadric = Instance(tvtk.Quadric, ())
     
@@ -47,6 +49,7 @@ class OffAxisParabloid(BaseMirror):
         rad = self.diameter/2
         h = self.height
         
+        self.update_grid()
         self.vtk_grid.modified()
                       
         cyl = self.vtk_cylinder
@@ -63,25 +66,22 @@ class OffAxisParabloid(BaseMirror):
                           A9)
         self.update=True
         
-    def create_grid(self):
+    def update_grid(self):
         EFL = self.EFL
         r = self.diameter/2
         h = self.height
         l = self.max_length
         source = self.vtk_grid
-        sp = source.structured_points_output
         size = 20
         spacing = 2*r / (size-1)
         lsize = int(l/spacing)
-        sp.dimensions = (size,size,lsize)
-        sp.whole_extent=(0,size,0,size,0,lsize)
-        sp.origin = (EFL - r, -r, -h)
-        sp.spacing = (spacing, spacing, spacing)
-        sp.set_update_extent_to_whole_extent()
+        source.dimensions = (size,size,lsize)
+        source.origin = (EFL - r, -r, -h)
+        source.spacing = (spacing, spacing, spacing)
         
     def _pipeline_default(self):
         grid = self.vtk_grid
-        grid.set_execute_method(self.create_grid)
+        self.update_grid()
         grid.modified()
         
         trans = tvtk.Transform()
