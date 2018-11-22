@@ -33,6 +33,7 @@ from raytrace.mirrors import BaseMirror
 from raytrace.cfaces import EllipsoidalFace
 from raytrace.ctracer import FaceList
 
+from raytrace.custom_sources import EmptyGridSource
 
 class MinMax(BaseTuple):
     def validate(self, obj, name, value):
@@ -71,7 +72,7 @@ class Ellipsoid(BaseMirror):
     f1_act = Instance(tvtk.Follower, (), transient=True)
     f2_act = Instance(tvtk.Follower, (), transient=True)
     
-    vtk_grid = Instance(tvtk.ProgrammableSource, (), transient=True)
+    vtk_grid = Instance(EmptyGridSource, (), transient=True)
     vtk_quadric = Instance(tvtk.Quadric, (), transient=True)
     
     vtkproperty = tvtk.Property(opacity = 0.7,
@@ -142,25 +143,23 @@ class Ellipsoid(BaseMirror):
             act.visibility = val
         self.render = True
     
-    def create_grid(self):
+    def update_grid(self):
         xmin, xmax = self.X_bounds
         ymin, ymax = self.Y_bounds
         zmin, zmax = self.Z_bounds
         
         source = self.vtk_grid
-        sp = source.structured_points_output
         size = 20
         dx = (xmax-xmin) / (size-1)
         dy = (ymax-ymin) / (size-1)
         dz = (zmax-zmin) / (size-1)
-        sp.dimensions = (size,size,size)
-        sp.whole_extent=(0,size,0,size,0,size)
-        sp.origin = (xmin, ymin, zmin)
-        sp.spacing = (dx, dy, dz)
-        sp.set_update_extent_to_whole_extent()
+        source.dimensions = (size,size,size)
+        source.origin = (xmin, ymin, zmin)
+        source.spacing = (dx, dy, dz)
         
     @on_trait_change("X_bounds, Y_bounds, Z_bounds")
     def change_bounds(self):
+        self.update_grid()
         self.vtk_grid.modified()
         self.update=True
     
@@ -206,19 +205,19 @@ class Ellipsoid(BaseMirror):
                                          
     def _pipeline_default(self):
         grid = self.vtk_grid
-        grid.set_execute_method(self.create_grid)
+        #grid.set_execute_method(self.create_grid)
         grid.modified()
         
         quad = self.vtk_quadric
         quad.transform = self.ellipse_trans
         
-        clip = tvtk.ClipVolume(input_connection=grid.structured_points_output,
+        clip = tvtk.ClipVolume(input_connection=grid.output_port,
                                  clip_function=quad,
                                  inside_out=0)
         
-        topoly = tvtk.GeometryFilter(input=clip.output)
-        norm = tvtk.PolyDataNormals(input=topoly.output)
-        transF = tvtk.TransformFilter(input=norm.output, transform=self.transform)
+        topoly = tvtk.GeometryFilter(input_connection=clip.output_port)
+        norm = tvtk.PolyDataNormals(input_connection=topoly.output_port)
+        transF = tvtk.TransformFilter(input_connection=norm.output_port, transform=self.transform)
         self.config_pipeline()
         grid.modified()
         return transF
@@ -231,24 +230,24 @@ class Ellipsoid(BaseMirror):
         
         for s,c in zip(sList, cList):
             s.radius = 1.0
-            map = tvtk.PolyDataMapper(input=s.output)
+            map = tvtk.PolyDataMapper(input_connection=s.output_port)
             act = tvtk.Actor(mapper=map, user_transform=self.transform)
             act.property.color=c
             actors.append(act)
         
         line = tvtk.LineSource(point1=(-100,0,0),
                                point2=(100,0,0))
-        t_line = tvtk.TransformFilter(input=line.output,
+        t_line = tvtk.TransformFilter(input_connection=line.output_port,
                                       transform=self.ellipse_trans.linear_inverse)
-        map = tvtk.PolyDataMapper(input=t_line.output)
+        map = tvtk.PolyDataMapper(input_connection=t_line.output_port)
         act = tvtk.Actor(mapper=map, user_transform=self.transform)
         act.property.color=(0,0,0)
         actors.append(act)
         
         l1 = tvtk.VectorText(text="F1")
         l2 = tvtk.VectorText(text="F2")
-        m1 = tvtk.PolyDataMapper(input=l1.output)
-        m2 = tvtk.PolyDataMapper(input=l2.output)
+        m1 = tvtk.PolyDataMapper(input_connection=l1.output_port)
+        m2 = tvtk.PolyDataMapper(input_connection=l2.output_port)
         act1 = self.f1_act
         act2 = self.f2_act
         

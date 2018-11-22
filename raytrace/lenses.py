@@ -83,29 +83,6 @@ class PlanoConvexLens(BaseLens):
                                    self.centre, self.direction, self.x_axis)
         return shape, "blue1"
     
-    def create_grid(self):
-        """NOT USED"""        
-        ct = self.CT
-        r = self.diameter/2
-        curve = self.curvature
-        
-        source = self.vtk_grid
-        sp = source.structured_points_output
-        sp.initialize()
-        size = 40
-        spacing = 2*r / (size-1)
-        if curve >= 0.0:
-            extra=0.0
-        else:
-            extra = - curve - math.sqrt(curve**2 - r**2)
-        lsize = int((ct+extra)/spacing) + 1
-        print "lsize", lsize, lsize * spacing
-        sp.dimensions = (size,size,lsize)
-        sp.whole_extent=(0,size,0,size,0,lsize)
-        sp.origin = (-r, -r, 0)
-        sp.spacing = (spacing, spacing, spacing)
-        sp.set_update_extent_to_whole_extent()
-    
     @on_trait_change("CT, diameter, curvature")
     def config_pipeline(self):
         ct = self.CT
