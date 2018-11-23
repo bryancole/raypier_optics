@@ -48,7 +48,11 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
 
 cdef struct vector_t:
     double x,y,z
-
+    
+    
+cdef struct orientation_t:
+    vector_t normal, tangent
+    
     
 cdef struct complex_t:
     double real
@@ -800,19 +804,22 @@ cdef class InterfaceMaterial(object):
     
     cdef eval_child_ray_c(self, ray_t *old_ray, 
                                 unsigned int ray_idx, 
-                                vector_t p, vector_t normal,
+                                vector_t p, 
+                                orientation_t orient,
                                 RayCollection new_rays):
         pass
     
     def eval_child_ray(self, Ray old_ray, ray_idx, point, 
-                        normal, RayCollection new_rays):
+                        normal, tangent, RayCollection new_rays):
         cdef:
-            vector_t p, n
+            vector_t p
+            orientation_t n
             Ray out=Ray()
             unsigned int idx
         
         p = set_v(point)
-        n = set_v(normal)
+        n.normal = set_v(normal)
+        n.tangent = set_v(tangent)
         self.eval_child_ray_c(&old_ray.ray, ray_idx, 
                                         p, n, new_rays)
         
@@ -873,13 +880,30 @@ cdef class Face(object):
     cdef vector_t compute_normal_c(self, vector_t p):
         return p
     
+    cdef vector_t compute_tangent_c(self, vector_t p):
+        cdef vector_t tangent
+        tangent.x = 1.0
+        tangent.y = 0.0
+        tangent.z = 0.0
+        return tangent
+    
     def compute_normal(self, p):
         """Compute normal vector at a given point, in local
         face coordinates
         """
         cdef vector_t p_, n
+        p_.x, p_.y, p_.z = p
         n = self.compute_normal_c(p_)
         return (n.x, n.y, n.z)
+    
+    def compute_tangent(self, p):
+        """Compute the surface tangent at a given point,
+        in face-local coordinates"""
+        cdef vector_t tanget, p_
+        
+        p_.x, p_.y, p_.z = p
+        tangent = self.compute_tangent_c(p_)
+        return (tangent.x, tangent.y, tangent.z)
         
 
 
@@ -962,21 +986,26 @@ cdef class FaceList(object):
         idx = self.intersect_c(&r.ray, P1_, max_length)
         return idx
     
-    cdef vector_t compute_normal_c(self, Face face, vector_t point):
-        cdef vector_t out
+    cdef orientation_t compute_orientation_c(self, Face face, vector_t point):
+        cdef orientation_t out
         
-        out = transform_c(self.inv_trans, point)
-        out = face.compute_normal_c(out)
+        point = transform_c(self.inv_trans, point)
+        out.normal = face.compute_normal_c(point)
+        out.tangent = face.compute_tangent_c(point)
         if face.invert_normal:
-            out = invert_(out)
-        out = rotate_c(self.trans, out)
+            out.normal = invert_(out.normal)
+            out.tangent = invert_(out.tangent)
+        out.normal = rotate_c(self.trans, out.normal)
+        out.tangent = rotate_c(self.trans, out.tangent)
         return out
     
-    def compute_normal(self, Face face, point):
-        cdef vector_t p
+    def compute_orientation(self, Face face, point):
+        cdef:
+            vector_t p
+            orientation_t o
         p = set_v(point)
-        p = self.compute_normal_c(face, p)
-        return (p.x, p.y, p.z)
+        o = self.compute_orientation_c(face, p)
+        return (o.normal.x, o.normal.y, o.normal.z), (o.tangent.x, o.tangent.y, o.tangent.z)
     
 
 ##################################
@@ -1000,7 +1029,8 @@ cdef RayCollection trace_segment_c(RayCollection rays,
     cdef:
         FaceList face_set #a FaceList
         unsigned int size, i, j
-        vector_t P1, normal, point
+        vector_t P1, point
+        orientation_t orient
         int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
         ray_t new_ray
         ray_t *ray
@@ -1031,11 +1061,11 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             face.count += 1
             #print "ray length", ray.length
             point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-            normal = (<FaceList>(face_sets[nearest_set])).compute_normal_c(face, point)
+            orient = (<FaceList>(face_sets[nearest_set])).compute_orientation_c(face, point)
             #print "s normal", normal
             (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
                                                     point,
-                                                    normal,
+                                                    orient,
                                                     new_rays
                                                     )
     return new_rays

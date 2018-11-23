@@ -19,6 +19,9 @@ from libc.stdlib cimport malloc, free
 cdef struct vector_t:
     double x,y,z
     
+cdef struct orientation_t:
+    vector_t normal, tangent
+    
 cdef struct complex_t:
     double real
     double imag
@@ -95,7 +98,8 @@ cdef class InterfaceMaterial(object):
     
     cdef eval_child_ray_c(self, ray_t *old_ray, 
                             unsigned int ray_idx, 
-                            vector_t point, vector_t normal,
+                            vector_t point, 
+                            orientation_t orient,
                             RayCollection new_rays)
     
     cdef on_set_wavelengths(self)       
@@ -114,6 +118,7 @@ cdef class Face(object):
     cdef double intersect_c(self, vector_t p1, vector_t p2)
 
     cdef vector_t compute_normal_c(self, vector_t p)
+    cdef vector_t compute_tangent_c(self, vector_t p)
     
     
 cdef class FaceList(object):
@@ -124,7 +129,7 @@ cdef class FaceList(object):
     cdef public object owner
      
     cdef int intersect_c(self, ray_t *ray, vector_t end_point, double max_length)
-    cdef vector_t compute_normal_c(self, Face face, vector_t point)
+    cdef orientation_t compute_orientation_c(self, Face face, vector_t point)
 
 
 ##################################

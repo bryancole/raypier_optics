@@ -6,7 +6,8 @@ pyximport.install()
 import sys
 sys.path.append('..')
 from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP, \
-    TransparentMaterial, WaveplateMaterial, CoatedDispersiveMaterial
+    TransparentMaterial, WaveplateMaterial, CoatedDispersiveMaterial, \
+    BaseDispersionCurve
 from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
 import unittest
 from math import sqrt
@@ -423,4 +424,19 @@ class TestFullDielectricMaterial(unittest.TestCase):
 class TestDispersionMaterial(unittest.TestCase):
     def test_instantiate(self):
         m = CoatedDispersiveMaterial()
+        
+        
+class TestDispersionCurve(unittest.TestCase):
+    def test_sellmeier_2(self):
+        coefs = numpy.array([0, 1.03961212, 0.00600069867, 0.231792344, 0.0200179144, 1.01046945, 103.560653])
+        formula_id=2
+        curve = BaseDispersionCurve(formula_id, coefs, absorption=1.0)
+        
+        wavelens = numpy.array([0.5,1.0,1.5])
+        print( curve.evaluate_n(wavelens) )
+        
+    def test_bad_formula(self):
+        coefs = numpy.array([0, 1.03961212, 0.00600069867, 0.231792344, 0.0200179144, 1.01046945, 103.560653])
+        formula_id=10
+        self.assertRaises(ValueError, BaseDispersionCurve, formula_id, coefs)
         

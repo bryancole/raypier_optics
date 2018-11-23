@@ -21,7 +21,8 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
-        complex_t, mag_sq_, Ray, cross_, set_v, ray_power_
+        complex_t, mag_sq_, Ray, cross_, set_v, ray_power_, \
+        orientation_t
 
 import numpy as np
 cimport numpy as np_
@@ -79,6 +80,100 @@ def Convert_to_SP(Ray ray, normal):
     return out
 
 
+ctypedef double (*dispersion_curve) (double, double[:])
+
+
+cdef double nondispersive_0(double wavelen, double[:] coefs):
+    return coefs[0]
+
+cdef double sellmeier_1(double wavelen, double[:] coefs ):
+    cdef:
+        double n2=1.0
+        double wl2=wavelen*wavelen
+        int i, n_coefs = coefs.shape[0]
+        
+    n2 += coefs[0]
+    for i in range((n_coefs-1)/2):
+        n2 += coefs[2*i + 1] * wl2 / (wl2 - coefs[2*i + 2]**2)
+    return sqrt(n2)
+
+cdef double sellmeier_2(double wavelen, double[:] coefs ):
+    cdef:
+        double n2=1.0
+        double wl2=wavelen*wavelen
+        int i, n_coefs = coefs.shape[0]
+        
+    n2 += coefs[0]
+    for i in range((n_coefs-1)/2):
+        n2 += coefs[2*i + 1] * wl2 / (wl2 - coefs[2*i + 2])
+    return sqrt(n2)
+
+cdef double sellmeier_5(double wavelen, double[:] coefs):
+    cdef:
+        double n= coefs[0]
+        int i
+        
+    for i in range((coefs.shape[0]-1)/2):
+        n += coefs[2*i + 1] * (wavelen**coefs[2*i+2])
+        
+        
+cdef class BaseDispersionCurve(object):
+    cdef:
+        readonly double wavelength_min
+        readonly double wavelength_max
+        readonly double[:] coefs
+        readonly double absorption #in cm^-1
+        readonly int formula_id
+        dispersion_curve curve
+        
+    def __init__(self, int formula_id, double[:] coefs, 
+                  double absorption=0.0,
+                  double wavelength_min=0.1, 
+                  double wavelength_max=1000000.0):
+        self.coefs = coefs
+        if formula_id==1:
+            self.curve = &sellmeier_1
+        elif formula_id==2:
+            self.curve = &sellmeier_2
+        elif formula_id==5:
+            self.curve = &sellmeier_5
+        elif formula_id==0:
+            self.curve = &nondispersive_0
+        else:
+            raise ValueError("Unknown formula id (%d)"%(formula_id,))
+        self.formula_id = formula_id
+        self.absorption = absorption
+        self.wavelength_min = wavelength_min
+        self.wavelength_max = wavelength_max
+        
+    cdef np_.npy_complex128[:] c_evaluate_n(self, double[:] wavelen):
+        cdef:
+            dispersion_curve curve=self.curve
+            double[:] coefs=self.coefs
+            int i
+            np_.npy_complex128[:] n_out
+            double n_imag #imaginary part of n due to absorption
+            double wvl
+            
+        n_imag = 0.0001 * self.absorption / (4* M_PI)
+        
+        n_out = np.empty(wavelen.shape[0], dtype=np.complex128)
+        for i in range(wavelen.shape[0]):
+            wvl = wavelen[i] #in microns
+            if (wvl < self.wavelength_min) or (wvl > self.wavelength_max):
+                msg = "Wavelength (%f) outside range of dispersion curve (%f -> %f)"%(wvl, 
+                                                                                      self.wavelength_min,
+                                                                                      self.wavelength_max)
+                raise ValueError(msg) 
+            n_out[i].real = curve(wvl, coefs)
+            n_out[i].imag = n_imag * wvl
+            
+        return n_out
+    
+    def evaluate_n(self, wavelen):
+        return np.asarray(self.c_evaluate_n(np.asarray(wavelen)))
+
+
 cdef class OpaqueMaterial(InterfaceMaterial):
     """A perfect absorber i.e. it generates no rays
     """
@@ -86,7 +181,7 @@ cdef class OpaqueMaterial(InterfaceMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         pass
     
@@ -101,15 +196,15 @@ cdef class TransparentMaterial(InterfaceMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         cdef:
-            vector_t cosThetaNormal, reflected
+            vector_t cosThetaNormal, reflected, normal
             ray_t sp_ray
             complex_t cpx
             double cosTheta
         
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
         sp_ray.origin = point
         sp_ray.normal = normal
@@ -124,7 +219,7 @@ cdef class PECMaterial(InterfaceMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -133,12 +228,12 @@ cdef class PECMaterial(InterfaceMaterial):
            normal - the outward normal vector for the surface
         """
         cdef:
-            vector_t cosThetaNormal, reflected
+            vector_t cosThetaNormal, reflected, normal
             ray_t sp_ray
             complex_t cpx
             double cosTheta
         
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
         cosTheta = dotprod_(normal, in_ray.direction)
         cosThetaNormal = multvs_(normal, cosTheta)
@@ -162,7 +257,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -171,13 +266,13 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
            normal - the outward normal vector for the surface
         """
         cdef:
-            vector_t cosThetaNormal, reflected
+            vector_t cosThetaNormal, reflected, normal
             vector_t tangent, tg2, in_direction
             ray_t sp_ray, sp_ray2
             double cosTheta
             complex_t P
             
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = sp_ray2 = convert_to_sp(in_ray[0], normal)
         cosTheta = dotprod_(normal, in_direction)            
@@ -260,7 +355,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -269,10 +364,11 @@ cdef class WaveplateMaterial(InterfaceMaterial):
            normal - the outward normal vector for the surface
         """
         cdef:
+            vector_t normal
             ray_t out_ray
             complex_t E1, retard
             
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         ###The "P" output of convert_to_sp with be aligned with the fast_axis
         ###The "S" output will thus be orthogonal to the fast axis
@@ -321,7 +417,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -331,7 +427,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
         """
         cdef:
             vector_t cosThetaNormal, reflected, transmitted
-            vector_t tangent, tg2, in_direction
+            vector_t tangent, tg2, in_direction, normal
             ray_t sp_ray
             complex_t cpx
             double cosTheta, n1, n2, N2, cos1
@@ -339,7 +435,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             double cos2, Two_n1_cos1, aspect, T_p, T_s
             int flip
             
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
         cosTheta = dotprod_(normal, in_direction)
@@ -438,7 +534,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -448,7 +544,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         """
         cdef:
             vector_t cosThetaNormal, reflected, transmitted
-            vector_t tangent, tg2, in_direction
+            vector_t tangent, tg2, in_direction, normal
             ray_t sp_ray
             complex_t cpx
             double complex n1, n2, cos2, sin2, R_p, R_s, T_p, T_s, E1_amp, E2_amp
@@ -457,7 +553,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             double Two_n1_cos1, aspect
             int flip
             
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
@@ -564,7 +660,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -574,7 +670,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
         """
         cdef:
             vector_t cosThetaNormal, reflected, transmitted
-            vector_t tangent, tg2, in_direction
+            vector_t tangent, tg2, in_direction, normal
             ray_t sp_ray
             complex_t cpx
             double complex n1, n2, n3, cos2, sin2, cos3, sin3, R_p, R_s, T_p, T_s, E1_amp, E2_amp
@@ -587,7 +683,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             int flip
             
         wavelength = self._wavelengths[in_ray.wavelength_idx]
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
@@ -714,66 +810,29 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
             new_rays.add_ray_c(sp_ray)
-            
-            
-cdef double sellmeier_1(double wavelen, double[:] coefs ):
-    cdef:
-        double n2=1.0
-        double wl2=wavelen*wavelen
-        int i, n_coefs = coefs.shape[0]
-        
-    n2 += coefs[0]
-    for i in range((n_coefs-1)/2):
-        n2 += coefs[2*i + 1] * wl2 / (wl2 - coefs[2*i + 2]**2)
-    return sqrt(n2)
-
-cdef double sellmeier_2(double wavelen, double[:] coefs ):
-    cdef:
-        double n2=1.0
-        double wl2=wavelen*wavelen
-        int i, n_coefs = coefs.shape[0]
-        
-    n2 += coefs[0]
-    for i in range((n_coefs-1)/2):
-        n2 += coefs[2*i + 1] * wl2 / (wl2 - coefs[2*i + 2])
-    return sqrt(n2)
-            
+    
             
 cdef class CoatedDispersiveMaterial(InterfaceMaterial):
     cdef:
-        public double complex[:] n_inside, n_outside, n_coating
-        public double[:] coefficients_inside
-        public double[:] coefficients_outside
-        public double[:] coefficients_coating
-        public int formula_inside
-        public int formula_outside
-        public int formula_coating
+        public np_.npy_complex128[:] n_inside, n_outside, n_coating
+        public BaseDispersionCurve dispersion_inside
+        public BaseDispersionCurve dispersion_outside
+        public BaseDispersionCurve dispersion_coating
         
     cdef on_set_wavelengths(self):
         cdef:
-            double wavelen
-            int n_wavelengths = self.wavelengths.shape[0]
-            int i
+            double[:] wavelengths = self._wavelengths
         
-        coefs = self.coefficients_inside
-        self.n_inside = np.empty(n_wavelengths, dtype=np.complex128)
-        self.n_outside = np.empty(n_wavelengths, dtype=np.complex128)
-        self.n_coating = np.empty(n_wavelengths, dtype=np.complex128)
-        for i in range(n_wavelengths):
-            wavelen = self.wavelengths[i]
-            self.n_inside[i] = sellmeier_1(wavelen, 
-                                           self.coefficients_inside) + 0.0j
-            self.n_outside[i] = sellmeier_1(wavelen, 
-                                            self.coefficients_outside) + 0.0j
-            self.n_coating[i] = sellmeier_1(wavelen,
-                                            self.coefficients_coating) + 0.0j
+        self.n_inside = self.dispersion_inside.c_evaluate_n(wavelengths)
+        self.n_outside = self.dispersion_outside.c_evaluate_n(wavelengths)
+        self.n_coating = self.dispersion_coating.c_evaluate_n(wavelengths)
     
     @cython.cdivision(True)
     cdef eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
-                            vector_t normal,
+                            orientation_t orient,
                             RayCollection new_rays):
         """
            ray - the ingoing ray
@@ -783,7 +842,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         """
         cdef:
             vector_t cosThetaNormal, reflected, transmitted
-            vector_t tangent, tg2, in_direction
+            vector_t tangent, tg2, in_direction, normal
             ray_t sp_ray
             complex_t cpx
             double complex n1, n2, n3, cos2, sin2, cos3, sin3, R_p, R_s, T_p, T_s, E1_amp, E2_amp
@@ -794,9 +853,10 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             double Two_n1_cos1, aspect
             double wavelength
             int flip
+            np_.npy_complex128 ctemp
             
         wavelength = self._wavelengths[in_ray.wavelength_idx]
-        normal = norm_(normal)
+        normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
@@ -805,17 +865,22 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         cos1 = fabs(cosTheta)
         sin1 = sqrt(1 - cos1*cos1)
         
-        n2 = self.n_coating[in_ray.wavelength_idx]#self.n_coating_.real + 1.0j*self.n_coating_.imag
+        ctemp = self.n_coating[in_ray.wavelength_idx]
+        n2 = ctemp.real + I*ctemp.imag#self.n_coating_.real + 1.0j*self.n_coating_.imag
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
-            n1 = self.n_outside[in_ray.wavelength_idx]#self.n_outside_.real + 1.0j*self.n_outside_.imag
-            n3 = self.n_inside[in_ray.wavelength_idx]#self.n_inside_.real + 1.0j*self.n_inside_.imag
+            ctemp = self.n_outside[in_ray.wavelength_idx]
+            n1 = ctemp.real + I*ctemp.imag#self.n_outside_.real + 1.0j*self.n_outside_.imag
+            ctemp = self.n_inside[in_ray.wavelength_idx]
+            n3 = ctemp.real + I*ctemp.imag#self.n_inside_.real + 1.0j*self.n_inside_.imag
             flip = 1
             #print "out to in", n1, n2
         else:
-            n1 = self.n_inside[in_ray.wavelength_idx]
-            n3 = self.n_outside[in_ray.wavelength_idx]
+            ctemp = self.n_inside[in_ray.wavelength_idx]
+            n1 = ctemp.real + I*ctemp.imag
+            ctemp = self.n_outside[in_ray.wavelength_idx]
+            n3 = ctemp.real + I*ctemp.imag
             flip = -1
             #print "in to out", n1, n2
             
@@ -924,3 +989,64 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.refractive_index.imag = n2.imag
             new_rays.add_ray_c(sp_ray)
             
+
+cdef class DiffractionGratingMaterial(InterfaceMaterial):
+    ###A perfect reflection diffraction grating
+    cdef:
+        double lines_per_mm 
+        int order #order of diffraction
+        double efficiency
+    
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected, normal, tangent
+            ray_t sp_ray
+            complex_t cpx, n_ray
+            double cosTheta
+            double wavelen
+        
+        normal = norm_(orient.normal)
+        tangent = norm_(orient.tangent)
+        
+        wavelen = self._wavelengths[in_ray.wavelength_idx]
+        line_spacing = 1000.0 / self.lines_per_mm #in microns
+        
+        sp_ray = convert_to_sp(in_ray[0], normal)
+        cosTheta = dotprod_(normal, in_ray.direction)
+        cosThetaNormal = multvs_(normal, cosTheta)
+        reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+        
+        n_ray = in_ray[0].refractive_index
+        a = self.order*wavelen/(line_spacing*n_ray.real)
+        e = dotprod_(normal, reflected) #always real
+        h2 = mag_sq_(reflected)
+        c = sqrt(h2 - e*e) #always real
+        ac = (a+c)**2
+        if ac>h2: #diffracted ray has imaginary k i.e. evanescent
+            return
+        d = sqrt(h2 - (a+c)**2)
+        b = e-d
+        
+        reflected = addvv_(reflected, multvs_(tangent, a))
+        reflected = subvv_(reflected, multvs_(normal, b))
+        
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.direction = reflected
+        sp_ray.E1_amp.real = -sp_ray.E1_amp.real
+        sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag
+        #sp_ray.E2_amp.real = -sp_ray.E2_amp.real
+        #sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+        sp_ray.parent_idx = idx
+        new_rays.add_ray_c(sp_ray)
