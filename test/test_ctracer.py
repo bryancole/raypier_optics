@@ -11,6 +11,12 @@ from math import sqrt
 import random
 import numpy
 
+
+class TestRayStructure(unittest.TestCase):
+    def test_sizeof_ray(self):
+        self.assertEqual(ctracer.get_ray_size(), ctracer.ray_dtype.itemsize)
+
+
 class TestVectorMathsFunctions(unittest.TestCase):
     def test_set_v(self):
         a = (1., 2., 3.)
@@ -97,7 +103,7 @@ class TestPECMaterial(unittest.TestCase):
         m = cmaterials.PECMaterial()
         in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
         out_rays = ctracer.RayCollection(1)
-        m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1), out_rays)
+        m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1), (0,1,0), out_rays)
         out_ray = out_rays[0]
         self.assertEquals(out_ray.direction, (1,0,-1))
         

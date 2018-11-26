@@ -59,7 +59,7 @@ cdef struct complex_t:
     double imag
 
     
-cdef struct ray_t:
+cdef packed struct ray_t:
     #vectors
     vector_t origin, direction, normals, E_vector
     #complex attribs
@@ -67,7 +67,7 @@ cdef struct ray_t:
     #simple attribs
     double length
     #reference ids to related objects
-    unsigned int parent_idx, end_face_idx, wavelength_idx
+    unsigned int wavelength_idx, parent_idx, end_face_idx
     ##objects
     #object face, end_face, child_refl, child_trans
     
@@ -1090,4 +1090,5 @@ def transform(Transform t, p):
     p2 = transform_c(t.trans, p1)
     return (p2.x, p2.y, p2.z)
     
-    
+def get_ray_size():
+    return sizeof( ray_t )

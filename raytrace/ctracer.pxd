@@ -26,7 +26,7 @@ cdef struct complex_t:
     double real
     double imag
     
-cdef struct ray_t:
+cdef packed struct ray_t:
     #vectors
     vector_t origin, direction, normal, E_vector
     #complex attribs
@@ -34,7 +34,7 @@ cdef struct ray_t:
     #simple attribs
     double length
     #reference ids to related objects
-    unsigned int parent_idx, end_face_idx, wavelength_idx
+    unsigned int wavelength_idx, parent_idx, end_face_idx 
     ##objects
     #object face, end_face, child_refl, child_trans
     
@@ -102,7 +102,7 @@ cdef class InterfaceMaterial(object):
                             orientation_t orient,
                             RayCollection new_rays)
     
-    cdef on_set_wavelengths(self)       
+    cdef on_set_wavelengths(self)
                                 
 
 cdef class Face(object):

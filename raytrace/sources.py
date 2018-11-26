@@ -328,7 +328,7 @@ class SingleRaySource(BaseRaySource):
     def _do_wavelength_changed(self):
         self.wavelength_list = [self.wavelength]
     
-    @on_trait_change("focus, direction, max_ray_len")
+    @on_trait_change("direction, max_ray_len")
     def on_update(self):
         self.data_source.modified()
         self.update=True
@@ -367,6 +367,75 @@ class SingleRaySource(BaseRaySource):
         return rays
     
     
+class BroadbandRaySource(SingleRaySource):
+    """Creates a number of coincident rays covering a range of wavelengths.
+    The wavelength spacings may be uniform in wavelength, or uniform in frequency.
+    Wavelength is given in microns and is the in-vacuo wavelength.
+    """
+    number = Int(200, auto_set=False, enter_set=True)
+    wavelength_start = Float(1.50, editor=NumEditor)
+    wavelength_end = Float(1.60, editor=NumEditor)
+    uniform_deltaf = Bool(True)
+    
+    view_ray_ids = numpy.arange(200)
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, number, wavelength_start, "
+                         "wavelength_end, uniform_deltaf, max_ray_len, E_vector")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item('number'),
+                       Item('wavelength_start'),
+                       Item('wavelength_end'),
+                       Item("uniform_deltaf"),
+                       label="Geometry")
+    
+    @on_trait_change("direction, number, wavelength_start, wavelength_end, uniform_deltaf, max_ray_len")
+    def on_update(self):
+        self.data_source.modified()
+        self.update=True
+        
+    @on_trait_change("number, wavelength_start, wavelength_end, uniform_deltaf")
+    def _do_wavelength_changed(self):
+        if self.uniform_deltaf:
+            f_start = 1./self.wavelength_start
+            f_end = 1./self.wavelength_end
+            wavelengths = 1./numpy.linspace(f_start, f_end, self.number)
+        else:
+            wavelengths = numpy.linspace(self.wavelength_start, self.wavelength_end,
+                                         self.number)
+        self.wavelength_list = list(wavelengths)
+        
+    @cached_property
+    def _get_InputRays(self):
+        origin = numpy.array(self.origin)
+        direction = numpy.array(self.direction)
+        count = self.number
+
+        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(E_vector, direction)
+        
+        wavelen_idx = numpy.arange(count)
+
+        ray_data = numpy.zeros(count, dtype=ray_dtype)            
+        ray_data['origin'] = origin.reshape(-1,3)
+        ray_data['direction'] = direction.reshape(-1,3)
+        ray_data['wavelength_idx'] = wavelen_idx
+        ray_data['E_vector'] = [normaliseVector(E_vector)]
+        ray_data['E1_amp'] = self.E1_amp
+        ray_data['E2_amp'] = self.E2_amp
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        rays = RayCollection.from_array(ray_data)
+        return rays
+    
+    
 class ParallelRaySource(SingleRaySource):
     
     number = Int(20, auto_set=False, enter_set=True)
@@ -391,7 +460,7 @@ class ParallelRaySource(SingleRaySource):
                        label="Geometry")
     
     
-    @on_trait_change("focus, direction, number, rings, radius, max_ray_len")
+    @on_trait_change("direction, number, rings, radius, max_ray_len")
     def on_update(self):
         self.data_source.modified()
         self.update=True

@@ -22,7 +22,7 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
         complex_t, mag_sq_, Ray, cross_, set_v, ray_power_, \
-        orientation_t
+        orientation_t, addvv_
 
 import numpy as np
 cimport numpy as np_
@@ -993,9 +993,14 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
 cdef class DiffractionGratingMaterial(InterfaceMaterial):
     ###A perfect reflection diffraction grating
     cdef:
-        double lines_per_mm 
-        int order #order of diffraction
-        double efficiency
+        public double lines_per_mm 
+        public int order #order of diffraction
+        public double efficiency
+        
+    def __cinit__(self, **kwds):
+        self.lines_per_mm = kwds.get("lines_per_mm", 1000)
+        self.order = kwds.get("order", 1)
+        self.efficiency = kwds.get("efficiency", 1.0)
     
     cdef eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -1010,43 +1015,53 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
            normal - the outward normal vector for the surface
         """
         cdef:
-            vector_t cosThetaNormal, reflected, normal, tangent
+            vector_t reflected, normal, tangent, tangent2
             ray_t sp_ray
-            complex_t cpx, n_ray
-            double cosTheta
-            double wavelen
+            complex_t n_ray
+            double k_x, k_y, k_z
+            double wavelen, line_spacing
+            int sign
         
+        #Create surface unit axes
         normal = norm_(orient.normal)
         tangent = norm_(orient.tangent)
+        tangent2 = cross_(normal, tangent)
         
         wavelen = self._wavelengths[in_ray.wavelength_idx]
         line_spacing = 1000.0 / self.lines_per_mm #in microns
         
-        sp_ray = convert_to_sp(in_ray[0], normal)
-        cosTheta = dotprod_(normal, in_ray.direction)
-        cosThetaNormal = multvs_(normal, cosTheta)
-        reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+        reflected = norm_(in_ray.direction) #ensure unit vector
+        #Break incoming direction vector into components along surface unit axes
+        k_z = dotprod_(normal, reflected)
+        k_y = dotprod_(tangent2, reflected)
+        k_x = dotprod_(tangent, reflected)
+        
+        if k_z<0.0:#invert for a reflecting grating
+            sign = 1
+        else:
+            sign = -1
         
         n_ray = in_ray[0].refractive_index
-        a = self.order*wavelen/(line_spacing*n_ray.real)
-        e = dotprod_(normal, reflected) #always real
-        h2 = mag_sq_(reflected)
-        c = sqrt(h2 - e*e) #always real
-        ac = (a+c)**2
-        if ac>h2: #diffracted ray has imaginary k i.e. evanescent
+        k_x = k_x + self.order*wavelen/(line_spacing*n_ray.real)
+        #y-component (parallel to grating lines) doesn't change
+        
+        k_z = 1 - (k_x*k_x) - (k_y*k_y) #Apply Pythagoras to get z-component
+        if k_z < 0: #diffracted ray is evanescent
             return
-        d = sqrt(h2 - (a+c)**2)
-        b = e-d
+        k_z = sign * sqrt(k_z) 
         
-        reflected = addvv_(reflected, multvs_(tangent, a))
-        reflected = subvv_(reflected, multvs_(normal, b))
+        #Add the x- , y- and z-components together
+        reflected = multvs_(tangent, k_x)
+        reflected = addvv_(reflected, multvs_(tangent2, k_y))
+        reflected = addvv_(reflected, multvs_(normal, k_z))
         
+        sp_ray = convert_to_sp(in_ray[0], normal)
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.direction = reflected
-        sp_ray.E1_amp.real = -sp_ray.E1_amp.real
-        sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag
-        #sp_ray.E2_amp.real = -sp_ray.E2_amp.real
-        #sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
+        sp_ray.E1_amp.real = -sp_ray.E1_amp.real * self.efficiency
+        sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag * self.efficiency
+        sp_ray.E2_amp.real = sp_ray.E2_amp.real * self.efficiency
+        sp_ray.E2_amp.imag = sp_ray.E2_amp.imag * self.efficiency
         sp_ray.parent_idx = idx
         new_rays.add_ray_c(sp_ray)
