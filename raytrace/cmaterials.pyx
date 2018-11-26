@@ -818,6 +818,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         public BaseDispersionCurve dispersion_inside
         public BaseDispersionCurve dispersion_outside
         public BaseDispersionCurve dispersion_coating
+        public double coating_thickness #in microns
         
     cdef on_set_wavelengths(self):
         cdef:
@@ -904,7 +905,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         n1cos1 = n1*cos1
         n2cos2 = n2*cos2
         n3cos3 = n3*cos3
-        dwc = 2*M_PI*self.thickness/wavelength
+        dwc = 2*M_PI*self.coating_thickness/wavelength
         phi = -I*dwc*(n2 - sin2*sin2)/cos2
         ep1 = cexp(phi)/(4*n2cos2*n3cos3)
         ep2 = cexp(-2*phi)

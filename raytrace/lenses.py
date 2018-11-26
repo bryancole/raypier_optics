@@ -76,6 +76,9 @@ class PlanoConvexLens(BaseLens):
     
     def _CT_changed(self, new_ct):
         self.faces.faces[1].z_height = new_ct
+        
+    def _curvature_changed(self, new_curve):
+        self.faces.faces[1].curvature = new_curve
     
     def make_step_shape(self):
         from step_export import make_spherical_lens

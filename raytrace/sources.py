@@ -211,15 +211,15 @@ class BaseRaySource(BaseBase):
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
-        #return actors
-        return actors[:2]  #makeshift turning off of normal glyphs
+        return actors
+        #return actors[:2]  #makeshift turning off of normal glyphs
     
     def _normals_source_default(self):
         source = tvtk.ProgrammableSource()
         def execute():
             output = source.poly_data_output
             points = numpy.vstack([p.origin for p in self.TracedRays])
-            normals = numpy.vstack([p.normals for p in self.TracedRays])
+            normals = numpy.vstack([p.normal for p in self.TracedRays])
             output.points = points
             output.point_data.normals = normals
             print "calc normals GLYPH"
@@ -262,6 +262,7 @@ class BaseRaySource(BaseBase):
     
     def _ray_actor_default(self):
         tube = self.tube
+        tube.radius = self.scale_factor
         tube.input_connection=self.data_source.output_port
         tube.number_of_sides = 20
         
@@ -734,6 +735,7 @@ class ConfocalRaySource(SingleRaySource):
         rays.offset_length = numpy.sqrt(((origins - focus)**2).sum(axis=-1)).reshape(-1,1)
         #print cells.max(), rays.number, "check"
         return rays
+
 
 class AdHocSource(BaseRaySource):
     '''create a source by specifying the input rays yourself''' 

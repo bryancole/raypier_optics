@@ -6,8 +6,8 @@ A simple example
 """
 import sys
 sys.path.append('..')
-#import pyximport
-#pyximport.install()
+import pyximport
+pyximport.install()
 
 from raytrace.sources import ConfocalRaySource
 from raytrace.tracer import RayTraceModel
@@ -28,7 +28,7 @@ l1 = PlanoConvexLens(diameter=25.4,
                 thickness=6.0,
                 centre=(0,-20,0),
                 direction=(0,1,0),
-                n_inside = 3.4,
+                n_inside = 1.5,
                 curvature = 20,
                 name="l1")
 

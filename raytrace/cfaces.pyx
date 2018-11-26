@@ -221,10 +221,16 @@ cdef class SphericalFace(Face):
         a2 = (-B-D)/(2*A)
         pt2 = addvv_(r, multvs_(s, a2))
         
-        if pt1.z < cz:
-            a1 = INF
-        if pt2.z < cz:
-            a2 = INF
+        if self.curvature >= 0:
+            if pt1.z < cz:
+                a1 = INF
+            if pt2.z < cz:
+                a2 = INF
+        else:
+            if pt1.z > cz:
+                a1 = INF
+            if pt2.z > cz:
+                a2 = INF
             
         D = self.diameter*self.diameter/4.
         
@@ -244,7 +250,12 @@ cdef class SphericalFace(Face):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
+        
         p.z -= (self.z_height - self.curvature)
+        if self.curvature < 0:
+            p.z = -p.z
+            p.y = -p.y
+            p.x = -p.x
         return norm_(p)
     
     
