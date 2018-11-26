@@ -20,10 +20,10 @@ MATERIAL_DATABASE = pkg_resources.resource_filename("raytrace", GLASS_DATABASE_P
 class NondispersiveCurve(BaseDispersionCurve):
     def __init__(self, refractive_index=1.37, absorption=0.0):
         formula_id=0
-        coefs = [refractive_index,]
+        coefs = numpy.array([refractive_index,])
         wavelen_min=0.0
         wavelen_max=1000000.0
-        super(NamedDispersionCurve,self).__init__(formula_id,
+        super(NondispersiveCurve,self).__init__(formula_id,
                                                   coefs,
                                                   absorption,
                                                   wavelen_min,

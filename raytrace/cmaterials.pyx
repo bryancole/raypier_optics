@@ -819,6 +819,11 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         public BaseDispersionCurve dispersion_outside
         public BaseDispersionCurve dispersion_coating
         public double coating_thickness #in microns
+        public double reflection_threshold, transmission_threshold
+        
+    def __cinit__(self, **kwds):
+        self.reflection_threshold = kwds.get('reflection_threshold', 0.1)
+        self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
         
     cdef on_set_wavelengths(self):
         cdef:

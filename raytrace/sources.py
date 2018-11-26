@@ -229,9 +229,9 @@ class BaseRaySource(BaseBase):
         
     def _normals_actor_default(self):
         source = self.normals_source
-        glyph = tvtk.ArrowSource()
+        glyph = tvtk.ArrowSource(tip_radius=0.3, shaft_radius=0.1)
         glyph_filter = tvtk.Glyph3D(input_connection = source.output_port,
-                                    scale_factor=10.0,
+                                    scale_factor=2.0,
                                     vector_mode='use_normal'
                                     )
         glyph_filter.set_source_connection(glyph.output_port)
@@ -324,6 +324,9 @@ class SingleRaySource(BaseRaySource):
                             show_border=True,
                             label="Direction"),
                        label="Geometry")
+    
+    def _wavelength_list_default(self):
+        return [self.wavelength,]
     
     @on_trait_change("wavelength")
     def _do_wavelength_changed(self):

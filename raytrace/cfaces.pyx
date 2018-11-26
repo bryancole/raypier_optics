@@ -177,7 +177,9 @@ cdef class RectangularFace(Face):
 cdef class SphericalFace(Face):
     cdef public double diameter, curvature, z_height
     
-    params = ['diameter', 'curvature']
+    #Don't want curvature in this list in case the owner defines the 
+    #curvature in a different way
+    params = ['diameter',] 
     
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)

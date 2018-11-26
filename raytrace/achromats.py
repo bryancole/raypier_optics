@@ -6,7 +6,9 @@ Created on 23 Nov 2018
 @author: bryan
 '''
 from traits.api import Float, Instance, on_trait_change
+from traitsui.api import View, Item, VGroup
 
+from raytrace.bases import NumEditor, Traceable
 from raytrace.lenses import BaseLens
 from raytrace.dispersion import BaseDispersionCurve, NamedDispersionCurve, \
         NondispersiveCurve
@@ -46,6 +48,17 @@ class Doublet(BaseLens):
     
     clip2 = Instance(tvtk.ClipDataSet, ())
     
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('CT1', editor=NumEditor),
+                       Item('CT2', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       Item('curvature1', editor=NumEditor),
+                       Item('curvature2', editor=NumEditor),
+                       Item('curvature3', editor=NumEditor),
+                       )
+                    )
+    
     @on_trait_change("dispersion1, dispersion2, dispersion_coating, coating_thickness")
     def on_materials_changed(self):
         self.apply_materials()
@@ -63,8 +76,10 @@ class Doublet(BaseLens):
         self._material2.dispersion_coating = self.dispersion_coating
         self._material2.coating_thickness = 0.0
         
-        self._material3.dispersion_inside = self.dispersion2
-        self._material3.dispersion_outside = air
+        ### We reverse inside and outside because really, outside means
+        ### "the direction the surface normals point".
+        self._material3.dispersion_inside = air
+        self._material3.dispersion_outside = self.dispersion2
         self._material3.dispersion_coating = self.dispersion_coating
         self._material3.coating_thickness = self.coating_thickness
         
@@ -79,12 +94,12 @@ class Doublet(BaseLens):
         face2.curvature = self.curvature2
         
         face3.diameter = self.diameter
-        face3.z_height = self.CT2
+        face3.z_height = -self.CT2
         face3.curvature = self.curvature3
         self.update = True
     
     def _faces_default(self):
-        self.on_apply_materials()
+        self.apply_materials()
         fl = FaceList(owner=self)
         fl.faces = [ 
                   SphericalFace(owner=self, 
@@ -143,9 +158,10 @@ class Doublet(BaseLens):
         s1.radius = abs(curve1)
         
         s3 = self.vtk_sphere3
-        s3.center = (0,0,ct2 - curve2)
+        s3.center = (0,0,-ct2 - curve3)
+        s3.radius = abs(curve3)
         
-        self.clip2.inside_out = bool(curve >= 0.0)
+        self.clip2.inside_out = bool(curve1 >= 0.0)
         
         self.vtk_grid.modified()
         self.update=True
@@ -165,8 +181,13 @@ class Doublet(BaseLens):
                                  clip_function=self.vtk_cylinder,
                                  inside_out=1)
         
+        boolean = tvtk.ImplicitBoolean()
+        boolean.add_function(self.vtk_sphere1)
+        boolean.add_function(self.vtk_sphere3)
+        boolean.operation_type = "intersection"
+        
         self.clip2.set(input_connection = clip1.output_port,
-                      clip_function=self.vtk_sphere,
+                      clip_function=boolean,
                       inside_out=1)
         
         topoly = tvtk.GeometryFilter(input_connection=self.clip2.output_port)
