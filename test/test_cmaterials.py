@@ -3,12 +3,16 @@
 import pyximport
 pyximport.install()
 
+import faulthandler
+faulthandler.enable()
+
 import sys
 sys.path.append('..')
 from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP, \
     TransparentMaterial, WaveplateMaterial, CoatedDispersiveMaterial, \
-    BaseDispersionCurve
+    BaseDispersionCurve, SingleLayerCoatedMaterial
 from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
+from raytrace.dispersion import NondispersiveCurve
 import unittest
 from math import sqrt
 import random
@@ -228,11 +232,13 @@ class TestFullDielectricMaterial(unittest.TestCase):
         ray_idx = 123
         point = (0.0,0.0,0.0)
         normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
         
         mat.eval_child_ray(ray_in, 
                            ray_idx,
                            point,
                            normal,
+                           tangent,
                            out)
         
         self.assertEquals(len(out),2)
@@ -267,6 +273,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
         ray_idx = 123
         point = (0.0,0.0,0.0)
         normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
         
         P_in = ray_power(ray_in)
         
@@ -274,6 +281,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
                            ray_idx,
                            point,
                            normal,
+                           tangent,
                            out)
         
         self.assertEquals(len(out),2)
@@ -314,6 +322,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
         ray_idx = 123
         point = (0.0,0.0,0.0)
         normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
         
         P_in = ray_power(ray_in)
         
@@ -321,6 +330,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
                            ray_idx,
                            point,
                            normal,
+                           tangent,
                            out)
         
         self.assertEquals(len(out),2)
@@ -391,6 +401,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
         ray_idx = 123
         point = (0.0,0.0,0.0)
         normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
         
         P_in = ray_power(ray_in)
         
@@ -398,6 +409,7 @@ class TestFullDielectricMaterial(unittest.TestCase):
                            ray_idx,
                            point,
                            normal,
+                           tangent,
                            out)
         
         self.assertEquals(len(out),2)
@@ -420,10 +432,150 @@ class TestFullDielectricMaterial(unittest.TestCase):
         self.assertAlmostEquals(abs(dotprod(out[1].direction,
                                             trans_direction)), 1)
         
+class TestSingleLayerCoatedMaterial(unittest.TestCase):
+    def test_brewster_angle(self):
+        n_out = 1.2
+        n_in = 2.0
+        
+        theta_B = numpy.arctan2(n_in, n_out)
+        print "Brewsters angle:", theta_B*180/numpy.pi
+        
+        y = numpy.sin(theta_B)
+        z = numpy.cos(theta_B)
+        
+        #angle inside dielectric (for transmitted ray)
+        theta_inside = numpy.arcsin( n_out * numpy.sin(theta_B) / n_in )
+        print "Internal angle:", theta_inside*180/numpy.pi
+        trans_direction = norm((0.0, numpy.sin(theta_inside), numpy.cos(theta_inside)))
+        
+        ###input ray is directed into object
+        ray_in = Ray(origin=(0.0,-y,-z),
+                     direction=(0.0,y,z),
+                     E_vector=(0.0,1.0,0.0),
+                     E1_amp = (1.0+1.0j),
+                     E2_amp = (0.0+0.0j),
+                     refractive_index=n_out)
+        
+        mat = SingleLayerCoatedMaterial(thickness=0.1,
+                                        n_coating=1.5,
+                                        n_inside=n_in,
+                                     n_outside=n_out,
+                                     reflection_threshold=-0.01,
+                                     transmission_threshold=-0.01)
+        mat.wavelengths=numpy.array([0.78])
+        
+        out = RayCollection(8)
+        ray_idx = 123
+        point = (0.0,0.0,0.0)
+        normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
+        
+        P_in = ray_power(ray_in)
+        
+        mat.eval_child_ray(ray_in, 
+                           ray_idx,
+                           point,
+                           normal,
+                           tangent,
+                           out)
+        
+        self.assertEquals(len(out),2)
+        
+        refl_pow = ray_power(out[0])
+        trans_pow = ray_power(out[1])
+        
+        #self.assertAlmostEquals(0.0, refl_pow)
+        #self.assertAlmostEquals(refl_pow, out[0].power)
+        
+        #self.assertAlmostEquals(P_in, trans_pow)
+        
+        ###check relfected ray direction
+        self.assertAlmostEquals(abs(dotprod(norm(subvv(ray_in.direction, 
+                                                       out[0].direction)),
+                                            normal)),
+                                1)
+        
+        dir_out = out[1].direction
+        theta_trans = 180*numpy.arctan2(dir_out[2], dir_out[1])/numpy.pi
+        print "Transmitted angle:", theta_trans
+        ###check transmitted ray direction
+        self.assertAlmostEquals(abs(dotprod(out[1].direction,
+                                            trans_direction)), 1)
         
 class TestDispersionMaterial(unittest.TestCase):
     def test_instantiate(self):
         m = CoatedDispersiveMaterial()
+        
+    def test_snells_law(self):
+        n_out = 1.2
+        n_in = 2.0
+        
+        d_out = NondispersiveCurve(n_out)
+        d_in = NondispersiveCurve(n_in)
+        d_coating = NondispersiveCurve(1.4)
+        
+        theta_B = numpy.arctan2(n_in, n_out)
+        print "Brewsters angle:", theta_B*180/numpy.pi
+        
+        y = numpy.sin(theta_B)
+        z = numpy.cos(theta_B)
+        
+        #angle inside dielectric (for transmitted ray)
+        theta_inside = numpy.arcsin( n_out * numpy.sin(theta_B) / n_in )
+        trans_direction = norm((0.0, numpy.sin(theta_inside), numpy.cos(theta_inside)))
+        
+        ###input ray is directed into object
+        ray_in = Ray(origin=(0.0,-y,-z),
+                     direction=(0.0,y,z),
+                     E_vector=(0.0,1.0,0.0),
+                     E1_amp = (1.0+1.0j),
+                     E2_amp = (0.0+0.0j),
+                     refractive_index=n_out)
+        print ray_in.wavelength_idx
+        
+        mat = CoatedDispersiveMaterial(dispersion_inside=d_in,
+                                       dispersion_outside=d_out,
+                                       coating_thickness=0.1,
+                                       dispersion_coating=d_coating,
+                                     reflection_threshold=0.01,
+                                     transmission_threshold=0.01)
+        wavelens = numpy.array([0.78], 'd')
+        mat.wavelengths=wavelens
+        
+        out = RayCollection(8)
+        ray_idx = 123
+        point = (0.0,0.0,0.0)
+        normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
+        
+        P_in = ray_power(ray_in)
+        
+        mat.eval_child_ray(ray_in, 
+                           ray_idx,
+                           point,
+                           normal,
+                           tangent,
+                           out)
+        
+        self.assertEquals(len(out),2)
+        
+        refl_pow = ray_power(out[0])
+        trans_pow = ray_power(out[1])
+        
+        #self.assertAlmostEquals(0.0, refl_pow)
+        #self.assertAlmostEquals(refl_pow, out[0].power)
+        
+        #self.assertAlmostEquals(P_in, trans_pow)
+        
+        ###check relfected ray direction
+        self.assertAlmostEquals(abs(dotprod(norm(subvv(ray_in.direction, 
+                                                       out[0].direction)),
+                                            normal)),
+                                1)
+        
+        ###check transmitted ray direction
+        self.assertAlmostEquals(abs(dotprod(out[1].direction,
+                                            trans_direction)), 1)
         
         
 class TestDispersionCurve(unittest.TestCase):

@@ -154,7 +154,7 @@ cdef class BaseDispersionCurve(object):
             np_.npy_complex128[:] n_out
             double n_imag #imaginary part of n due to absorption
             double wvl
-            
+        
         n_imag = 0.0001 * self.absorption / (4* M_PI)
         
         n_out = np.empty(wavelen.shape[0], dtype=np.complex128)
@@ -526,6 +526,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
     
     def __cinit__(self, **kwds):
         self.n_coating = kwds.get("n_coating", 1.0)
+        self.thickness = kwds.get("thickness", 0.1)
         self.reflection_threshold = kwds.get('reflection_threshold', 0.1)
         self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
     
@@ -786,7 +787,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             
         #normal transmission            
         tangent = subvv_(in_direction, cosThetaNormal)
-        tg2 = multvs_(tangent, n1.real/n2.real) #This is an approximation for complex N
+        tg2 = multvs_(tangent, n1.real/n3.real) #This is an approximation for complex N
         tan_mag_sq = mag_sq_(tg2)
         c2 = sqrt(1-tan_mag_sq)
         transmitted = subvv_(tg2, multvs_(normal, c2*flip))
@@ -811,6 +812,8 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.refractive_index.imag = n2.imag
             new_rays.add_ray_c(sp_ray)
     
+vacuum = BaseDispersionCurve(0,np.array([1.0,]))
+    
             
 cdef class CoatedDispersiveMaterial(InterfaceMaterial):
     cdef:
@@ -824,11 +827,14 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
     def __cinit__(self, **kwds):
         self.reflection_threshold = kwds.get('reflection_threshold', 0.1)
         self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
+        self.dispersion_inside = kwds.get("dispersion_inside",vacuum)
+        self.dispersion_outside = kwds.get("dispersion_outside",vacuum)
+        self.dispersion_coating = kwds.get("dispersion_coating",vacuum)
+        self.coating_thickness = kwds.get("coating_thickness", 0.1)
         
     cdef on_set_wavelengths(self):
         cdef:
             double[:] wavelengths = self._wavelengths
-        
         self.n_inside = self.dispersion_inside.c_evaluate_n(wavelengths)
         self.n_outside = self.dispersion_outside.c_evaluate_n(wavelengths)
         self.n_coating = self.dispersion_coating.c_evaluate_n(wavelengths)
@@ -970,7 +976,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             
         #normal transmission            
         tangent = subvv_(in_direction, cosThetaNormal)
-        tg2 = multvs_(tangent, n1.real/n2.real) #This is an approximation for complex N
+        tg2 = multvs_(tangent, n1.real/n3.real) #This is an approximation for complex N
         tan_mag_sq = mag_sq_(tg2)
         c2 = sqrt(1-tan_mag_sq)
         transmitted = subvv_(tg2, multvs_(normal, c2*flip))
