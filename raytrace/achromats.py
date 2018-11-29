@@ -233,8 +233,8 @@ class Doublet(BaseLens):
         self._material1.dispersion_coating = self.dispersion_coating
         self._material1.coating_thickness = self.coating_thickness
         
-        self._material2.dispersion_inside = self.dispersion1
-        self._material2.dispersion_outside = self.dispersion2
+        self._material2.dispersion_inside = self.dispersion2
+        self._material2.dispersion_outside = self.dispersion1
         self._material2.dispersion_coating = self.dispersion_coating
         self._material2.coating_thickness = 0.0
         

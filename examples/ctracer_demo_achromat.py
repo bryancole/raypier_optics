@@ -17,6 +17,7 @@ from raytrace.sources import ParallelRaySource
 from raytrace.tracer import RayTraceModel
 from raytrace.achromats import EdmundOptic45805, Singlet
 from raytrace.dispersion import NondispersiveCurve, NamedDispersionCurve
+from raytrace.find_focus import find_ray_focus
 
 
 import numpy
@@ -34,6 +35,7 @@ source = ParallelRaySource(direction=(0,1,0),
                            origin=(0,-50,0),
                            number=25,
                            radius=10,
+                           wavelength=0.8,
                            rings=5)
                             
 l1 = EdmundOptic45805(centre=(0,-20,0),
@@ -47,7 +49,7 @@ l1 = EdmundOptic45805(centre=(0,-20,0),
 #              curvature2 = -50,
 #              dispersion = NondispersiveCurve(1.5),
 #              dispersion_coating = NondispersiveCurve(1.25),
-#              coating_thickness = 0.25
+#              coating_thickness = 0.0
 #              )
 
                 
@@ -65,5 +67,12 @@ model = RayTraceModel(optics=[l1,],
 #t = timeit.Timer("model.update = True","from __main__ import model")
 #ret = t.timeit(10)
 #print "time:", ret
+
+model.trace_all()
+
+final_rays = source.TracedRays[-1]
+
+focus = find_ray_focus(final_rays)
+print "Effective focal length:", (focus[1]-l1.centre[1])
 
 model.configure_traits(kind="live")
