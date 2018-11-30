@@ -29,7 +29,9 @@ from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
 from raytrace.cfaces import CircularFace, RectangularFace
 from raytrace.ctracer import FaceList
-from raytrace.cmaterials import DielectricMaterial
+from raytrace.cmaterials import DielectricMaterial, \
+        CoatedDispersiveMaterial
+from raytrace.dispersion import BaseDispersionCurve, NondispersiveCurve
 
 import math, numpy
 
@@ -134,6 +136,55 @@ class PlanarWindow(PECMirror, Optic):
                     CircularFace(owner=self, z_plane=self.thickness, 
                         invert_normal=True, material=m)]
         return fl
+    
+
+class PlanarDispersiveWindow(PECMirror, Optic):
+    name = "Planar dispersive window"
+    abstract = False
+    
+    material = Instance(CoatedDispersiveMaterial, ())
+    
+    dispersion = Instance(BaseDispersionCurve, desc="Dispersion curve for the glass")
+    dispersion_coating = Instance(BaseDispersionCurve, desc="Dispersion curve for the coating")
+    coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('diameter', editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('offset', editor=NumEditor),
+                       Item('n_inside', editor=NumEditor),
+                        ),
+                   )
+                   
+    vtkproperty = tvtk.Property(opacity = 0.4,
+                             color = (0.6,0.9,0.5))
+                             
+    @on_trait_change("dispersion, dispersion_coating, coating_thickness")
+    def on_materials_changed(self):
+        self.apply_materials()
+        self.update = True
+    
+    def apply_materials(self):
+        air = NondispersiveCurve(1.0)
+        self.material.dispersion_inside = self.dispersion
+        self.material.dispersion_outside = air
+        self.material.dispersion_coating = self.dispersion_coating
+        self.material.coating_thickness = self.coating_thickness
+                   
+    def _thickness_changed(self, new_t):
+        self.faces[1].z_plane = new_t
+        self.update = True
+    
+    def _faces_default(self):
+        self.apply_materials()
+        m = self.material
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self, z_plane=0, material=m),
+                    CircularFace(owner=self, z_plane=self.thickness, 
+                        invert_normal=True, material=m)]
+        return fl
+
 
 class RectMirror(BaseMirror):
     name = "Rectangular Mirror"

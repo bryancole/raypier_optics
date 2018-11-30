@@ -337,6 +337,7 @@ class RayTraceModel(HasQueue):
         
     def trace_ray_source(self, ray_source, optics):
         """trace a ray source asequentially, using the ctracer framework"""
+        max_length = ray_source.max_ray_len
         rays = ray_source.InputRays #FIXME
         rays.reset_length()
         traced_rays = []
@@ -346,15 +347,18 @@ class RayTraceModel(HasQueue):
         all_faces = list(self.all_faces)
         wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
         for face in all_faces:
-            print face, wavelengths
             face.material.wavelengths = wavelengths
-        while rays.n_rays>0 and count<limit:
-            #print "count", count
-            traced_rays.append(rays)
-            rays = ctracer.trace_segment(rays, face_sets, all_faces)
-            count += 1
-        ray_source.TracedRays = traced_rays
-        ray_source.data_source.modified()
+            face.max_length = max_length
+        try:
+            while rays.n_rays>0 and count<limit:
+                #print "count", count
+                traced_rays.append(rays)
+                rays = ctracer.trace_segment(rays, face_sets, all_faces, 
+                                             max_length=max_length)
+                count += 1
+            ray_source.TracedRays = traced_rays
+        finally:
+            ray_source.data_source.modified()
         
     def trace_sequence(self, input_rays, faces_sequence):
         """

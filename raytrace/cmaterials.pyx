@@ -997,8 +997,8 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real = T_p.real
             sp_ray.E2_amp.imag = T_p.imag
             sp_ray.parent_idx = idx
-            sp_ray.refractive_index.real = n2.real
-            sp_ray.refractive_index.imag = n2.imag
+            sp_ray.refractive_index.real = n3.real
+            sp_ray.refractive_index.imag = n3.imag
             new_rays.add_ray_c(sp_ray)
             
 

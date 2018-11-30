@@ -386,8 +386,8 @@ cdef class Ray:
         def __get__(self):
             cdef vector_t end
             cdef float length
-            if self.ray.length > 100.0:
-                length = 100.0
+            if self.ray.length > 1000.0:
+                length = 1000.0
             else:
                 length = self.ray.length
             end = addvv_(self.ray.origin, multvs_(self.ray.direction, 

@@ -59,6 +59,60 @@ class MeanOpticalPathLength(Result):
         self.result = total.mean()
         
         
+class GroupVelocityDispersion(MeanOpticalPathLength):
+    name = "Group Velocity Dispersion"
+    wavelength = Float(label="WAavelength /um", transient=True)
+    result = Float(label="GDD /fs^2", transient=True)
+    tod = Float(label="TOD", transient=True)
+    
+    traits_view = View(Item("wavelength", style="readonly"),
+                       Item('result', style="readonly"),
+                       Item('tod', style="readonly"),
+                       Item('source', editor=DropEditor()),
+                       Item('target', editor=DropEditor()),
+                       title="Optical path length",
+                       resizable=True,
+                       )
+    
+    def _calc_result(self):
+        c = 2.99792458e8 * 1e-9 #convert to mm/ps
+        all_wavelengths = numpy.asarray(self.source.wavelength_list) #in microns
+        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
+        idx = self.target.idx
+        last = all_rays[0]
+        selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
+        wavelengths = all_wavelengths[last['wavelength_idx'][selected_idx]]
+        sort_idx = numpy.argsort(wavelengths)
+        wavelengths = wavelengths[sort_idx]
+        selected_idx = selected_idx[sort_idx]
+        
+        total = numpy.zeros(len(selected_idx), 'd')
+        for ray in all_rays:
+            selected = ray[selected_idx]
+            total += selected['length'] * selected['refractive_index'].real
+            selected_idx = selected['parent_idx']
+            
+        if len(total) < 6:
+            return
+        total -= total.mean() #because we don't care about the overall offset
+        f = 1000.0*c/wavelengths #in THz
+        omega = 2 * numpy.pi * f
+        phase = total*omega/c
+        dw = numpy.diff(omega)
+        dw_mean = dw.mean()
+        dw_sd = numpy.std(dw)
+        print "uniformity in f:", dw_sd, dw_mean
+        print "FREQ:", f
+        second_deriv = numpy.diff(phase,2)/(dw_mean**2)
+        third_deriv = numpy.diff(phase,3)/(dw_mean**3)
+        second_deriv *= 1e6 #convert to fs^2
+        third_deriv *= 1e9 #convert to fs^3
+        idx = len(second_deriv)//2
+        self.result = second_deriv[idx]
+        self.wavelength = wavelengths[idx+1]*1000000.0 #convert to nm
+        self.tod = third_deriv[idx]
+         
+        
 def get_total_intersections(raysList, face):
     all_rays = itertools.chain(*raysList)
     '''#debug

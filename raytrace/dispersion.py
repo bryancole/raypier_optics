@@ -29,6 +29,25 @@ class NondispersiveCurve(BaseDispersionCurve):
                                                   wavelen_min,
                                                   wavelen_max
                                                   )
+        
+class FusedSilica(BaseDispersionCurve):
+    def __init__(self, absorption=0.0):
+        formula_id=1
+        coefs = numpy.array([0.0,
+                             0.6961663,
+                             0.0684043,
+                             0.4079426,
+                             0.1162414,
+                             0.8974794,
+                             9.896161])
+        wavelen_min=0.21
+        wavelen_max=6.7
+        super(FusedSilica,self).__init__(formula_id,
+                                                  coefs,
+                                                  absorption,
+                                                  wavelen_min,
+                                                  wavelen_max
+                                                  )
 
 
 class NamedDispersionCurve(BaseDispersionCurve):
