@@ -12,6 +12,8 @@ from raytrace.bases import Result, Traceable
 from raytrace.sources import BaseRaySource
 #from raytrace.tracer import RayTraceModel
 from raytrace.ctracer import Face
+from raytrace.dispersion import FusedSilica
+
 from traitsui.editors.drop_editor import DropEditor
 
 import numpy
@@ -61,18 +63,31 @@ class MeanOpticalPathLength(Result):
         
 class GroupVelocityDispersion(MeanOpticalPathLength):
     name = "Group Velocity Dispersion"
-    wavelength = Float(label="WAavelength /um", transient=True)
+    wavelength = Float(label="Wavelength /um", transient=True)
     result = Float(label="GDD /fs^2", transient=True)
     tod = Float(label="TOD", transient=True)
+    glass_path = Float(0.0)
+    
+    _fs = Instance(FusedSilica, ())
     
     traits_view = View(Item("wavelength", style="readonly"),
                        Item('result', style="readonly"),
                        Item('tod', style="readonly"),
+                       Item("glass_path"),
                        Item('source', editor=DropEditor()),
                        Item('target', editor=DropEditor()),
                        title="Optical path length",
                        resizable=True,
                        )
+    
+    @on_trait_change("source, target, glass_path")
+    def update(self):
+        if self.target is None:
+            return
+        if self.source is None:
+            return
+        if self.source.TracedRays:
+            self._calc_result()
     
     def _calc_result(self):
         c = 2.99792458e8 * 1e-9 #convert to mm/ps
@@ -82,7 +97,7 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         last = all_rays[0]
         selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
         wavelengths = all_wavelengths[last['wavelength_idx'][selected_idx]]
-        sort_idx = numpy.argsort(wavelengths)
+        sort_idx = numpy.argsort(wavelengths)[::-1]
         wavelengths = wavelengths[sort_idx]
         selected_idx = selected_idx[sort_idx]
         
@@ -97,6 +112,12 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         total -= total.mean() #because we don't care about the overall offset
         f = 1000.0*c/wavelengths #in THz
         omega = 2 * numpy.pi * f
+        
+        n_fs = self._fs.evaluate_n(wavelengths).real
+        fs_total = n_fs*self.glass_path*1000.0 #convert path length to mm
+        fs_total -= fs_total.mean()
+        total += fs_total
+        
         phase = total*omega/c
         dw = numpy.diff(omega)
         dw_mean = dw.mean()
@@ -109,7 +130,7 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         third_deriv *= 1e9 #convert to fs^3
         idx = len(second_deriv)//2
         self.result = second_deriv[idx]
-        self.wavelength = wavelengths[idx+1]*1000000.0 #convert to nm
+        self.wavelength = wavelengths[idx+1]*1000.0 #convert to nm
         self.tod = third_deriv[idx]
          
         
