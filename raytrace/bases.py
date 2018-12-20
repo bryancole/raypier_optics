@@ -328,15 +328,17 @@ class Traceable(ModelObject):
     def update_complete(self):
         pass
 
+OrientationEditor = RangeEditor(low=-180.0, high=180.0, mode='slider')
+
 
 Traceable.uigroup = VGroup(
                    Item('name', editor=TitleEditor(), springy=False,
                         show_label=False),
                    Item('display'),
                    VGroup(
-                   Item('orientation', editor=ScrubberEditor()),
-                   Item('elevation', editor=ScrubberEditor()),
-                   Item('rotation', editor=ScrubberEditor()),
+                   Item('orientation', editor=OrientationEditor),
+                   Item('elevation', editor=OrientationEditor),
+                   Item('rotation', editor=OrientationEditor),
                    ),
                    HGroup(Item('centre', 
                                show_label=False, 
