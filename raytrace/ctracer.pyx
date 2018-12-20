@@ -36,6 +36,7 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('E1_amp', np.complex128),
                         ('E2_amp', np.complex128),
                         ('length', np.double),
+                        ('phase', np.double),
                         ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
                         ('end_face_idx', np.uint32)
@@ -371,6 +372,15 @@ cdef class Ray:
         
         def __set__(self, double v):
             self.ray.length = v
+            
+    property phase:
+        """The length of the ray. This is infinite in 
+        unterminated rays"""
+        def __get__(self):
+            return self.ray.phase
+        
+        def __set__(self, double v):
+            self.ray.phase = v
             
     property wavelength_idx:
         """The wavelength of the ray in vacuum, in microns"""
@@ -744,6 +754,17 @@ cdef class RayCollection:
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].length
+                out[i] = v
+            return out
+        
+    property phase:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype='d')
+                int i
+                double v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].phase
                 out[i] = v
             return out
         

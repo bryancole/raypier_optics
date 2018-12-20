@@ -32,8 +32,13 @@ class RectangularGrating(RectMirror):
                         ),
                    )
     
+    @on_trait_change("centre")
+    def on_centre_changed(self, vnew):
+        self.material.origin = vnew
+    
     def _material_default(self):
         return DiffractionGratingMaterial(order=self.order,
+                                          origin=self.centre,
                                           lines_per_mm=self.lines_per_mm,
                                           efficiency=self.efficiency)
         

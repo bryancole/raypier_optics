@@ -101,12 +101,15 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         wavelengths = wavelengths[sort_idx]
         selected_idx = selected_idx[sort_idx]
         
+        phase = last['phase'].copy()
+        phase -= phase.mean()
         total = numpy.zeros(len(selected_idx), 'd')
         for ray in all_rays:
             selected = ray[selected_idx]
             total += selected['length'] * selected['refractive_index'].real
             selected_idx = selected['parent_idx']
             
+        #print "Phase:", phase
         if len(total) < 6:
             return
         total -= total.mean() #because we don't care about the overall offset
@@ -118,12 +121,12 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         fs_total -= fs_total.mean()
         total += fs_total
         
-        phase = total*omega/c
+        phase += total*omega/c
         dw = numpy.diff(omega)
         dw_mean = dw.mean()
         dw_sd = numpy.std(dw)
         print "uniformity in f:", dw_sd, dw_mean
-        print "FREQ:", f
+        #print "FREQ:", f
         second_deriv = numpy.diff(phase,2)/(dw_mean**2)
         third_deriv = numpy.diff(phase,3)/(dw_mean**3)
         second_deriv *= 1e6 #convert to fs^2

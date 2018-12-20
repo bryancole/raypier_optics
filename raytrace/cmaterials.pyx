@@ -1008,11 +1008,23 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         public double lines_per_mm 
         public int order #order of diffraction
         public double efficiency
+        vector_t origin_
         
     def __cinit__(self, **kwds):
         self.lines_per_mm = kwds.get("lines_per_mm", 1000)
         self.order = kwds.get("order", 1)
         self.efficiency = kwds.get("efficiency", 1.0)
+        self.origin = kwds.get("origin", (0.0,0.0,0.0))
+        
+    property origin: 
+        def __get__(self):
+            cdef vector_t o = self.origin_
+            return (o.x, o.y, o.z)
+        
+        def __set__(self, o):
+            self.origin_.x = o[0]
+            self.origin_.y = o[1]
+            self.origin_.z = o[2]
     
     cdef eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -1066,7 +1078,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         reflected = multvs_(tangent, k_x)
         reflected = addvv_(reflected, multvs_(tangent2, k_y))
         reflected = addvv_(reflected, multvs_(normal, k_z))
-        
+                
         sp_ray = convert_to_sp(in_ray[0], normal)
         sp_ray.origin = point
         sp_ray.normal = normal
@@ -1076,4 +1088,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = sp_ray.E2_amp.real * self.efficiency
         sp_ray.E2_amp.imag = sp_ray.E2_amp.imag * self.efficiency
         sp_ray.parent_idx = idx
+        ### This is the mysterious Grating Phase
+        sp_ray.phase += dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
+
         new_rays.add_ray_c(sp_ray)
