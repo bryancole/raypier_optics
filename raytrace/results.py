@@ -20,12 +20,29 @@ import numpy
 import itertools
 
 
-
-class MeanOpticalPathLength(Result):
-    name = "Mean optical path length"
-    abstract = False
+class TargetResult(Result):
     source = Instance(BaseRaySource)
     target = Instance(Face)
+    
+    def calc_result(self, tracer):
+        self._calc_result()
+        
+    def _calc_result(self):
+        raise NotImplementedError()
+        
+    @on_trait_change("source, target")
+    def update(self):
+        if self.target is None:
+            return
+        if self.source is None:
+            return
+        if self.source.TracedRays:
+            self._calc_result()
+        
+
+class MeanOpticalPathLength(TargetResult):
+    name = "Mean optical path length"
+    abstract = False
     
     result = Float(label="Path length", transient=True)
     
@@ -80,14 +97,9 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
                        resizable=True,
                        )
     
-    @on_trait_change("source, target, glass_path")
-    def update(self):
-        if self.target is None:
-            return
-        if self.source is None:
-            return
-        if self.source.TracedRays:
-            self._calc_result()
+    @on_trait_change("glass_path")
+    def _glass_path_update(self):
+        self.update()
     
     def _calc_result(self):
         c = 2.99792458e8 * 1e-9 #convert to mm/ps
