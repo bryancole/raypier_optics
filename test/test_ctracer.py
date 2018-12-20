@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import pyximport
-pyximport.install()
+pyximport.install(language_level=3)
 
 import sys
 sys.path.append('..')

@@ -30,7 +30,6 @@ from traitsui.file_dialog import save_file
 from tvtk.api import tvtk
 import numpy
 import threading, os, itertools
-import wx
 from itertools import chain, islice, count
 import yaml
 from raytrace.constraints import BaseConstraint

@@ -35,7 +35,7 @@ from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 import threading, os, itertools
-import wx, os
+import os
 import yaml
 from itertools import chain, islice, count
 from raytrace.sources import BaseRaySource

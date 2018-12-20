@@ -16,4 +16,4 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.etsconfig.api import ETSConfig
-ETSConfig.toolkit = 'wx'
+ETSConfig.toolkit = 'qt' #was 'wx'
