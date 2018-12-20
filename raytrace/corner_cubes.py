@@ -25,7 +25,7 @@ from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
-from itertools import chain, izip, islice, tee
+from itertools import chain, islice, tee
 
 #from raytrace.tracer import Optic, VTKOptic, normaliseVector, RaySegment,\
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
@@ -110,7 +110,7 @@ class HollowRetroreflector(BaseMirror):
     
 class SolidRetroreflector(Optic, HollowRetroreflector):
     abstract = False
-    yaml_tag = u"!SolidRetroreflector"
+    yaml_tag = "!SolidRetroreflector"
     n_inside = 1.5
     name = "Solid Retroreflector"
     
@@ -130,7 +130,7 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
                    )
     
     def _material_default(self):
-        print "Making full dielectric material"
+        print("Making full dielectric material")
         m = FullDielectricMaterial(n_inside = self.n_inside,
                                   n_outside = self.n_outside,
                                   reflection_threshold=0.5,
@@ -143,12 +143,12 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
         fl.faces.append(CircularFace(owner=self, material=m, 
                                      z_plane=self.thickness,
                                      invert_normal=True))
-        print "adding circular face", m
+        print("adding circular face", m)
         return fl
     
     def _thickness_changed(self, new_t):
         face = self.faces.faces[-1]
-        print "setting thickness", face, face.z_plane
+        print("setting thickness", face, face.z_plane)
         face.z_plane = new_t
         thickness = new_t
         size = max(thickness, self.diameter)*2

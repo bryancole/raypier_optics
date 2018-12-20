@@ -26,7 +26,7 @@ from traitsui.api import View, Item, ListEditor, VSplit,\
 from tvtk.api import tvtk
 import numpy
 import math
-from itertools import izip
+
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
                 transformNormals, transformPoints
@@ -395,7 +395,7 @@ class TroughParabloid(BaseMirror):
         y = numpy.ones_like(x) * (self.length/2.)
     
         points = numpy.array([x,y,z]).T 
-        cells = [[i,i+1] for i in xrange(size-1)]
+        cells = [[i,i+1] for i in range(size-1)]
         output.points = points
         output.lines = cells
         return output
@@ -484,8 +484,8 @@ class RectMirror(BaseMirror):
         y = numpy.ones_like(x)*(self.length/2.)         #this is a 2d profile.  so, no Y
     
         points = numpy.array([x,y,z]).T 
-        print points
-        cells = [[i,i+1] for i in xrange(size-1)]
+        print(points)
+        cells = [[i,i+1] for i in range(size-1)]
         output.points = points
         output.lines = cells
         return output

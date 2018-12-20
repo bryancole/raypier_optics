@@ -72,11 +72,11 @@ class CylindricalLDLF(Extruded_interpolant):
         m=self.material
 
         if radius**2 < opening**2:
-            print "error: radius is too small (<.5 width)"
+            print("error: radius is too small (<.5 width)")
             return
 
         if d/np.tan(np.radians(slant)) > opening:
-            print "The Cyclindrical LDLF is too deep, slanted sides intersect."
+            print("The Cyclindrical LDLF is too deep, slanted sides intersect.")
             return
 
         sign = 1
@@ -144,7 +144,7 @@ class CylindricalLDLF(Extruded_interpolant):
             z = np.ones(xy.shape[0]) * self.z_height_1
             points = np.column_stack((xy,z))
             
-            cells = [range(len(z)),]
+            cells = [list(range(len(z))),]
             
             output = source.poly_data_output
             output.points = points
@@ -153,7 +153,7 @@ class CylindricalLDLF(Extruded_interpolant):
         
         self.extrude.scale_factor = self.z_height_2 - self.z_height_1  #mm, put here because it wasn;t being initialized
         if self.trace_ends:
-            print "drew ends"
+            print("drew ends")
             self.extrude.capping = True 
         extrude = self.extrude
         extrude.input = source.output

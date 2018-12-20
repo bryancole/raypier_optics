@@ -10,7 +10,7 @@ class MyPanel(wx.Panel):
         
         self.brushes = [wx.Brush(wx.Colour(random.random()*255,
                                   random.random()*255,
-                                  random.random()*255)) for i in xrange(15)]
+                                  random.random()*255)) for i in range(15)]
         self.pen = wx.TRANSPARENT_PEN
         
     def on_paint(self, event):
@@ -19,7 +19,7 @@ class MyPanel(wx.Panel):
         
         w,h = self.GetClientSizeTuple()
         
-        rectangles = [(0,i*h/15.,w,h/15.) for i in xrange(15)]
+        rectangles = [(0,i*h/15.,w,h/15.) for i in range(15)]
         
         dc.BeginDrawing()
         dc.DrawRectangleList(rectangles, self.pen, self.brushes)

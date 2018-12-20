@@ -21,60 +21,60 @@ class TestVectorMathsFunctions(unittest.TestCase):
     def test_set_v(self):
         a = (1., 2., 3.)
         b = ctracer.py_set_v(a)
-        self.assertEquals(a,b)
+        self.assertEqual(a,b)
     
     def test_addvv(self):
         a = [1.,2.,3.]
         b = [2.,3.,4.]
         c = ctracer.addvv(a,b)
-        self.assertEquals(c, tuple(ai+bi for ai,bi in zip(a,b)))
+        self.assertEqual(c, tuple(ai+bi for ai,bi in zip(a,b)))
         
     def test_invert(self):
         a = (1.2, 3.4, 5.6)
         b = ctracer.invert(a)
-        self.assertEquals(a, tuple(-bi for bi in b))
+        self.assertEqual(a, tuple(-bi for bi in b))
         
     def test_subvv(self):
         a = [1.,2.,3.]
         b = [2.,3.,4.]
         c = ctracer.subvv(a,b)
-        self.assertEquals(c, tuple(ai-bi for ai,bi in zip(a,b)))
+        self.assertEqual(c, tuple(ai-bi for ai,bi in zip(a,b)))
         
     def test_multvv(self):
         a = [1.,2.,3.]
         b = [2.,3.,4.]
         c = ctracer.multvv(a,b)
-        self.assertEquals(c, tuple(ai*bi for ai,bi in zip(a,b)))
+        self.assertEqual(c, tuple(ai*bi for ai,bi in zip(a,b)))
         
     def test_addvs(self):
         a = [1.,2.,3.]
         b = 4.56
         c = ctracer.addvs(a,b)
-        self.assertEquals(c, tuple(ai+b for ai in a))
+        self.assertEqual(c, tuple(ai+b for ai in a))
         
     def test_subvs(self):
         a = [1.,2.,3.]
         b = 4.56
         c = ctracer.subvs(a,b)
-        self.assertEquals(c, tuple(ai-b for ai in a))
+        self.assertEqual(c, tuple(ai-b for ai in a))
         
     def test_multvs(self):
         a = [1.,2.,3.]
         b = 4.56
         c = ctracer.multvs(a,b)
-        self.assertEquals(c, tuple(ai*b for ai in a))
+        self.assertEqual(c, tuple(ai*b for ai in a))
         
     def test_sep(self):
         a = [1., 2., 3.]
         b = [4., 5., 6.]
         c = ctracer.sep(a,b)
-        self.assertEquals(c, sqrt(sum((ai-bi)**2 for ai,bi in zip(a,b))))
+        self.assertEqual(c, sqrt(sum((ai-bi)**2 for ai,bi in zip(a,b))))
         
     def test_dotprod(self):
         a = [1., 2., 3.]
         b = [4., 5., 6.]
         c = ctracer.dotprod(a,b)
-        self.assertEquals(c, sum(x*y for x,y in zip(a,b)))
+        self.assertEqual(c, sum(x*y for x,y in zip(a,b)))
         
     def test_cross(self):
         a = [1., 2., 3.]
@@ -82,18 +82,18 @@ class TestVectorMathsFunctions(unittest.TestCase):
         c = ctracer.cross(a,b)
         A = ctracer.dotprod(a,c)
         B = ctracer.dotprod(b,c)
-        self.assertEquals(A, 0.0)
-        self.assertEquals(B, 0.0)
+        self.assertEqual(A, 0.0)
+        self.assertEqual(B, 0.0)
         
     def test_map(self):
         a = [3.4, 5.6, 7.8]
         b = ctracer.mag(a)
-        self.assertEquals(b, sqrt(sum(x**2 for x in a)))
+        self.assertEqual(b, sqrt(sum(x**2 for x in a)))
         
     def test_norm(self):
         a = [1.1, 2.2, 3.3]
         b = ctracer.norm(a)
-        print "B", b
+        print("B", b)
         self.assertAlmostEqual(1.0, sum(x**2 for x in b))
         self.assertAlmostEqual(0.0, ctracer.mag(ctracer.cross(a,b)))
         
@@ -105,7 +105,7 @@ class TestPECMaterial(unittest.TestCase):
         out_rays = ctracer.RayCollection(1)
         m.eval_child_ray(in_ray, 1, (0,0,0), (0,0,1), (0,1,0), out_rays)
         out_ray = out_rays[0]
-        self.assertEquals(out_ray.direction, (1,0,-1))
+        self.assertEqual(out_ray.direction, (1,0,-1))
         
         
 class TestPolarisation(unittest.TestCase):
@@ -117,7 +117,7 @@ class TestPolarisation(unittest.TestCase):
                              E1_amp=phase*(1.0+0.0j)/numpy.sqrt(2),
                              E2_amp=phase*(0.0+1.0j)/numpy.sqrt(2))
         
-        self.assertEquals(in_ray.ellipticity, 1.0)
+        self.assertEqual(in_ray.ellipticity, 1.0)
         
     def test_ellipticity_LHS(self):
         phase = (1.23 + 3.45j)
@@ -127,7 +127,7 @@ class TestPolarisation(unittest.TestCase):
                              E1_amp=phase*(2.0+0.0j)/numpy.sqrt(2),
                              E2_amp=phase*(0.0-2.0j)/numpy.sqrt(2))
         
-        self.assertEquals(in_ray.ellipticity, -1.0)
+        self.assertEqual(in_ray.ellipticity, -1.0)
         
     def test_linear(self):
         in_ray = ctracer.Ray(origin=(-1,0,-1), 
@@ -136,7 +136,7 @@ class TestPolarisation(unittest.TestCase):
                              E1_amp=(1.0+2.0j)/numpy.sqrt(2),
                              E2_amp=(2.0+4.0j)/numpy.sqrt(2))
         
-        self.assertAlmostEquals(in_ray.ellipticity, 0.0)
+        self.assertAlmostEqual(in_ray.ellipticity, 0.0)
         
         
 class TestRay(unittest.TestCase):
@@ -148,31 +148,31 @@ class TestRay(unittest.TestCase):
         ray.length = c
         result = tuple(A+c*B for A,B in zip(a,b))
         shift = sum((a-b)**2 for a,b in zip(result, ray.termination))
-        self.assertAlmostEquals(shift, 0.0)
+        self.assertAlmostEqual(shift, 0.0)
         
         
 class TestRayCollection(unittest.TestCase):
     def test_iteration(self):
         ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
         rc = ctracer.RayCollection(10)
-        for i in xrange(6):
+        for i in range(6):
             rc.add_ray(ray)
-        self.assertEquals(rc.n_rays, 6)
+        self.assertEqual(rc.n_rays, 6)
         rays = [r for r in rc]
-        self.assertEquals(len(rays), 6)
+        self.assertEqual(len(rays), 6)
         
     def test_iteration2(self):
         ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
         rc = ctracer.RayCollection(10)
-        for i in xrange(6):
+        for i in range(6):
             rc.add_ray(ray)
-        self.assertEquals(rc.n_rays, 6)
+        self.assertEqual(rc.n_rays, 6)
         itr = iter(rc)
-        self.assertEquals(type(itr), ctracer.RayCollectionIterator)
-        for i in xrange(6):
-            r1 = itr.next()
-            self.assertEquals(r1.origin, ray.origin)
-            self.assertEquals(r1.direction, ray.direction)
+        self.assertEqual(type(itr), ctracer.RayCollectionIterator)
+        for i in range(6):
+            r1 = next(itr)
+            self.assertEqual(r1.origin, ray.origin)
+            self.assertEqual(r1.direction, ray.direction)
         
     @staticmethod
     def make_ray():
@@ -193,7 +193,7 @@ class TestRayCollection(unittest.TestCase):
         
     def test_copy_to_array(self):
         rc = ctracer.RayCollection(10)
-        rays = [self.make_ray() for i in xrange(7)]
+        rays = [self.make_ray() for i in range(7)]
         for ray in rays:
             rc.add_ray(ray)
         data = rc.copy_as_array()
@@ -203,13 +203,13 @@ class TestRayCollection(unittest.TestCase):
     def test_from_array(self):
         a = numpy.empty(5, dtype=ctracer.ray_dtype)
         rc = ctracer.RayCollection.from_array(a)
-        for i in xrange(len(a)):
-            self.assertEquals(tuple(a[i]['origin']), tuple(rc[i].origin))
-            self.assertEquals(tuple(a[i]['direction']), tuple(rc[i].direction))
+        for i in range(len(a)):
+            self.assertEqual(tuple(a[i]['origin']), tuple(rc[i].origin))
+            self.assertEqual(tuple(a[i]['direction']), tuple(rc[i].direction))
         
     def test_properties(self):
         rc = ctracer.RayCollection(10)
-        rays = [self.make_ray() for i in xrange(7)]
+        rays = [self.make_ray() for i in range(7)]
         for ray in rays:
             rc.add_ray(ray)
         data = rc.copy_as_array()
@@ -262,7 +262,7 @@ class TestTraceSegment(unittest.TestCase):
         in_ray = ctracer.Ray(origin=(-1,0,-1), direction=(1,0,1))
         rays.add_ray(in_ray)
         
-        self.assertEquals(rays.n_rays, 1)
+        self.assertEqual(rays.n_rays, 1)
         
         face_set = ctracer.FaceList()
         face_set.faces = [c]
@@ -270,11 +270,11 @@ class TestTraceSegment(unittest.TestCase):
         
         out_rays = ctracer.trace_segment(rays, [face_set], all_faces)
         
-        self.assertEquals(out_rays.n_rays, 1)
+        self.assertEqual(out_rays.n_rays, 1)
         
         out_ray = out_rays[0]
         
-        self.assertEquals(out_ray.direction, (1,0,-1))
+        self.assertEqual(out_ray.direction, (1,0,-1))
         
         
 class TestInterfaceMaterial(unittest.TestCase):

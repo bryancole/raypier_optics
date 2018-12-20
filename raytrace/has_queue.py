@@ -43,7 +43,7 @@ class QueuedTraitChangeNotifyWrapper(TraitChangeNotifyWrapper):
         this_queue = notification_queue[this_thd]
         handlers = [h for h,a in this_queue]
         count = handlers.count(handler)
-        for i in xrange(count):
+        for i in range(count):
             idx = [h for h,a in this_queue].index(handler)
             del this_queue[idx]
         this_queue.append((handler, args))
@@ -156,23 +156,23 @@ if __name__=="__main__":
         
         @on_trait_change("a", dispatch="same")
         def change_a(self, vnew):
-            print "a changed to", vnew
+            print("a changed to", vnew)
             self.c = vnew + 2
             self.b = vnew + 1
             
         @on_trait_change("b", dispatch="same")
         def change_b(self, vnew):
-            print "b changed to", vnew
+            print("b changed to", vnew)
             self.d = vnew + 3
             
         @on_trait_change("c", dispatch="same")
         def change_c(self, vnew):
-            print "c changed to", vnew
+            print("c changed to", vnew)
             self.d = vnew + 4
             
         @on_trait_change("d", dispatch="queued", retrigger="replace")
         def change_d(self, vnew):
-            print "d changed to", vnew
+            print("d changed to", vnew)
             self.e = vnew + 5
             
     t = test()

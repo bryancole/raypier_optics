@@ -125,7 +125,7 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         dw = numpy.diff(omega)
         dw_mean = dw.mean()
         dw_sd = numpy.std(dw)
-        print "uniformity in f:", dw_sd, dw_mean
+        print("uniformity in f:", dw_sd, dw_mean)
         #print "FREQ:", f
         second_deriv = numpy.diff(phase,2)/(dw_mean**2)
         third_deriv = numpy.diff(phase,3)/(dw_mean**3)
@@ -196,12 +196,12 @@ class RayPaths(Result):
                     path.append(c)
                 #get_ray_list_by_id goes from last ray to first, which isn't as pretty as forwards in time.
                 path.reverse()      
-                if str(path) in result.keys():
+                if str(path) in list(result.keys()):
                     result[str(path)] += 1
                 else:
                     result[str(path)] = 1
         total = float(sum(result.values()))
-        for key in result.keys():
+        for key in list(result.keys()):
             result[key] = result[key]/total
         self.result = result   
 

@@ -4,4 +4,4 @@ from raytrace.bases import Traceable
 o = Traceable()
 f = EllipsoidFace(owner=o)
 
-print "end"
+print("end")

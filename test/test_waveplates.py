@@ -28,19 +28,19 @@ class TestWaveplate(unittest.TestCase):
         wp = self.wp
         for val in [0.0, 0.25, 0.5, 0.75, 1.0]:
             wp.retardance = val
-            self.assertEquals(wp.retardance, val)
+            self.assertEqual(wp.retardance, val)
         
     def test_input_ray(self):
         ray = self.src.InputRays[0]
-        print ray.power, ray.ellipticity, ray.E_vector, ray.E1_amp, ray.E2_amp
-        self.assertEquals(ray.ellipticity, 0.0)
+        print(ray.power, ray.ellipticity, ray.E_vector, ray.E1_amp, ray.E2_amp)
+        self.assertEqual(ray.ellipticity, 0.0)
         
     def test_zero_retardance(self):
         wp = self.wp
         wp.retardance = 0.0
         wp.rotation = 19.235
         direction=(0.,0.,1.)
-        print wp.x_axis
+        print(wp.x_axis)
         self.model.trace_all()
         
         ray_in = self.src.InputRays[0]
@@ -49,16 +49,16 @@ class TestWaveplate(unittest.TestCase):
         ray_in.project_E(1,1,0)
         ray_out.project_E(1,1,0)
         
-        self.assertEquals(ray_in.E_vector, ray_out.E_vector)
-        self.assertAlmostEquals(ray_in.E1_amp, ray_out.E1_amp)
-        self.assertAlmostEquals(ray_in.E2_amp, ray_out.E2_amp)
+        self.assertEqual(ray_in.E_vector, ray_out.E_vector)
+        self.assertAlmostEqual(ray_in.E1_amp, ray_out.E1_amp)
+        self.assertAlmostEqual(ray_in.E2_amp, ray_out.E2_amp)
         
     def test_zero_retardance2(self):
         wp = self.wp
         wp.retardance = 0.0
         wp.rotation = 19.235
         direction=(0.,0.,-1.)
-        print wp.x_axis
+        print(wp.x_axis)
         self.model.trace_all()
         
         ray_in = self.src.InputRays[0]
@@ -67,9 +67,9 @@ class TestWaveplate(unittest.TestCase):
         ray_in.project_E(1,1,0)
         ray_out.project_E(1,1,0)
         
-        self.assertEquals(ray_in.E_vector, ray_out.E_vector)
-        self.assertAlmostEquals(ray_in.E1_amp, ray_out.E1_amp)
-        self.assertAlmostEquals(ray_in.E2_amp, ray_out.E2_amp)
+        self.assertEqual(ray_in.E_vector, ray_out.E_vector)
+        self.assertAlmostEqual(ray_in.E1_amp, ray_out.E1_amp)
+        self.assertAlmostEqual(ray_in.E2_amp, ray_out.E2_amp)
         
     def test_half_wave_plate(self):
         wp = self.wp
@@ -81,7 +81,7 @@ class TestWaveplate(unittest.TestCase):
             ray_in = self.src.InputRays[0]
             ray_out = self.src.TracedRays[-1][0]
     
-            self.assertAlmostEquals(ray_in.ellipticity, ray_out.ellipticity)
+            self.assertAlmostEqual(ray_in.ellipticity, ray_out.ellipticity)
             
             
 class TestWaveplateBackreflection(unittest.TestCase):
@@ -115,15 +115,15 @@ class TestWaveplateBackreflection(unittest.TestCase):
         
         #print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
         
-        self.assertEquals(len(src.TracedRays), 4)
+        self.assertEqual(len(src.TracedRays), 4)
         
-        for i in xrange(4):
+        for i in range(4):
             ray = src.TracedRays[i][0]
-            print i, "::", ray.E_left, ray.E_right, ray.E_vector, ray.E1_amp, ray.E2_amp
-            print "\t", get_major_axis(ray)
+            print(i, "::", ray.E_left, ray.E_right, ray.E_vector, ray.E1_amp, ray.E2_amp)
+            print("\t", get_major_axis(ray))
             
         ray_out = src.TracedRays[-1][0]
-        self.assertAlmostEquals(numpy.dot(get_major_axis(ray_out),
+        self.assertAlmostEqual(numpy.dot(get_major_axis(ray_out),
                                     get_major_axis(ray_in)), 0.0)
             
     def test_quarter_retardance2(self):
@@ -139,15 +139,15 @@ class TestWaveplateBackreflection(unittest.TestCase):
                        centre=(0,0,40),
                        direction=(0,0,1))
         
-        print "wp1 fa:", wp1.material.fast_axis
+        print("wp1 fa:", wp1.material.fast_axis)
         
         wp2 = Waveplate(retardance=0.25,
                        rotation = -45.0,
                        centre=(0,0,80),
                        direction=(0,0,-1))
         
-        print "wp2 fa:", wp2.material.fast_axis
-        print "wp1 fa:", wp1.material.fast_axis
+        print("wp2 fa:", wp2.material.fast_axis)
+        print("wp1 fa:", wp1.material.fast_axis)
         
         model = RayTraceModel(optics=[wp1,wp2], sources=[src])
         model.trace_all()
@@ -163,8 +163,8 @@ class TestWaveplateBackreflection(unittest.TestCase):
         
         #print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
         
-        self.assertEquals(len(src.TracedRays), 3)
+        self.assertEqual(len(src.TracedRays), 3)
         
-        for i in xrange(len(src.TracedRays)):
+        for i in range(len(src.TracedRays)):
             ray = src.TracedRays[i][0]
-            print i, "::", get_major_axis(ray), ray.E_left, ray.E_right, ray.ellipticity, ray.E_vector
+            print(i, "::", get_major_axis(ray), ray.E_left, ray.E_right, ray.ellipticity, ray.E_vector)

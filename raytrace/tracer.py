@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import with_statement
+
 
 from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, Range, Any,\
@@ -37,7 +37,7 @@ import numpy
 import threading, os, itertools
 import wx, os
 import yaml
-from itertools import chain, izip, islice, count
+from itertools import chain, islice, count
 from raytrace.sources import BaseRaySource
 from raytrace.ctracer import Face
 from raytrace.constraints import BaseConstraint
@@ -183,7 +183,7 @@ class RayTraceModel(HasQueue):
     def load_from_yaml(self, filename):
         with open(filename, 'r') as fobj:
             model = yaml.load(fobj)
-        print model
+        print(model)
         self.optics = model['components']
         self.sources = model['sources']
         self.results = model['results']
@@ -203,7 +203,7 @@ class RayTraceModel(HasQueue):
     
     @on_trait_change("optics[]")
     def on_optics_change(self, obj, name, removed, opticList):
-        print "adding", opticList, removed, name
+        print("adding", opticList, removed, name)
         scene = self.scene
         #del scene.actor_list[:]    
         for o in opticList:
@@ -264,7 +264,7 @@ class RayTraceModel(HasQueue):
     def do_update(self):
         optics = self.optics
         #print "trace", 
-        counter.next()
+        next(counter)
         if optics is not None:
             self.prepare_to_trace()
             for o in optics:
@@ -280,13 +280,13 @@ class RayTraceModel(HasQueue):
         
     def trace_detail(self, async=False):
         optics = [o.clone_traits() for o in self.optics]
-        for child, parent in izip(optics, self.optics):
+        for child, parent in zip(optics, self.optics):
             child.shadow_parent = parent
         sources = [s.clone_traits() for s in self.sources]
-        for child, parent in izip(sources, self.sources):
+        for child, parent in zip(sources, self.sources):
             child.shadow_parent = parent
         probes = [p.clone_traits() for p in self.probes]
-        for child, parent in izip(probes, self.probes):
+        for child, parent in zip(probes, self.probes):
             child.shadow_parent = parent
         if async:
             self.thd = threading.Thread(target=self.async_trace, 
@@ -313,7 +313,7 @@ class RayTraceModel(HasQueue):
             s.shadow_parent.copy_traits(s)
         for o in optics:
             o.shadow_parent.copy_traits(o)
-        print "async trace complete"
+        print("async trace complete")
         
     def render_vtk(self):
         if self.scene is not None:
@@ -421,8 +421,8 @@ class RayTraceModel(HasQueue):
         from raytrace.step_export import export_shapes2 as export_shapes
         optics = self.optics
         sources = self.sources
-        shapes_colors = filter(None, (o.make_step_shape() for o in optics))
-        shapes_colors.extend(filter(None,[s.make_step_shape() for s in sources]))
+        shapes_colors = [_f for _f in (o.make_step_shape() for o in optics) if _f]
+        shapes_colors.extend([_f for _f in [s.make_step_shape() for s in sources] if _f])
         
         shapes = [s for s,c in shapes_colors]
         colors = [c for s,c in shapes_colors]
@@ -536,30 +536,30 @@ class RayTraceModel(HasQueue):
             return show()
         
         
-        b1 = widgets.Button(description = u'\u2191')
+        b1 = widgets.Button(description = '\u2191')
         b1.on_click(r_up)
-        b2 = widgets.Button(description = u'\u2193')
+        b2 = widgets.Button(description = '\u2193')
         b2.on_click(r_down)
-        b3 = widgets.Button(description = u'\u2190')
+        b3 = widgets.Button(description = '\u2190')
         b3.on_click(r_left)
-        b4 = widgets.Button(description = u'\u2192')
+        b4 = widgets.Button(description = '\u2192')
         b4.on_click(r_right)
-        b5 = widgets.Button(description = u'\u21ba')
+        b5 = widgets.Button(description = '\u21ba')
         b5.on_click(roll_left)
-        b6 = widgets.Button(description = u'\u21bb')
+        b6 = widgets.Button(description = '\u21bb')
         b6.on_click(roll_right)
         
         b7 = widgets.Button(description = '+')
         b7.on_click(zoom_in)
         b8 = widgets.Button(description = '-')
         b8.on_click(zoom_out)
-        b9 = widgets.Button(description = u'\u2190')
+        b9 = widgets.Button(description = '\u2190')
         b9.on_click(pan_left)
-        b10 = widgets.Button(description = u'\u2192')
+        b10 = widgets.Button(description = '\u2192')
         b10.on_click(pan_right)
-        b11 = widgets.Button(description = u'\u2191')
+        b11 = widgets.Button(description = '\u2191')
         b11.on_click(pan_up)
-        b12 = widgets.Button(description = u'\u2193')
+        b12 = widgets.Button(description = '\u2193')
         b12.on_click(pan_down)
         
         grp1 = widgets.HBox(border_style="solid",
@@ -644,7 +644,7 @@ controller = RayTraceModelHandler()
     
         
 def on_dclick(*obj):
-    print "objects", obj
+    print("objects", obj)
     obj[0].edit_traits(kind="live", parent=controller.info.ui.control)
     
     

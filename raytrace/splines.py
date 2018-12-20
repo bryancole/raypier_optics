@@ -25,7 +25,7 @@ from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
-from itertools import chain, izip, islice, tee
+from itertools import chain, islice, tee
 
 
 from raytrace.bases import Optic, Traceable
@@ -153,9 +153,9 @@ class Extruded_bezier(Optic):
         
         curves=[]
         #seems normal needs to be inverted.  All the time?  should there be a conditional test here?
-        print "invert normal: ",self.invert_normal
+        print("invert normal: ",self.invert_normal)
         curves.append(ExtrudedBezierFace(owner=self, beziercurves = ctl_pts, z_height_1 = self.z_height_1, z_height_2 = self.z_height_2, material=m, invert_normal = self.invert_normal))
-        print curves[0].invert_normal
+        print(curves[0].invert_normal)
                             
         if trace_ends:
             """not perfect, just a polygon of the original profile"""
@@ -215,21 +215,21 @@ class Extruded_bezier(Optic):
             z = numpy.ones(xy.shape[0]) * self.z_height_1
             points = numpy.column_stack((xy,z))
             
-            cells = [range(len(z)),]
+            cells = [list(range(len(z))),]
             
             output = source.poly_data_output
             output.points = points
             output.lines = cells
-            print "cells: ",type(output)
+            print("cells: ",type(output))
         source.set_execute_method(execute)
         
         self.extrude.scale_factor = self.z_height_2 - self.z_height_1  #mm, put here because it wasn;t being initialized
         if self.trace_ends:
-            print "drew ends"
+            print("drew ends")
             self.extrude.capping = True
         extrude = self.extrude
         extrude.input = source.output
-        print "extrude: ",extrude.input
+        print("extrude: ",extrude.input)
         t = self.transform
         transf = tvtk.TransformFilter(input_connection=extrude.output_port, 
                                       transform=t)
@@ -259,9 +259,9 @@ class Extruded_interpolant(Extruded_bezier):
         tck, uout = splprep(profile, s=self.smoothness, k=3, per=False)
         self.tck, self.uout = [tck,uout]
         self.control_points = b_spline_to_bezier_series(tck)
-        print "splprep used ",len(self.control_points), " faces to make this spline"
+        print("splprep used ",len(self.control_points), " faces to make this spline")
         if len(self.control_points) > 30:
-            print "!!! thats alot of faces.  try adjusting smoothness."
+            print("!!! thats alot of faces.  try adjusting smoothness.")
             #need imperfection statistics
 
         return super(Extruded_interpolant,Extruded_interpolant).make_faces(self)                                

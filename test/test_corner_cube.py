@@ -51,7 +51,7 @@ data = """
 
 import yaml
 
-print yaml.dump([source,cc])
+print(yaml.dump([source,cc]))
 
 source, cc = yaml.load(data)
 

@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy
-from utils import normaliseVector, transformPoints
+from .utils import normaliseVector, transformPoints
 from tvtk.api import tvtk
 
 def transform_pts(centre, direction, points):

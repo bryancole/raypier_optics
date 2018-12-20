@@ -76,10 +76,10 @@ class VTKAlgorithm(HasTraits):
 
     def ProcessRequest(self, vtkself, request, inInfo, outInfo):
         """Splits a request to RequestXXX() methods."""
-        print vtkself
-        print request
-        print inInfo
-        print outInfo
+        print(vtkself)
+        print(request)
+        print(inInfo)
+        print(outInfo)
         if request.Has(vtkDemandDrivenPipeline.REQUEST_DATA_OBJECT()):
             return self.RequestDataObject(vtkself, request, inInfo, outInfo)
         elif request.Has(vtkDemandDrivenPipeline.REQUEST_INFORMATION()):

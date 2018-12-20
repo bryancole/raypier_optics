@@ -73,6 +73,6 @@ model.trace_all()
 final_rays = source.TracedRays[-1]
 
 focus = find_ray_focus(final_rays)
-print "Effective focal length:", (focus[1]-l1.centre[1])
+print("Effective focal length:", (focus[1]-l1.centre[1]))
 
 model.configure_traits(kind="live")
