@@ -7,10 +7,12 @@ from traits.api import Float, Instance, Bool
 from traitsui.api import View, Item, VGroup
 from chaco.api import Plot, ArrayPlotData
 from enable.api import ComponentEditor
+from chaco.tools.api import PanTool, ZoomTool
 
 import numpy as np
 from numpy import fft
 from numpy.core._umath_tests import euclidean_pdist
+from traits.has_traits import on_trait_change
 
 
 
@@ -42,7 +44,14 @@ class ChirpResult(TargetResult):
         plot = Plot(plotdata)
         plot.plot(("x", "y"), type="line", color="blue")
         #plot.title = "sin(x) * x^3"
+        plot.tools.append(PanTool(plot, drag_button="right"))
+        plot.overlays.append(ZoomTool(plot))
+        
         return plot
+    
+    @on_trait_change("glass_path, ACF, pulse_width")
+    def do_update(self):
+        self.update()
     
     def _calc_result(self):
         c = 2.99792458e8 * 1e-9 #convert to mm/ps
@@ -51,16 +60,21 @@ class ChirpResult(TargetResult):
         idx = self.target.idx
         last = all_rays[0]
         selected_idx = np.argwhere(last['end_face_idx']==idx).ravel()
-        wavelengths = all_wavelengths[last['wavelength_idx'][selected_idx]]
+        wavelength_idx = last['wavelength_idx'][selected_idx]
+        wavelengths = all_wavelengths[wavelength_idx]
         sort_idx = np.argsort(wavelengths)[::-1]
         wavelengths = wavelengths[sort_idx]
         selected_idx = selected_idx[sort_idx]
+        wavelength_idx = last['wavelength_idx'][selected_idx]
         
-        phase = last['phase'].copy()
+        phase = last['phase'][selected_idx].copy() #The Grating Phase
+        phase[:] = 0.0
         phase -= phase.mean()
         total = np.zeros(len(selected_idx), 'd')
         for ray in all_rays:
             selected = ray[selected_idx]
+            wl_idx = selected['wavelength_idx']
+            assert np.array_equal(wl_idx, wavelength_idx)
             total += selected['length'] * selected['refractive_index'].real
             selected_idx = selected['parent_idx']
             
@@ -85,7 +99,7 @@ class ChirpResult(TargetResult):
         phase -= phase[hsize]
         
         f0 = c/(self.wavelength*0.001) #in THz
-        dt = (1/f0)/3.0 #in ps
+        dt = 0.2*(1/f0)/3.0 #in ps
         size = int(20.0* self.pulse_width/dt)
         print("SIZE:", size, "F0", f0)
         t = np.arange(size)*dt - 10*self.pulse_width
@@ -96,9 +110,11 @@ class ChirpResult(TargetResult):
         f_max = 1./(2*dt)
         f2 = np.roll(np.linspace(-f_max,f_max,len(spec)), len(spec)//2)
         
-        phase2 = np.interp(f2, f, phase, 0.0, 0.0) + np.interp(-f2, f, phase, 0.0, 0.0)
+        phase2 = np.interp(f2, f, phase, 0.0, 0.0) - np.interp(-f2, f, phase, 0.0, 0.0)
         
-        spec *= np.exp(-1.0j*phase2/1.0)
+        bad = np.logical_or(np.abs(f2)<f.min(), np.abs(f2)>f.max())
+        spec *= np.exp(1.0j*phase2/1.0)
+        spec[bad] = 0.0
         
         pulse_out = fft.ifft(spec)
         
