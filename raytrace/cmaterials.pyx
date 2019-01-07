@@ -67,6 +67,8 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     ray.E_vector = S_vector
     ray.E1_amp = S_amp
     ray.E2_amp = P_amp
+    
+    ray.phase = 0.0
     return ray
 
 
@@ -1048,8 +1050,8 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         
         #Create surface unit axes
         normal = norm_(orient.normal)
-        tangent = norm_(orient.tangent)
-        tangent2 = cross_(normal, tangent)
+        tangent = norm_(orient.tangent) #this is the grating wavevector direction
+        tangent2 = cross_(normal, tangent) #parallel to grating lines
         
         wavelen = self._wavelengths[in_ray.wavelength_idx]
         line_spacing = 1000.0 / self.lines_per_mm #in microns
@@ -1066,7 +1068,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
             sign = -1
         
         n_ray = in_ray[0].refractive_index
-        k_x = k_x + self.order*wavelen/(line_spacing*n_ray.real)
+        k_x = k_x - self.order*wavelen/(line_spacing*n_ray.real)
         #y-component (parallel to grating lines) doesn't change
         
         k_z = 1 - (k_x*k_x) - (k_y*k_y) #Apply Pythagoras to get z-component
@@ -1088,7 +1090,12 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = sp_ray.E2_amp.real * self.efficiency
         sp_ray.E2_amp.imag = sp_ray.E2_amp.imag * self.efficiency
         sp_ray.parent_idx = idx
+        
         ### This is the mysterious Grating Phase
-        sp_ray.phase += dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
+        #sp_ray.phase += dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
+        #sp_ray.phase = in_ray[0].phase + dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
+        
+        #Need to convert origin offset to microns since line-spacing is in microns
+        sp_ray.phase = 1000.0*dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
 
         new_rays.add_ray_c(sp_ray)

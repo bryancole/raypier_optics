@@ -74,6 +74,7 @@ class ChirpResult(TargetResult):
         for ray in all_rays:
             selected = ray[selected_idx]
             wl_idx = selected['wavelength_idx']
+            phase -= selected['phase']
             assert np.array_equal(wl_idx, wavelength_idx)
             total += selected['length'] * selected['refractive_index'].real
             selected_idx = selected['parent_idx']

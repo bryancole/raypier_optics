@@ -113,19 +113,26 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         wavelengths = wavelengths[sort_idx]
         selected_idx = selected_idx[sort_idx]
         
-        phase = last['phase'].copy()
-        phase -= phase.mean()
+        idx = len(selected_idx)//2
+        #phase = last['phase'].copy()
+        #phase -= phase.mean()
         total = numpy.zeros(len(selected_idx), 'd')
+        phase = numpy.zeros(len(selected_idx), 'd')
         for ray in all_rays:
             selected = ray[selected_idx]
             total += selected['length'] * selected['refractive_index'].real
+            phase -= selected['phase']
+            print("Phase:", selected['phase'][idx])
             selected_idx = selected['parent_idx']
             
         #print "Phase:", phase
         if len(total) < 6:
             return
-        total -= total.mean() #because we don't care about the overall offset
+        ave_path = total.mean()
+        print("Ave path:", ave_path)
+        total -= ave_path #because we don't care about the overall offset
         f = 1000.0*c/wavelengths #in THz
+        print("Ave Freq:", f.mean())
         omega = 2 * numpy.pi * f
         
         n_fs = self._fs.evaluate_n(wavelengths).real
@@ -133,7 +140,7 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         fs_total -= fs_total.mean()
         total += fs_total
         
-        phase += total*omega/c
+        phase += 2*numpy.pi*total/(0.001*wavelengths) #total*omega/c
         dw = numpy.diff(omega)
         dw_mean = dw.mean()
         dw_sd = numpy.std(dw)
@@ -143,7 +150,7 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         third_deriv = numpy.diff(phase,3)/(dw_mean**3)
         second_deriv *= 1e6 #convert to fs^2
         third_deriv *= 1e9 #convert to fs^3
-        idx = len(second_deriv)//2
+        
         self.result = second_deriv[idx]
         self.wavelength = wavelengths[idx+1]*1000.0 #convert to nm
         self.tod = third_deriv[idx]

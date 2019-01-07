@@ -941,7 +941,7 @@ cdef class FaceList(object):
         try:
             trans = self.owner.transform
         except AttributeError:
-            print "NO OWNER", self.owner
+            print("NO OWNER", self.owner)
             return
         m = trans.matrix
         rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
