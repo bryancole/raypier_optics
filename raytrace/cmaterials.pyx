@@ -68,7 +68,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     ray.E1_amp = S_amp
     ray.E2_amp = P_amp
     
-    ray.phase = 0.0
+    #ray.phase = 0.0
     return ray
 
 
@@ -1092,10 +1092,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         sp_ray.parent_idx = idx
         
         ### This is the mysterious Grating Phase
-        #sp_ray.phase += dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
-        #sp_ray.phase = in_ray[0].phase + dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
-        
         #Need to convert origin offset to microns since line-spacing is in microns
-        sp_ray.phase = 1000.0*dotprod_(subvv_(point, self.origin_), tangent)*self.order*2*M_PI/line_spacing
-
+        sp_ray.phase += 1000.0*dotprod_(subvv_(self.origin_, point), tangent)*self.order*2*M_PI/line_spacing
+        
         new_rays.add_ray_c(sp_ray)
