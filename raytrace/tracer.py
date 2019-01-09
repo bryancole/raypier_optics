@@ -24,7 +24,7 @@ from traits.api import HasTraits, Array, Float, Complex,\
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
-            ShellEditor, Controller
+            ShellEditor, Controller, Tabbed
             
 from traitsui.menu import Menu, MenuBar, Action, Separator
             
@@ -742,7 +742,11 @@ ray_tracer_view = View(
                             height=600),
                        #Item('optics@', editor=ListEditor(use_notebook=True),
                        #     width=200),
-                       Item('ShellObj', editor=ShellEditor(share=False)),
+                       Tabbed(
+                           Item('ShellObj', editor=ShellEditor(share=False)),
+                           Item('constraints', style="custom", editor=ListEditor(use_notebook=True)),
+                           show_labels=False
+                           ),
                        show_labels=False,
                        dock="vertical"
                        ),

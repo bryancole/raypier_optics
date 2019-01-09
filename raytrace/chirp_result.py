@@ -1,6 +1,6 @@
 
 
-from raytrace.results import TargetResult
+from raytrace.results import TargetResult, evaluate_phase
 from raytrace.dispersion import FusedSilica
 
 from traits.api import Float, Instance, Bool
@@ -59,45 +59,15 @@ class ChirpResult(TargetResult):
         self.update()
     
     def _calc_result(self):
+        all_wavelengths = np.asarray(self.source.wavelength_list)
+        traced_rays = self.source.TracedRays
+        target_face = self.target
+        glass_length = self.glass_path
+        glass_dispersion = self._fs
+        f, phase = evaluate_phase(all_wavelengths, traced_rays, target_face, glass_length, glass_dispersion)
+        
         c = 2.99792458e8 * 1e-9 #convert to mm/ps
-        all_wavelengths = np.asarray(self.source.wavelength_list) #in microns
-        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
-        idx = self.target.idx
-        last = all_rays[0]
-        selected_idx = np.argwhere(last['end_face_idx']==idx).ravel()
-        wavelength_idx = last['wavelength_idx'][selected_idx]
-        wavelengths = all_wavelengths[wavelength_idx]
-        sort_idx = np.argsort(wavelengths)[::-1]
-        wavelengths = wavelengths[sort_idx]
-        selected_idx = selected_idx[sort_idx]
-        wavelength_idx = last['wavelength_idx'][selected_idx]
-        
-        phase = last['phase'][selected_idx].copy() #The Grating Phase
-        phase -= phase.mean()
-        total = np.zeros(len(selected_idx), 'd')
-        for ray in all_rays:
-            selected = ray[selected_idx]
-            wl_idx = selected['wavelength_idx']
-            assert np.array_equal(wl_idx, wavelength_idx)
-            total += selected['length'] * selected['refractive_index'].real
-            selected_idx = selected['parent_idx']
-            
-        #print "Phase:", phase
-        if len(total) < 6:
-            return
-        total -= total.mean() #because we don't care about the overall offset
-        f = 1000.0*c/wavelengths #in THz
-        omega = 2 * np.pi * f
-        
-        n_fs = self._fs.evaluate_n(wavelengths).real
-        fs_total = n_fs*self.glass_path*1000.0 #convert path length to mm
-        fs_total -= fs_total.mean()
-        total += fs_total
-        
         hsize = len(phase)//2
-        
-        phase += total*omega/c
-        
         dphi = np.diff(phase)[hsize-hsize//5:hsize + hsize//5].mean()
         phase -= np.arange(len(phase))*dphi
         phase -= phase[hsize]
