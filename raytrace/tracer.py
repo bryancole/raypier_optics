@@ -28,7 +28,7 @@ from traitsui.api import View, Item, ListEditor, VSplit,\
             
 from traitsui.menu import Menu, MenuBar, Action, Separator
             
-from traitsui.file_dialog import save_file
+from pyface.api import FileDialog, OK as FD_OK
             
 from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
@@ -48,6 +48,7 @@ from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
         
 from raytrace import ctracer
+from raytrace.qt_future_call import FutureCall
 
 counter = count()
 
@@ -92,29 +93,27 @@ class RayTraceModelHandler(Controller):
             self.save_as_action(info)
         
     def save_as_action(self, info):
-        flags = wx.CHANGE_DIR | wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-        default_filename = "MyModel.yaml"
-        fname = wx.FileSelector("Choose filename to save model as",
-                               default_filename=default_filename,
-                               wildcard='Model files (*.yaml)|*.yaml|'
-                                        'All files (*.*)|*.*',
-                               flags=flags)
-        if fname:
+        dlg = FileDialog(parent=info.ui.control,
+                         action='save as', 
+                         wildcard=FileDialog.create_wildcard("Raytrace model", ["*.raymod"]))
+        ret = dlg.open()
+        if ret == FD_OK:
+            fname = dlg.path
             model = info.ui.context['object']
             model.save_as_yaml(filename=fname)
         info.ui.title = fname
     
     def open_file_action(self, info):
-        flags = wx.CHANGE_DIR | wx.FD_OPEN
-        default_filename = "MyModel.yaml"
-        fname = wx.FileSelector("Choose model file to open",
-                               wildcard='Model files (*.yaml)|*.yaml|'
-                                        'All files (*.*)|*.*',
-                               flags=flags)
-        if os.path.exists(fname):
-            model = info.ui.context['object']
-            model.load_from_yaml(fname)
-        info.ui.title = fname
+        dlg = FileDialog(parent=info.ui.control,
+                         action='open', 
+                         wildcard=FileDialog.create_wildcard("Raytrace model", ["*.raymod"]))
+        ret = dlg.open()
+        if ret == FD_OK:
+            fname = dlg.path
+            if os.path.exists(fname):
+                model = info.ui.context['object']
+                model.load_from_yaml(fname)
+            info.ui.title = fname
         
     def insert_component(self, info, cls):
         tracer = info.ui.context['object']
@@ -330,7 +329,8 @@ class RayTraceModel(HasQueue):
         for o in optics:
             o.update_complete()
             
-        wx.CallAfter(self.on_trace_complete, optics, sources)
+        #wx.CallAfter(self.on_trace_complete, optics, sources)
+        FutureCall(0, self.on_trace_complete, optics, sources)
         
     def on_trace_complete(self, optics, sources):
         for s in sources:
@@ -419,8 +419,15 @@ class RayTraceModel(HasQueue):
         return traced_rays
     
     def _save_btn_changed(self):
-        filename = save_file()
-        if not filename: return
+        dlg = FileDialog(action="save as",
+                         wildcard=FileDialog.create_wildcard("Scene model", 
+                                                             ["*.stp",
+                                                              "*.step",
+                                                              "*.wrl",
+                                                              "*.vrml"]))
+        ret = dlg.open()
+        if ret != FD_OK: return
+        filename = dlg.path
         fmap = {".stp": self.write_to_STEP,
                 ".step": self.write_to_STEP,
                 ".wrl": self.write_to_VRML,

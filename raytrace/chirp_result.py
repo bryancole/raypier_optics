@@ -18,6 +18,7 @@ from posix import pwrite
 
 
 class ChirpResult(TargetResult):
+    name = "Pulse Intensity Envelope"
     plot = Instance(Plot)
     
     pulse_width = Float(0.2) #in picoseconds
@@ -51,14 +52,14 @@ class ChirpResult(TargetResult):
         #plot.title = "sin(x) * x^3"
         plot.tools.append(PanTool(plot, drag_button="right"))
         plot.overlays.append(ZoomTool(plot))
-        
+        self._calc_result(redraw=False)
         return plot
     
     @on_trait_change("glass_path, ACF, pulse_width")
     def do_update(self):
         self.update()
     
-    def _calc_result(self):
+    def _calc_result(self, redraw=True):
         all_wavelengths = np.asarray(self.source.wavelength_list)
         traced_rays = self.source.TracedRays
         target_face = self.target
@@ -105,5 +106,6 @@ class ChirpResult(TargetResult):
         
         self._pd.set_data('x', t)
         self._pd.set_data('y', pwr)
-        self.plot.request_redraw()
+        if redraw: #prevent a recursive loop.
+            self.plot.request_redraw()
         
