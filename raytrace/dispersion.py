@@ -62,8 +62,8 @@ class NamedDispersionCurve(BaseDispersionCurve):
         sql = "select * from dispersion where %s"%(where,)
         
         conn = sqlite3.connect(MATERIAL_DATABASE)
-        print(MATERIAL_DATABASE)
-        print("SQL", sql, vals)
+        #print(MATERIAL_DATABASE)
+        #print("SQL", sql, vals)
         rows = list(conn.execute(sql, vals))
         if len(rows) > 1:
             raise ValueError("Names given return multiple Material entries.")

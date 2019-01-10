@@ -37,6 +37,7 @@ import numpy
 import threading, os, itertools
 import os
 import yaml
+from contextlib import contextmanager
 from itertools import chain, islice, count
 from raytrace.sources import BaseRaySource
 from raytrace.ctracer import Face
@@ -167,9 +168,12 @@ class RayTraceModel(HasQueue):
     face_sets = List(ctracer.FaceList, desc="list of FaceLists extracted from all "
                      "optics when a tracing operation is initiated")
     
-    update = Event()
-    _updating = Bool(False)
+    update = Event() #triggers a tracing operation
+    _updating = Bool(False) #indicating that tracing is in progress
     update_complete = Event()
+    
+    _hold_off = Bool(False) #Blocks tracing (while model parameters are altered)
+    _update_requested = Bool(False)
     
     Self = self
     ShellObj = PythonValue({}, transient=True)
@@ -203,7 +207,7 @@ class RayTraceModel(HasQueue):
     
     @on_trait_change("optics[]")
     def on_optics_change(self, obj, name, removed, opticList):
-        print("adding", opticList, removed, name)
+        #print("adding", opticList, removed, name)
         scene = self.scene
         #del scene.actor_list[:]    
         for o in opticList:
@@ -256,9 +260,29 @@ class RayTraceModel(HasQueue):
             self.render_vtk()
         
     def trace_all(self):
+        if self._hold_off:
+            self._update_requested=True
+            return
         if not self._updating:
             self._updating = True
             self.update = True
+            
+    @contextmanager
+    def hold_off(self):
+        """A provides a context where the tracing operations are blocked so
+        the user can edit parameters of the model without triggering multiple traces.
+        A final trace occurs on exiting the context if required."""
+        self._hold_off = True
+        try:
+            yield
+        except:
+            self._update_requested = False
+            raise
+        finally:
+            self._hold_off = False
+        if self._update_requested:
+            self._update_requested = False
+            self.trace_all()
         
     @on_trait_change("update", dispatch="queued")
     def do_update(self):
@@ -477,7 +501,7 @@ class RayTraceModel(HasQueue):
             view_out.update({"position": tuple(camera.position), 
                              "view_up": tuple(camera.view_up),
                              "focal_point": tuple(camera.focal_point)})
-            return display(Image(filename))
+            return display(Image(filename), grp)
         
         def r_up(arg):
             camera.orthogonalize_view_up()
@@ -578,7 +602,6 @@ class RayTraceModel(HasQueue):
         
         
         grp = widgets.HBox(children=[grp1,grp2])
-        display(grp)
         
         show()
         return view_out

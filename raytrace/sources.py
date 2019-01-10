@@ -61,7 +61,7 @@ class BaseRaySource(BaseBase):
 
     max_ray_len = Float(200.0)
     
-    scale_factor = Float(0.2)
+    scale_factor = Float(0.1)
     
     show_start = Bool(True)
     show_polarisation = Bool(False)
@@ -222,7 +222,7 @@ class BaseRaySource(BaseBase):
             normals = numpy.vstack([p.normal for p in self.TracedRays])
             output.points = points
             output.point_data.normals = normals
-            print("calc normals GLYPH")
+            #print("calc normals GLYPH")
         source.set_execute_method(execute)
         return source
         
