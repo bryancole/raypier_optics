@@ -43,7 +43,7 @@ all_names = ((make_name(b), make_name(a)) for a,b in all_pairs)
 
 edges = set(all_names)
 for a in edges:
-    print a
+    print(a)
 
 g = pydot.graph_from_edges(edges)
 g.aspect = (8, 5)

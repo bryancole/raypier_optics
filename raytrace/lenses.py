@@ -81,7 +81,7 @@ class PlanoConvexLens(BaseLens):
         self.faces.faces[1].curvature = new_curve
     
     def make_step_shape(self):
-        from step_export import make_spherical_lens
+        from .step_export import make_spherical_lens
         shape = make_spherical_lens(self.CT, self.diameter, self.curvature, 
                                    self.centre, self.direction, self.x_axis)
         return shape, "blue1"

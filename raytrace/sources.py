@@ -61,7 +61,7 @@ class BaseRaySource(BaseBase):
 
     max_ray_len = Float(200.0)
     
-    scale_factor = Float(0.2)
+    scale_factor = Float(0.1)
     
     show_start = Bool(True)
     show_polarisation = Bool(False)
@@ -222,7 +222,7 @@ class BaseRaySource(BaseBase):
             normals = numpy.vstack([p.normal for p in self.TracedRays])
             output.points = points
             output.point_data.normals = normals
-            print "calc normals GLYPH"
+            #print("calc normals GLYPH")
         source.set_execute_method(execute)
         return source
         
@@ -255,7 +255,7 @@ class BaseRaySource(BaseBase):
             if pointArrayList:
                 points = numpy.vstack(pointArrayList)
                 output.points=points
-                lines = list([i,i+1] for i in xrange(0,points.shape[0],2))
+                lines = list([i,i+1] for i in range(0,points.shape[0],2))
                 output.lines = lines
         source.set_execute_method(execute)
         return source
@@ -548,7 +548,7 @@ class RectRaySource(BaseRaySource):
     
     @cached_property
     def _get_InputRays(self):
-        from utils import z_rotation
+        from .utils import z_rotation
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number

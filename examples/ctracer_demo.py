@@ -65,7 +65,7 @@ model.update = True
 import timeit
 t = timeit.Timer("model.update = True","from __main__ import model")
 ret = t.timeit(10)
-print "time:", ret
+print("time:", ret)
 
 
 

@@ -4,7 +4,7 @@ A module for Results subclasses
 
 
 from traits.api import Instance, Float, on_trait_change,\
-            Button, DictStrFloat
+            Button, DictStrFloat, Str
 
 from traitsui.api import View, Item, DropEditor
 
@@ -15,17 +15,53 @@ from raytrace.ctracer import Face
 from raytrace.dispersion import FusedSilica
 
 from traitsui.editors.drop_editor import DropEditor
+from traitsui.editors.title_editor import TitleEditor
 
 import numpy
 import itertools
+import traceback
 
 
-
-class MeanOpticalPathLength(Result):
-    name = "Mean optical path length"
-    abstract = False
+class TargetResult(Result):
+    """A base-class for result calculated from rays terminating on a chosen face"""
     source = Instance(BaseRaySource)
     target = Instance(Face)
+    name = Str("TargetResult")
+    result = Float(label="Result", transient=True)
+    
+    traits_view = View(Item("name", style="readonly", editor=TitleEditor()), 
+                       Item('result', style="readonly"),
+                       Item('source', editor=DropEditor()),
+                       Item('target', editor=DropEditor()),
+                       title="Optical path length",
+                       resizable=True,
+                       )
+    
+    def calc_result(self, tracer):
+        try:
+            self._calc_result()
+        except:
+            traceback.print_exc()
+        
+    def _calc_result(self):
+        raise NotImplementedError()
+        
+    @on_trait_change("source, target")
+    def update(self):
+        if self.target is None:
+            return
+        if self.source is None:
+            return
+        if self.source.TracedRays:
+            try:
+                self._calc_result()
+            except:
+                traceback.print_exc()
+        
+
+class MeanOpticalPathLength(TargetResult):
+    name = "Mean optical path length"
+    abstract = False
     
     result = Float(label="Path length", transient=True)
     
@@ -61,6 +97,54 @@ class MeanOpticalPathLength(Result):
         self.result = total.mean()
         
         
+def evaluate_phase(all_wavelengths, traced_rays, target_face,
+                   glass_length=0.0, glass_dispersion=FusedSilica()):
+    """
+    
+    all_wavelengths - a numpy array giving the wavelengths, in microns
+    traced_rays - the list of RayCollections from the source object after tracing
+    target_face - the Face object at which we terminate the tracing
+    glass_length - an additional length of glass added to the computation
+    glass_dispersion - the DispersionCurve for the extra glass (default Fused Silica)
+    
+    returns - (freq, phase) #freq in THz
+    """
+    c = 2.99792458e8 * 1e-9 #convert to mm/ps
+    all_rays = [r.copy_as_array() for r in reversed(traced_rays)]
+    idx = target_face.idx
+    last = all_rays[0]
+    selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
+    wavelengths = all_wavelengths[last['wavelength_idx'][selected_idx]]
+    sort_idx = numpy.argsort(wavelengths)[::-1]
+    wavelengths = wavelengths[sort_idx]
+    selected_idx = selected_idx[sort_idx]
+    
+    idx = len(selected_idx)//2
+    phase = last['phase'][selected_idx].copy()
+    phase -= phase.mean()
+    total = numpy.zeros(len(selected_idx), 'd')
+    for ray in all_rays:
+        selected = ray[selected_idx]
+        total += selected['length'] * selected['refractive_index'].real
+        selected_idx = selected['parent_idx']
+        
+    #print "Phase:", phase
+    if len(total) < 6:
+        raise ValueError("Not enough rays to evaluate 2nd and 3rd derivatives")
+    ave_path = total.mean()
+    total -= ave_path #because we don't care about the overall offset
+    f = 1000.0*c/wavelengths #in THz
+    
+    n_fs = glass_dispersion.evaluate_n(wavelengths).real
+    fs_total = n_fs*glass_length*1000.0 #convert path length to mm
+    fs_total -= fs_total.mean()
+    total += fs_total
+    
+    #phase += 2*numpy.pi*total/(0.001*wavelengths) #total*omega/c
+    phase += total*f*((2*numpy.pi)/c)
+    return (f, phase)
+    
+
 class GroupVelocityDispersion(MeanOpticalPathLength):
     name = "Group Velocity Dispersion"
     wavelength = Float(label="Wavelength /um", transient=True)
@@ -80,62 +164,64 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
                        resizable=True,
                        )
     
-    @on_trait_change("source, target, glass_path")
-    def update(self):
-        if self.target is None:
-            return
-        if self.source is None:
-            return
-        if self.source.TracedRays:
-            self._calc_result()
+    @on_trait_change("glass_path")
+    def _glass_path_update(self):
+        self.update()
     
     def _calc_result(self):
-        c = 2.99792458e8 * 1e-9 #convert to mm/ps
-        all_wavelengths = numpy.asarray(self.source.wavelength_list) #in microns
-        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
-        idx = self.target.idx
-        last = all_rays[0]
-        selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
-        wavelengths = all_wavelengths[last['wavelength_idx'][selected_idx]]
-        sort_idx = numpy.argsort(wavelengths)[::-1]
-        wavelengths = wavelengths[sort_idx]
-        selected_idx = selected_idx[sort_idx]
+        all_wavelengths = numpy.asarray(self.source.wavelength_list)
+        traced_rays = self.source.TracedRays
+        target_face = self.target
+        glass_length = self.glass_path
+        glass_dispersion = self._fs
+        f, phase = evaluate_phase(all_wavelengths, traced_rays, target_face, glass_length, glass_dispersion)
         
-        phase = last['phase'].copy()
-        phase -= phase.mean()
-        total = numpy.zeros(len(selected_idx), 'd')
-        for ray in all_rays:
-            selected = ray[selected_idx]
-            total += selected['length'] * selected['refractive_index'].real
-            selected_idx = selected['parent_idx']
-            
-        #print "Phase:", phase
-        if len(total) < 6:
-            return
-        total -= total.mean() #because we don't care about the overall offset
-        f = 1000.0*c/wavelengths #in THz
-        omega = 2 * numpy.pi * f
-        
-        n_fs = self._fs.evaluate_n(wavelengths).real
-        fs_total = n_fs*self.glass_path*1000.0 #convert path length to mm
-        fs_total -= fs_total.mean()
-        total += fs_total
-        
-        phase += total*omega/c
+        omega = f*(2*numpy.pi)
         dw = numpy.diff(omega)
         dw_mean = dw.mean()
-        dw_sd = numpy.std(dw)
-        print "uniformity in f:", dw_sd, dw_mean
+        #dw_sd = numpy.std(dw)
+        #print("uniformity in f:", dw_sd, dw_mean)
         #print "FREQ:", f
         second_deriv = numpy.diff(phase,2)/(dw_mean**2)
         third_deriv = numpy.diff(phase,3)/(dw_mean**3)
         second_deriv *= 1e6 #convert to fs^2
         third_deriv *= 1e9 #convert to fs^3
-        idx = len(second_deriv)//2
+        
+        c = 2.99792458e8 * 1e-9 #convert to mm/ps
+        
+        idx = target_face.idx
         self.result = second_deriv[idx]
-        self.wavelength = wavelengths[idx+1]*1000.0 #convert to nm
+        self.wavelength = c*1000.0/numpy.median(f) #convert to nm
         self.tod = third_deriv[idx]
-         
+        
+        
+class FocalPoint(TargetResult):
+    pass #TODO
+
+
+class Divergence(TargetResult):
+    abstract = False
+    name = "Beam Divergence"
+    
+    traits_view = View(Item('result', style="readonly"),
+                       Item('source', editor=DropEditor()),
+                       Item('target', editor=DropEditor()),
+                       title="Optical path length",
+                       resizable=True,
+                       )
+    
+    def _calc_result(self):
+        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
+        idx = self.target.idx
+        last = all_rays[0]
+        selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
+        selected_rays = last[selected_idx]
+        directions = selected_rays['direction']
+        ave_direction = directions.mean(axis=0,keepdims=True)
+        cp_vectors = numpy.cross(ave_direction,directions)
+        rms_cp = (cp_vectors**2).sum(axis=-1).mean()
+        self.result = rms_cp 
+        
         
 def get_total_intersections(raysList, face):
     all_rays = itertools.chain(*raysList)
@@ -196,12 +282,12 @@ class RayPaths(Result):
                     path.append(c)
                 #get_ray_list_by_id goes from last ray to first, which isn't as pretty as forwards in time.
                 path.reverse()      
-                if str(path) in result.keys():
+                if str(path) in list(result.keys()):
                     result[str(path)] += 1
                 else:
                     result[str(path)] = 1
         total = float(sum(result.values()))
-        for key in result.keys():
+        for key in list(result.keys()):
             result[key] = result[key]/total
         self.result = result   
 

@@ -17,7 +17,7 @@ class PSF(HasTraits):
         rays = input_rays
         for faceList in face_sequence:
             if len(faceList) > 1:
-                print "rays more than 1"
+                print("rays more than 1")
                 rayList = [f.trace_rays(rays) for f in faceList]
                 rays = collectRays(*rayList)
             else:

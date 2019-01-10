@@ -19,14 +19,14 @@ from OCC import BRepPrimAPI, BRep, STEPControl, TopoDS, gp, \
         BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom, TopAbs, TopExp,\
         XCAFApp, STEPCAFControl, TDocStd, TCollection,\
         XCAFDoc, Quantity, TopLoc
-from itertools import izip, tee
+from itertools import tee
 import itertools
 import numpy
 
 def pairs(itr):
     a,b = tee(itr)
-    b.next()
-    return izip(a,b)
+    next(b)
+    return zip(a,b)
 
 def MakeVertex(pt): 
     vt = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp.gp_Pnt(*pt))
@@ -71,7 +71,7 @@ def make_cylinder(position, direction, radius, length, offset, x_axis):
     trans = gp.gp_Trsf()
     trans.SetTransformation(gp.gp_Ax3(ax), ax3)
     t_cyl = BRepBuilderAPI.BRepBuilderAPI_Transform(cyl.Shape(), trans)
-    print position, direction, radius, length
+    print(position, direction, radius, length)
     return toshape(t_cyl)
 
 def make_cylinder_2(start, end, radius):
@@ -184,13 +184,13 @@ def make_interp_parabola(FL, rmin, rmax, segments=50):
     x = numpy.linspace(rmin, rmax, segments)
     y = (A * x**2) - FL
     
-    points = [(X,0,Z) for X,Z in itertools.izip(x,y)]
+    points = [(X,0,Z) for X,Z in zip(x,y)]
     points.append((x[0],0,y[-1]))
     
     def pairs(itr):
         a,b = itertools.tee(itr)
-        b.next()
-        return itertools.izip(a,b)
+        next(b)
+        return zip(a,b)
     
     edges = (BRepBuilderAPI.BRepBuilderAPI_MakeEdge(
                     gp.gp_Pnt(*p1), gp.gp_Pnt(*p2))
@@ -282,7 +282,7 @@ def make_spherical_lens(CT, diameter, curvature,
     
     wire = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
     for e in (e1,e2,e3,e4):
-        print e
+        print(e)
         wire.Add(e.Edge())
     
     face = BRepBuilderAPI.BRepBuilderAPI_MakeFace(wire.Wire())
@@ -324,7 +324,7 @@ def make_rays_both(listOfRays, scale):
 
 def make_rays_wires(listOfRays, scale=None):
     raysItr = iter(listOfRays)
-    first = raysItr.next()
+    first = next(raysItr)
     def MakeVertex(pt): 
         vt = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp.gp_Pnt(*pt))
         #print "make vertex", pt, vt
@@ -334,31 +334,31 @@ def make_rays_wires(listOfRays, scale=None):
         #print "make edge", v1, v2, e
         return e
     wires = [BRepBuilderAPI.BRepBuilderAPI_MakeWire() 
-             for i in xrange(first.origin.shape[0])]
+             for i in range(first.origin.shape[0])]
     v_start = [MakeVertex(pt) for pt in first.origin]
     v_end = [MakeVertex(pt) for pt in first.termination]
-    first_edges = [MakeEdge(v1,v2) for v1, v2 in izip(v_start, v_end)]
-    for edge, wire in izip(first_edges, wires):
+    first_edges = [MakeEdge(v1,v2) for v1, v2 in zip(v_start, v_end)]
+    for edge, wire in zip(first_edges, wires):
         wire.Add(edge.Edge())
-    id_map = range(len(wires))
+    id_map = list(range(len(wires)))
     for rays in raysItr:
         id_map = [id_map[pid] for pid in rays.parent_ids]
         v_start = [v_end[pid] for pid in rays.parent_ids]
         v_end = [MakeVertex(pt) for pt in rays.termination]
-        edges = [MakeEdge(v1,v2) for v1, v2 in izip(v_start, v_end)]
-        for edge, w_id in izip(edges, id_map):
+        edges = [MakeEdge(v1,v2) for v1, v2 in zip(v_start, v_end)]
+        for edge, w_id in zip(edges, id_map):
             wires[w_id].Add(edge.Edge())
     return make_compound([w.Shape() for w in wires])
 
 def make_rays_pipes(listOfRays, radius=0.1):
     itrRays = iter(listOfRays)
-    first = itrRays.next()
-    v_lists = [[s,e] for s,e in izip(first.origin, first.termination)]
-    id_map = range(len(v_lists))
+    first = next(itrRays)
+    v_lists = [[s,e] for s,e in zip(first.origin, first.termination)]
+    id_map = list(range(len(v_lists)))
     for rays in itrRays:
         id_map = [id_map[pid] for pid in rays.parent_ids]
         v_end = list(rays.termination)
-        for w_id, v in izip(id_map, v_end):
+        for w_id, v in zip(id_map, v_end):
             v_lists[w_id].append(v)
         
     shapes=[]    
@@ -379,7 +379,7 @@ def fuse_shapes(shapeList):
     return s1
 
 def export_shapes(shapeList, filename):
-    print shapeList
+    print(shapeList)
     step_export = STEPControl.STEPControl_Writer()
     for shape in shapeList:
         step_export.Transfer(shape,STEPControl.STEPControl_AsIs)
@@ -389,7 +389,7 @@ def get_color_map():
     c = [a for a in dir(Quantity) if a.startswith("Quantity_NOC_")]
     names = [a.split('_')[-1].lower() for a in c]
     vals = [getattr(Quantity, n) for n in c]
-    return dict(zip(names,vals))
+    return dict(list(zip(names,vals)))
     
 def export_shapes2(shapeList, filename, colorList=[]):
     h_doc = TDocStd.Handle_TDocStd_Document()
@@ -411,7 +411,7 @@ def export_shapes2(shapeList, filename, colorList=[]):
     colorMap = dict((c, Quantity.Quantity_Color(cmap[c])) for c in colorList)
     
     for shape, color in zip(shapeList, colorList):
-        print "color:", color
+        print("color:", color)
         label = shape_tool.AddShape(shape, False)
         ref_label = shape_tool.AddComponent(top_label, label, loc)
         c = colorMap[color]

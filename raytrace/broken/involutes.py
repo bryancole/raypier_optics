@@ -26,7 +26,7 @@ from traitsui.api import View, Item, ListEditor, VSplit,\
 from tvtk.api import tvtk
 import numpy
 import math
-from itertools import izip
+
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
                 transformNormals, transformPoints
@@ -225,7 +225,7 @@ class CylinderFace(Face):
         inter1[:,2]=z1
         inter2[:,2]=z2    
         
-        print "2: ",inter1,"\n",inter2
+        print("2: ",inter1,"\n",inter2)
         #now apply boundries based on begin and end angle.
         # for any given x or y value, there are two possible angles.
         # but only one will be resposible for both x and y.
@@ -239,7 +239,7 @@ class CylinderFace(Face):
         x1_cos = numpy.arccos(r*inter1[:,0])
         x1_thetas = numpy.column_stack((x1_cos, 2*pi-x1_cos))
 
-        print "x und y: ",inter1[:,1],r*inter1[:,0]
+        print("x und y: ",inter1[:,1],r*inter1[:,0])
         inter1_theta = numpy.ones(n)*numpy.inf
         for i,set in enumerate(y1_thetas):
             for phi in set:
@@ -282,7 +282,7 @@ class CylinderFace(Face):
         boundry_mask2 = numpy.array([boundry_mask2]*3).T
         inter2[boundry_mask2] = numpy.inf
 
-        print "3: ",inter1,"\n",inter2
+        print("3: ",inter1,"\n",inter2)
         #print "boundy masks: \n", boundry_mask2, "\n", inter2  
         # next, use the distance from start to intersection to select the first 
         # intersections if there are multiple
@@ -375,7 +375,7 @@ class Cylinder(BaseMirror):
         profile = numpy.column_stack((r1_x, ys, r1_z))
         
         points = profile
-        cells = [[i,i+1] for i in xrange(size-1)]
+        cells = [[i,i+1] for i in range(size-1)]
         output.points = points
         output.lines = cells
         return output
@@ -803,7 +803,7 @@ class CylindricalInvolute(BaseMirror):
         
     
         points = profile
-        cells = [[i,i+1] for i in xrange(size-1)]
+        cells = [[i,i+1] for i in range(size-1)]
         output.points = points
         output.lines = cells
         return output

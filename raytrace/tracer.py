@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import with_statement
+
 
 from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, Range, Any,\
@@ -24,7 +24,7 @@ from traits.api import HasTraits, Array, Float, Complex,\
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, TextEditor,\
             TupleEditor, VGroup, HGroup, TreeEditor, TreeNode, TitleEditor,\
-            ShellEditor, Controller
+            ShellEditor, Controller, Tabbed
             
 from traitsui.menu import Menu, MenuBar, Action, Separator
             
@@ -35,9 +35,10 @@ from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 import threading, os, itertools
-import wx, os
+import os
 import yaml
-from itertools import chain, izip, islice, count
+from contextlib import contextmanager
+from itertools import chain, islice, count
 from raytrace.sources import BaseRaySource
 from raytrace.ctracer import Face
 from raytrace.constraints import BaseConstraint
@@ -167,9 +168,12 @@ class RayTraceModel(HasQueue):
     face_sets = List(ctracer.FaceList, desc="list of FaceLists extracted from all "
                      "optics when a tracing operation is initiated")
     
-    update = Event()
-    _updating = Bool(False)
+    update = Event() #triggers a tracing operation
+    _updating = Bool(False) #indicating that tracing is in progress
     update_complete = Event()
+    
+    _hold_off = Bool(False) #Blocks tracing (while model parameters are altered)
+    _update_requested = Bool(False)
     
     Self = self
     ShellObj = PythonValue({}, transient=True)
@@ -183,7 +187,7 @@ class RayTraceModel(HasQueue):
     def load_from_yaml(self, filename):
         with open(filename, 'r') as fobj:
             model = yaml.load(fobj)
-        print model
+        print(model)
         self.optics = model['components']
         self.sources = model['sources']
         self.results = model['results']
@@ -203,7 +207,7 @@ class RayTraceModel(HasQueue):
     
     @on_trait_change("optics[]")
     def on_optics_change(self, obj, name, removed, opticList):
-        print "adding", opticList, removed, name
+        #print("adding", opticList, removed, name)
         scene = self.scene
         #del scene.actor_list[:]    
         for o in opticList:
@@ -256,15 +260,35 @@ class RayTraceModel(HasQueue):
             self.render_vtk()
         
     def trace_all(self):
+        if self._hold_off:
+            self._update_requested=True
+            return
         if not self._updating:
             self._updating = True
             self.update = True
+            
+    @contextmanager
+    def hold_off(self):
+        """A provides a context where the tracing operations are blocked so
+        the user can edit parameters of the model without triggering multiple traces.
+        A final trace occurs on exiting the context if required."""
+        self._hold_off = True
+        try:
+            yield
+        except:
+            self._update_requested = False
+            raise
+        finally:
+            self._hold_off = False
+        if self._update_requested:
+            self._update_requested = False
+            self.trace_all()
         
     @on_trait_change("update", dispatch="queued")
     def do_update(self):
         optics = self.optics
         #print "trace", 
-        counter.next()
+        next(counter)
         if optics is not None:
             self.prepare_to_trace()
             for o in optics:
@@ -280,13 +304,13 @@ class RayTraceModel(HasQueue):
         
     def trace_detail(self, async=False):
         optics = [o.clone_traits() for o in self.optics]
-        for child, parent in izip(optics, self.optics):
+        for child, parent in zip(optics, self.optics):
             child.shadow_parent = parent
         sources = [s.clone_traits() for s in self.sources]
-        for child, parent in izip(sources, self.sources):
+        for child, parent in zip(sources, self.sources):
             child.shadow_parent = parent
         probes = [p.clone_traits() for p in self.probes]
-        for child, parent in izip(probes, self.probes):
+        for child, parent in zip(probes, self.probes):
             child.shadow_parent = parent
         if async:
             self.thd = threading.Thread(target=self.async_trace, 
@@ -313,7 +337,7 @@ class RayTraceModel(HasQueue):
             s.shadow_parent.copy_traits(s)
         for o in optics:
             o.shadow_parent.copy_traits(o)
-        print "async trace complete"
+        print("async trace complete")
         
     def render_vtk(self):
         if self.scene is not None:
@@ -421,8 +445,8 @@ class RayTraceModel(HasQueue):
         from raytrace.step_export import export_shapes2 as export_shapes
         optics = self.optics
         sources = self.sources
-        shapes_colors = filter(None, (o.make_step_shape() for o in optics))
-        shapes_colors.extend(filter(None,[s.make_step_shape() for s in sources]))
+        shapes_colors = [_f for _f in (o.make_step_shape() for o in optics) if _f]
+        shapes_colors.extend([_f for _f in [s.make_step_shape() for s in sources] if _f])
         
         shapes = [s for s,c in shapes_colors]
         colors = [c for s,c in shapes_colors]
@@ -477,7 +501,7 @@ class RayTraceModel(HasQueue):
             view_out.update({"position": tuple(camera.position), 
                              "view_up": tuple(camera.view_up),
                              "focal_point": tuple(camera.focal_point)})
-            return display(Image(filename))
+            return display(Image(filename), grp)
         
         def r_up(arg):
             camera.orthogonalize_view_up()
@@ -536,30 +560,30 @@ class RayTraceModel(HasQueue):
             return show()
         
         
-        b1 = widgets.Button(description = u'\u2191')
+        b1 = widgets.Button(description = '\u2191')
         b1.on_click(r_up)
-        b2 = widgets.Button(description = u'\u2193')
+        b2 = widgets.Button(description = '\u2193')
         b2.on_click(r_down)
-        b3 = widgets.Button(description = u'\u2190')
+        b3 = widgets.Button(description = '\u2190')
         b3.on_click(r_left)
-        b4 = widgets.Button(description = u'\u2192')
+        b4 = widgets.Button(description = '\u2192')
         b4.on_click(r_right)
-        b5 = widgets.Button(description = u'\u21ba')
+        b5 = widgets.Button(description = '\u21ba')
         b5.on_click(roll_left)
-        b6 = widgets.Button(description = u'\u21bb')
+        b6 = widgets.Button(description = '\u21bb')
         b6.on_click(roll_right)
         
         b7 = widgets.Button(description = '+')
         b7.on_click(zoom_in)
         b8 = widgets.Button(description = '-')
         b8.on_click(zoom_out)
-        b9 = widgets.Button(description = u'\u2190')
+        b9 = widgets.Button(description = '\u2190')
         b9.on_click(pan_left)
-        b10 = widgets.Button(description = u'\u2192')
+        b10 = widgets.Button(description = '\u2192')
         b10.on_click(pan_right)
-        b11 = widgets.Button(description = u'\u2191')
+        b11 = widgets.Button(description = '\u2191')
         b11.on_click(pan_up)
-        b12 = widgets.Button(description = u'\u2193')
+        b12 = widgets.Button(description = '\u2193')
         b12.on_click(pan_down)
         
         grp1 = widgets.HBox(border_style="solid",
@@ -578,7 +602,6 @@ class RayTraceModel(HasQueue):
         
         
         grp = widgets.HBox(children=[grp1,grp2])
-        display(grp)
         
         show()
         return view_out
@@ -644,7 +667,7 @@ controller = RayTraceModelHandler()
     
         
 def on_dclick(*obj):
-    print "objects", obj
+    print("objects", obj)
     obj[0].edit_traits(kind="live", parent=controller.info.ui.control)
     
     
@@ -742,7 +765,11 @@ ray_tracer_view = View(
                             height=600),
                        #Item('optics@', editor=ListEditor(use_notebook=True),
                        #     width=200),
-                       Item('ShellObj', editor=ShellEditor(share=False)),
+                       Tabbed(
+                           Item('ShellObj', editor=ShellEditor(share=False)),
+                           Item('constraints', style="custom", editor=ListEditor(use_notebook=True)),
+                           show_labels=False
+                           ),
                        show_labels=False,
                        dock="vertical"
                        ),

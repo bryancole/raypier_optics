@@ -30,8 +30,7 @@ from traitsui.file_dialog import save_file
 from tvtk.api import tvtk
 import numpy
 import threading, os, itertools
-import wx
-from itertools import chain, izip, islice, count
+from itertools import chain, islice, count
 import yaml
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
@@ -73,13 +72,11 @@ class RaytraceObjectMetaclass(MetaHasTraits):
             cls.subclasses.add(cls)
 
 
-class RaytraceObject(object):
+class RaytraceObject(object, metaclass=RaytraceObjectMetaclass):
     """
     An object that can dump itself to a YAML stream
     and load itself from a YAML stream.
     """
-
-    __metaclass__ = RaytraceObjectMetaclass
     __slots__ = ()  # no direct instantiation, so allow immutable subclasses
 
     yaml_loader = yaml.Loader
@@ -115,8 +112,7 @@ class Direction(HasTraits):
     z = Float
 
 
-class Renderable(HasQueue, RaytraceObject):
-    __metaclass__ = RaytraceObjectMetaclass
+class Renderable(HasQueue, RaytraceObject, metaclass=RaytraceObjectMetaclass):
     display = Enum("shaded", "wireframe", "hidden")
     
     actors = Instance(tvtk.ActorCollection, (), transient=True)
@@ -332,15 +328,17 @@ class Traceable(ModelObject):
     def update_complete(self):
         pass
 
+OrientationEditor = RangeEditor(low=-180.0, high=180.0, mode='slider')
+
 
 Traceable.uigroup = VGroup(
                    Item('name', editor=TitleEditor(), springy=False,
                         show_label=False),
                    Item('display'),
                    VGroup(
-                   Item('orientation', editor=ScrubberEditor()),
-                   Item('elevation', editor=ScrubberEditor()),
-                   Item('rotation', editor=ScrubberEditor()),
+                   Item('orientation', editor=OrientationEditor),
+                   Item('elevation', editor=OrientationEditor),
+                   Item('rotation', editor=OrientationEditor),
                    ),
                    HGroup(Item('centre', 
                                show_label=False, 
@@ -456,7 +454,7 @@ class VTKOptic(Optic):
         if self is not last_optic:
             last_cell = None
         data = [ (sqrt(((array(p) - p1)**2).sum()), p, Id)
-                    for p, Id in izip(pts, ids) 
+                    for p, Id in zip(pts, ids) 
                     if Id is not last_cell ]
         if not data:
             return None

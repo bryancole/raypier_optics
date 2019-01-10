@@ -21,7 +21,7 @@ from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
-from itertools import chain, izip, islice, tee
+from itertools import chain, islice, tee
 from raytrace.bases import Optic, Traceable
 from raytrace.cfaces import PolygonFace, ExtrudedPlanarFace
 from raytrace.ctracer import FaceList
@@ -83,14 +83,14 @@ para = approx_parabola(material=PECMaterial(),
 
 
           
-print 0
+print(0)
 model0 = RayTraceModel(optics=[para,], sources=[source,])
-print 1
+print(1)
 model1 = RayTraceModel(optics=[para,], sources=[source,])
-print 2
+print(2)
 model2 = RayTraceModel(optics=[para,], sources=[source,])
-print 3
+print(3)
                     
 model1.configure_traits()
-print model.all_faces.size
+print(model.all_faces.size)
 

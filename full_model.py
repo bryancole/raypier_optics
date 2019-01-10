@@ -1,4 +1,4 @@
-import cPickle as pickle
+import pickle as pickle
 from ray_tracer import  BuildRaySet, RayTraceModel
 from prisms import Prism, Rhomboid
 

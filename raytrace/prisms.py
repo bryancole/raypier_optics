@@ -25,7 +25,7 @@ from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
-from itertools import chain, izip, islice, tee
+from itertools import chain, islice, tee
 
 #from raytrace.tracer import Optic, VTKOptic, normaliseVector, RaySegment,\
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
@@ -37,8 +37,8 @@ from raytrace.ctracer import FaceList
 
 def pairwise(itr):
     a,b = tee(itr)
-    fst = b.next()
-    return izip(a, chain(b,[fst]))
+    fst = next(b)
+    return zip(a, chain(b,[fst]))
 
 class Extrusion(Optic):
     """a general flat-faced optic formed by extrusion 
@@ -112,13 +112,13 @@ class Extrusion(Optic):
             z = numpy.ones(xy.shape[0]) * self.z_height_1
             points = numpy.column_stack((xy,z))
             
-            cells = [range(len(z)),]
+            cells = [list(range(len(z))),]
             
             output = source.poly_data_output
             output.points = points
             output.polys = cells
         source.set_execute_method(execute)
-        print "Made PIPELINE"
+        print("Made PIPELINE")
         
         extrude = self.extrude
         extrude.input_connection = source.output_port
@@ -300,7 +300,7 @@ if __name__=="__main__":
                         direction=(0,1,0))
     
     #print "rhomboid", rhomboid.polydata
-    print "beamstop", beamstop.polydata
+    print("beamstop", beamstop.polydata)
     
     model = RayTraceModel(optics=[rhomboid, beamstop], rays=input_rays)
     model.configure_traits()

@@ -70,7 +70,7 @@ model = RayTraceModel(optics=[r1,r2,en_ap,exit_ap],
                     
 model.configure_traits()
 
-print model.all_faces
+print(model.all_faces)
 ap_ratio = ent_ap/ex_ap
-print "ap ratio: ", ap_ratio
-print "effective concentration: ", ap_ratio*model.results[0].result	#still not right, circular source biases ratio.
+print("ap ratio: ", ap_ratio)
+print("effective concentration: ", ap_ratio*model.results[0].result)	#still not right, circular source biases ratio.

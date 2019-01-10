@@ -44,7 +44,7 @@ sun_angle = numpy.pi/2                      #sun coming straight down
 theta = numpy.arctan(tower_height/centers)
 phi = theta/2 + sun_angle/2
 
-print theta
+print(theta)
 
 # make an array of however many mirrors we have
 Mirrors = list([blank] for i in centers)

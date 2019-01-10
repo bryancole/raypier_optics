@@ -76,10 +76,10 @@ class VTKAlgorithm(HasTraits):
 
     def ProcessRequest(self, vtkself, request, inInfo, outInfo):
         """Splits a request to RequestXXX() methods."""
-        print vtkself
-        print request
-        print inInfo
-        print outInfo
+        print(vtkself)
+        print(request)
+        print(inInfo)
+        print(outInfo)
         if request.Has(vtkDemandDrivenPipeline.REQUEST_DATA_OBJECT()):
             return self.RequestDataObject(vtkself, request, inInfo, outInfo)
         elif request.Has(vtkDemandDrivenPipeline.REQUEST_INFORMATION()):
@@ -126,12 +126,15 @@ class PythonAlgorithmBase(tvtk.PythonAlgorithm):
         """Sets up default NumberOfInputPorts, NumberOfOutputPorts,
         InputType and OutputType that are used by various methods.
         Make sure to call this method from any subclass' __init__"""
+
+        number_of_input_ports = self.number_of_input_ports
+        number_of_output_ports = self.number_of_output_ports
         super(PythonAlgorithmBase, self).__init__(*args, **kwds)
         vtk_obj = self._vtk_obj
         vtk_obj.SetPythonObject(PythonAlgorithmBase.InternalAlgorithm())
-
-        self.set_number_of_input_ports(self.number_of_input_ports)
-        self.set_number_of_output_ports(self.number_of_output_ports)
+        self.number_of_input_ports = number_of_input_ports
+        self.number_of_output_ports = number_of_output_ports
+        
 
     def get_input_data(self, inInfo, i, j):
         """Convenience method that returns an input data object
@@ -226,6 +229,8 @@ if __name__=="__main__":
         def show(self):            
             grid = EmptyGridSource(dimensions=(20,30,40))
             src_output_port = grid.output_port
+            src_output_port = grid._vtk_obj.GetOutputPort()
+            assert src_output_port is not None
             extract = tvtk.ImageDataGeometryFilter(input_connection=src_output_port)
             mapper = tvtk.PolyDataMapper(input_connection=extract.output_port)
             act = tvtk.Actor(mapper=mapper)

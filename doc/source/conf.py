@@ -37,8 +37,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Raytrace'
-copyright = u'2010, Bryan Cole'
+project = 'Raytrace'
+copyright = '2010, Bryan Cole'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -172,8 +172,8 @@ htmlhelp_basename = 'Raytracedoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'Raytrace.tex', u'Raytrace Documentation',
-   u'Bryan Cole', 'manual'),
+  ('index', 'Raytrace.tex', 'Raytrace Documentation',
+   'Bryan Cole', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

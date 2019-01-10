@@ -26,7 +26,7 @@ from traitsui.api import View, Item, ListEditor, VSplit,\
 from tvtk.api import tvtk
 import numpy
 import math
-from itertools import izip
+
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
                 transformNormals, transformPoints
@@ -93,7 +93,7 @@ class OffAxisParabloid(BaseMirror):
     
     @on_trait_change("EFL, diameter, height, max_length")
     def config_pipeline(self):
-        print "config"
+        print("config")
         EFL = self.EFL
         rad = self.diameter/2
         h = self.height

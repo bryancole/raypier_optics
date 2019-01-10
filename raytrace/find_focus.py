@@ -46,9 +46,9 @@ if __name__=="__main__":
        [ 9.83472949e+00, -1.51142336e+01, -3.21953019e-16],
        [ 1.80661050e-15, -1.51142336e+01,  9.83472949e+00]])
     
-    print directions.shape, origins.shape
+    print(directions.shape, origins.shape)
     out = find_focus(origins, directions)
-    print out
+    print(out)
     
     ###Now check numerically
     def get_errs(y_coord):
@@ -68,7 +68,7 @@ if __name__=="__main__":
     
     a=np.linspace(0.0,100.0,200)
     
-    for i in xrange(5):
+    for i in range(5):
         x = origins[i,0] + a * directions[i,0]
         y = origins[i,1] + a * directions[i,1]
     

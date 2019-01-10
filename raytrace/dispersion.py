@@ -53,8 +53,8 @@ class FusedSilica(BaseDispersionCurve):
 class NamedDispersionCurve(BaseDispersionCurve):
     def __init__(self, name=None, book=None, filename=None, absorption=0.0):
         filters = {"name": name, "book": book, "filename": filename}
-        names, vals = zip(*[('(%s=?)'%(k,),v) for k,v in filters.items()\
-                             if v is not None])
+        names, vals = list(zip(*[('(%s=?)'%(k,),v) for k,v in list(filters.items())\
+                             if v is not None]))
         if not names:
             raise ValueError("No material data identifier given. "
                              "Must give at least one name, book or filename")
@@ -62,8 +62,8 @@ class NamedDispersionCurve(BaseDispersionCurve):
         sql = "select * from dispersion where %s"%(where,)
         
         conn = sqlite3.connect(MATERIAL_DATABASE)
-        print MATERIAL_DATABASE
-        print "SQL", sql, vals
+        #print(MATERIAL_DATABASE)
+        #print("SQL", sql, vals)
         rows = list(conn.execute(sql, vals))
         if len(rows) > 1:
             raise ValueError("Names given return multiple Material entries.")
@@ -83,6 +83,6 @@ class NamedDispersionCurve(BaseDispersionCurve):
 if __name__=="__main__":
     
     BK7 = NamedDispersionCurve("N-LAK22")
-    print BK7.formula_id, list(BK7.coefs)
-    print BK7.evaluate_n([1.0, 1.5])
+    print(BK7.formula_id, list(BK7.coefs))
+    print(BK7.evaluate_n([1.0, 1.5]))
         

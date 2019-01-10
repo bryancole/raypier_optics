@@ -383,7 +383,7 @@ class Doublet(BaseLens):
     
     
 class EdmundOptic45805(Doublet):
-    name = "Edumnd Optics Achromat#45805"
+    name = "Edmund Optics Achromat#45805"
     CT1 = 6.0
     CT2 = 4.0
     diameter = 25.4
@@ -395,3 +395,19 @@ class EdmundOptic45805(Doublet):
     dispersion2 = NamedDispersionCurve("N-SF6")
     dispersion_coating = NondispersiveCurve(refractive_index=1.37)
     coating_thickness = 0.283 #microns
+    
+    
+class EdmundOptic45806(Doublet):
+    name = "Edmund Optics Achromat#45-806"
+    CT1 = 6.0
+    CT2 = 4.0
+    diameter = 25.4
+    offset = 0.0
+    curvature1 = 57.01
+    curvature2 = -56.72
+    curvature3 = -656.51
+    dispersion1 = NamedDispersionCurve("N-LAK22")
+    dispersion2 = NamedDispersionCurve("N-SF6")
+    dispersion_coating = NondispersiveCurve(refractive_index=1.37)
+    coating_thickness = 0.283 #microns
+    
