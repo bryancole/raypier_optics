@@ -36,6 +36,7 @@ from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 import threading, os, itertools
 import os
+import traceback
 import yaml
 from contextlib import contextmanager
 from itertools import chain, islice, count
@@ -297,7 +298,10 @@ class RayTraceModel(HasQueue):
             for o in optics:
                 o.update_complete()
             for r in self.results:
-                r.calc_result(self)
+                try:
+                    r.calc_result(self)
+                except:
+                    traceback.print_exc()
         self.render_vtk()
         self._updating = False
         

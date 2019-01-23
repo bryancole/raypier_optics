@@ -309,7 +309,7 @@ class SingleRaySource(BaseRaySource):
                                 'labels':['x','y','z']})
     E1_amp = Complex(1.0+0.0j)
     E2_amp = Complex(0.0+0.0j)
-    wavelength = Float(0.78)
+    wavelength = Float(0.78) # in microns
     
     view_ray_ids = numpy.arange(1)
     
@@ -596,6 +596,87 @@ class RectRaySource(BaseRaySource):
         ray_data['E_vector'] = [[1,0,0]]
         ray_data['E1_amp'] = 1.0 + 0.0j
         ray_data['E2_amp'] = 0.0
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        rays = RayCollection.from_array(ray_data)
+        return rays
+    
+    
+class GaussianBeamRaySource(SingleRaySource):
+    """
+    Launches a set of skew rays simulating the propagation of a Gaussian beam.
+    See Paul D Colbourne - Proc. SPIE 9293, International Optical Design Conference 2014, 92931S
+    and refs theirin.
+    """
+    beam_waist = Float() #in microns
+    number = Range(2,64,16)
+    working_distance = Float(0.0) #the distance from the beam waist to the source location
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, number, beam_waist, wavelength, "
+                         "max_ray_len, E_vector, working_distance")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item('number'),
+                       Item("wavelength"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
+                       Item('working_distance', tooltip="The distance from the source to the beam waist"),
+                       label="Geometry")
+    
+    
+    @on_trait_change("direction, number, beam_waist, max_ray_len, working_distance")
+    def on_update(self):
+        self.data_source.modified()
+        self.update=True
+    
+    @cached_property
+    def _get_InputRays(self):
+        origin = numpy.array(self.origin)
+        direction = numpy.array(self.direction)
+        count = self.number
+        radius = self.beam_waist/2000.0 #convert to mm
+        max_axis = numpy.abs(direction).argmax()
+        if max_axis==0:
+            v = numpy.array([0.,1.,0.])
+        else:
+            v = numpy.array([1.,0.,0.])
+        d1 = numpy.cross(direction, v)
+        d1 = normaliseVector(d1)
+        d2 = numpy.cross(direction, d1)
+        d2 = normaliseVector(d2)
+
+        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(E_vector, direction)
+
+        ray_data = numpy.zeros((2*count)+1, dtype=ray_dtype)
+        
+        theta0 = self.wavelength/(numpy.pi*radius*1000.0)
+        lr = numpy.array([1,-1])[:,None,None]
+        eye = numpy.array([1,1])[:,None,None]
+        alpha = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
+        origins = eye*radius*(d1*numpy.sin(alpha) + d2*numpy.cos(alpha))
+        directions = theta0*lr*(d1*numpy.cos(alpha) - d2*numpy.sin(alpha))
+        
+        origins.shape = (-1,3)
+        directions.shape = (-1,3)
+        directions += direction
+        directions = normaliseVector(directions)
+        origins = origins - (self.working_distance*directions)
+            
+        ray_data['origin'][1:] = origins
+        ray_data['origin'] += origin + (self.working_distance*direction)
+        ray_data['direction'][1:] = directions
+        ray_data['direction'][0] = direction
+        ray_data['wavelength_idx'] = 0
+        ray_data['E_vector'] = [normaliseVector(E_vector)]
+        ray_data['E1_amp'] = self.E1_amp
+        ray_data['E2_amp'] = self.E2_amp
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
         rays = RayCollection.from_array(ray_data)
