@@ -169,11 +169,13 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
         
     def _pipeline_default(self):
         cyl = self.cyl
-        cyl.resolution = 64
-        cyl.height = self.thickness
+        cyl.resolution = 63 #use a prime no to avoid vertex degeneracy
+        # Important to ensure the cylinder end doesn't coincide with the corner of the cube
+        cyl.height = self.thickness-1
         cyl.radius = self.diameter/2.0
-        cyl.center = (0, self.thickness/2,0)
-        
+        cyl.center = (0, (self.thickness/2)-1,0)
+        print("thickness", self.thickness)
+        print("diameter", self.diameter)
         size = max(self.thickness, self.diameter)*2
         cube = self.cube
         cube.set_bounds(0,size,0,size,0,size)
@@ -188,11 +190,14 @@ class SolidRetroreflector(Optic, HollowRetroreflector):
         
         tri1 = tvtk.TriangleFilter(input_connection=cyl.output_port)
         tri2 = tvtk.TriangleFilter(input_connection=tfilt.output_port)
+        tri1.update()
+        tri2.update()
         
         intersect = tvtk.BooleanOperationPolyDataFilter()
         intersect.operation = "intersection"
         intersect.add_input_connection(0, tri1.output_port)
         intersect.add_input_connection(1, tri2.output_port)
+        intersect.tolerance = 1e-8
         
         tf2=tvtk.Transform()
         tf2.rotate_x(90.0)
