@@ -6,10 +6,10 @@ cdef extern from "math.h":
 cdef extern from "float.h":
     #double INFINITY
     double DBL_MAX
-    
+
 cdef double INF
-    
-    
+
+
 from libc.stdlib cimport malloc, free
 
 ############################################
@@ -18,14 +18,17 @@ from libc.stdlib cimport malloc, free
 
 cdef struct vector_t:
     double x,y,z
-    
+
 cdef struct orientation_t:
     vector_t normal, tangent
-    
-cdef struct complex_t:
-    double real
-    double imag
-    
+
+IF UNAME_SYSNAME == "Windows":
+    ctypedef double complex complex_t
+ELSE:
+    cdef struct complex_t:
+        double real
+        double imag
+
 cdef packed struct ray_t:
     #vectors
     vector_t origin, direction, normal, E_vector
@@ -34,10 +37,10 @@ cdef packed struct ray_t:
     #simple attribs
     double length, phase
     #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx 
+    unsigned int wavelength_idx, parent_idx, end_face_idx
     ##objects
     #object face, end_face, child_refl, child_trans
-    
+
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
     double tx, ty, tz
@@ -81,9 +84,9 @@ cdef class RayCollection:
     cdef ray_t *rays
     cdef readonly unsigned long n_rays, max_size
     cdef public RayCollection parent
-        
+
     cdef add_ray_c(self, ray_t r)
-    
+
 cdef class RayCollectionIterator:
     cdef:
         RayCollection rays
@@ -95,15 +98,15 @@ cdef class InterfaceMaterial(object):
     the materials characterics of a Face
     """
     cdef double[:] _wavelengths
-    
-    cdef eval_child_ray_c(self, ray_t *old_ray, 
-                            unsigned int ray_idx, 
-                            vector_t point, 
+
+    cdef eval_child_ray_c(self, ray_t *old_ray,
+                            unsigned int ray_idx,
+                            vector_t point,
                             orientation_t orient,
                             RayCollection new_rays)
-    
+
     cdef on_set_wavelengths(self)
-                                
+
 
 cdef class Face(object):
     cdef public object owner
@@ -114,20 +117,20 @@ cdef class Face(object):
     cdef public InterfaceMaterial material
     cdef public short int invert_normal
     cdef public unsigned int count
-    
+
     cdef double intersect_c(self, vector_t p1, vector_t p2)
 
     cdef vector_t compute_normal_c(self, vector_t p)
     cdef vector_t compute_tangent_c(self, vector_t p)
-    
-    
+
+
 cdef class FaceList(object):
     """A group of faces which share a transform"""
     cdef transform_t trans
     cdef transform_t inv_trans
     cdef public list faces
     cdef public object owner
-     
+
     cdef int intersect_c(self, ray_t *ray, vector_t end_point, double max_length)
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point)
 
@@ -136,8 +139,8 @@ cdef class FaceList(object):
 ### Python module functions
 ##################################
 
-cdef RayCollection trace_segment_c(RayCollection rays, 
-                                    list face_sets, 
+cdef RayCollection trace_segment_c(RayCollection rays,
+                                    list face_sets,
                                     list all_faces,
                                     float max_length)
 
