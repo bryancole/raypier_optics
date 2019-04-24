@@ -69,7 +69,7 @@ setup(
         #"wxPython", #maybe can avoid an explicit dependancy on wx
         "Traits >= 3.0",
         "Mayavi >= 3.0", #TVTK is distributed as part of Mayavi
-        "TraitsGUI >= 3.0"
+        "TraitsUI >= 3.0"
         ],
 
     package_data = {}, #none, yet
