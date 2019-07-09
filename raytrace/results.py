@@ -80,9 +80,6 @@ class MeanOpticalPathLength(TargetResult):
             return
         if self.source.TracedRays:
             self._calc_result()
-        
-    def calc_result(self, tracer):
-        self._calc_result()
     
     def _calc_result(self):
         all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]

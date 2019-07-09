@@ -47,4 +47,8 @@ class RectangularGrating(RectMirror):
         setattr(self.material, name, new)
         self.update = True
         
+    def make_step_shape(self):
+        shape, colour = super().make_step_shape()
+        return shape, "pink"
+        
         

@@ -247,6 +247,23 @@ class RectMirror(BaseMirror):
                                        transform=self.transform)
         self.config_pipeline()
         return transF2
+    
+    def make_step_shape(self):
+        """Creates an OpenCascade BRep Shape
+        representation of the object, which can be
+        exported to STEP format"""
+        from raytrace.step_export import make_box
+        position = self.centre
+        direction = self.direction
+        x_axis = self.x_axis
+        dz = self.thickness
+        dx = self.length
+        dy = self.width
+        
+        box = make_box(position, direction, x_axis, dx, dy, dz)
+        
+        return box, "green"
+    
 
 class RectWindow(RectMirror, Optic):
     n_inside = 1.5

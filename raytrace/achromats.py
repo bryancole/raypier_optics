@@ -381,6 +381,29 @@ class Doublet(BaseLens):
         grid.modified()
         return transF
     
+    def make_step_shape(self):
+        """Creates an OpenCascade BRep Shape
+        representation of the object, which can be
+        exported to STEP format"""
+        from raytrace.step_export import make_spherical_lens2, make_compound
+        centre = self.centre
+        direction = self.direction
+        x_axis = self.x_axis
+        diameter = self.diameter
+        CT1 = self.CT1
+        CT2 = 0.0
+        CT3 = -self.CT2
+        curvature1 = self.curvature1
+        curvature2 = self.curvature2
+        curvature3 = self.curvature3
+        
+        lens1 = make_spherical_lens2(CT1, CT2, diameter, curvature1, 
+                                     curvature2, centre, direction, x_axis)
+        lens2 = make_spherical_lens2(CT2, CT3, diameter, curvature2, 
+                                     curvature3, centre, direction, x_axis)
+        doublet = make_compound([lens1, lens2])
+        return doublet, "yellow"
+    
     
 class EdmundOptic45805(Doublet):
     name = "Edmund Optics Achromat#45805"

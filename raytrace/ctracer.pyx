@@ -800,6 +800,21 @@ cdef class RayCollection:
                 v = self.rays[i].end_face_idx
                 out[i] = v
             return out
+        
+    property termination:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                int i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = addvv_(self.rays[i].origin, 
+                           multvs_(self.rays[i].direction, 
+                                    self.rays[i].length))
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
     
     @classmethod
     def from_array(cls, np_.ndarray data):

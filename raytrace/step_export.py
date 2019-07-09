@@ -28,6 +28,9 @@ def pairs(itr):
     next(b)
     return zip(a,b)
 
+def sign(val):
+    return val/abs(val)
+
 def MakeVertex(pt): 
     vt = BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp.gp_Pnt(*pt))
     #print "make vertex", pt, vt
@@ -59,6 +62,18 @@ def position_shape(shape, centre, direction, x_axis):
     #return toshape(trans)
     return shape
 
+def make_box(position, direction, x_axis, dx, dy, dz):
+    box = BRepPrimAPI.BRepPrimAPI_MakeBox(gp.gp_Pnt(-dx/2., -dy/2., 0.0),
+                                          dx, dy, -dz)
+    ax = gp.gp_Ax2(gp.gp_Pnt(*position), 
+                   gp.gp_Dir(*direction),
+                   gp.gp_Dir(*x_axis))
+    ax3 = gp.gp_Ax3()
+    trans = gp.gp_Trsf()
+    trans.SetTransformation(gp.gp_Ax3(ax), ax3)
+    t_box = BRepBuilderAPI.BRepBuilderAPI_Transform(box.Shape(), trans)
+    return toshape(t_box)
+
 def make_cylinder(position, direction, radius, length, offset, x_axis):
     cyl_ax = gp.gp_Ax2(gp.gp_Pnt(offset,0,0), 
                        gp.gp_Dir(0,0,1), 
@@ -85,6 +100,30 @@ def make_cylinder_2(start, end, radius):
     trans.SetTransformation(ax, gp.gp_Ax3())
     t_cyl = BRepBuilderAPI.BRepBuilderAPI_Transform(cyl.Shape(), trans)
     return toshape(t_cyl)
+
+def make_sphere(position, radius):
+    sph = BRepPrimAPI.BRepPrimAPI_MakeSphere(radius)
+    trans = gp.gp_Trsf()
+    trans.SetTranslation(gp.gp_Vec(*position))
+    t_sph = BRepBuilderAPI.BRepBuilderAPI_Transform(sph.Shape(), trans)
+    return toshape(t_sph)
+
+# def make_spherical_lens(position, direction, x_axis, 
+#                         diameter, curvature1, curvature2, 
+#                         centre_height1, centre_height2, offset):
+#     radius = diameter/2.
+#     lower_z = min(centre_height1+curvature1, centre_height2+curvature2,
+#                   centre_height1, centre_height2)
+#     upper_z = max(centre_height1+curvature1, centre_height2+curvature2,
+#                   centre_height1, centre_height2)
+#     length = upper_z-lower_z
+#     cyl_ax = gp.gp_Ax2(gp.gp_Pnt(offset,0,lower_z), 
+#                        gp.gp_Dir(0,0,1), 
+#                        gp.gp_Dir(1,0,0))
+#     cyl = BRepPrimAPI.BRepPrimAPI_MakeCylinder(cyl_ax, radius, length)
+#     
+#     
+    
 
 def scale(sx, sy, sz):
     t = gp.gp_GTrsf()
@@ -292,6 +331,49 @@ def make_spherical_lens(CT, diameter, curvature,
     solid = BRepPrimAPI.BRepPrimAPI_MakeRevol(face.Shape(), ax)
     
     return position_shape(toshape(solid), centre, direction, x_axis)
+
+
+def make_spherical_lens2(CT1, CT2, diameter, 
+                         curvature1, curvature2, 
+                        centre, direction, x_axis):
+    cax = gp.gp_Ax2(gp.gp_Pnt(0,0,CT1-curvature1),
+                    gp.gp_Dir(0,sign(curvature1),0),
+                    gp.gp_Dir(1,0,0))
+    circ = Geom.Geom_Circle(cax, abs(curvature1))
+    h_circ = Geom.Handle_Geom_Circle(circ)
+    
+    cax2 = gp.gp_Ax2(gp.gp_Pnt(0,0,CT2-curvature2),
+                    gp.gp_Dir(0,-sign(curvature2),0),
+                    gp.gp_Dir(1,0,0))
+    circ2 = Geom.Geom_Circle(cax2, abs(curvature2))
+    h_circ2 = Geom.Handle_Geom_Circle(circ2)
+    
+    r = diameter/2.
+    
+    h2 = CT1 - curvature1 + numpy.sqrt(curvature1**2 - r**2)*sign(curvature1)
+    h3 = CT2 - curvature2 + numpy.sqrt(curvature2**2 - r**2)*sign(curvature2)
+    p1 = gp.gp_Pnt(0,0,CT1)
+    p2 = gp.gp_Pnt(r,0,h2)
+    p3 = gp.gp_Pnt(r,0,h3)
+    p4 = gp.gp_Pnt(0,0,CT2)
+    
+    e1 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(h_circ, p1, p2)    
+    e2 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p2,p3)
+    e3 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(h_circ2, p3,p4)
+    e4 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p4,p1)
+    
+    wire = BRepBuilderAPI.BRepBuilderAPI_MakeWire()
+    for e in (e1,e2,e3,e4):
+        print(e)
+        wire.Add(e.Edge())
+    
+    face = BRepBuilderAPI.BRepBuilderAPI_MakeFace(wire.Wire())
+    
+    ax = gp.gp_Ax1(gp.gp_Pnt(0,0,0),
+                   gp.gp_Dir(0,0,1))
+    solid = BRepPrimAPI.BRepPrimAPI_MakeRevol(face.Shape(), ax)
+    
+    return position_shape(toshape(solid), centre, direction, x_axis)
     
 
 def make_wire(listOfPoints, close=False):
@@ -342,8 +424,8 @@ def make_rays_wires(listOfRays, scale=None):
         wire.Add(edge.Edge())
     id_map = list(range(len(wires)))
     for rays in raysItr:
-        id_map = [id_map[pid] for pid in rays.parent_ids]
-        v_start = [v_end[pid] for pid in rays.parent_ids]
+        id_map = [id_map[pid] for pid in rays.parent_idx]
+        v_start = [v_end[pid] for pid in rays.parent_idx]
         v_end = [MakeVertex(pt) for pt in rays.termination]
         edges = [MakeEdge(v1,v2) for v1, v2 in zip(v_start, v_end)]
         for edge, w_id in zip(edges, id_map):
@@ -356,15 +438,21 @@ def make_rays_pipes(listOfRays, radius=0.1):
     v_lists = [[s,e] for s,e in zip(first.origin, first.termination)]
     id_map = list(range(len(v_lists)))
     for rays in itrRays:
-        id_map = [id_map[pid] for pid in rays.parent_ids]
+        id_map = [id_map[pid] for pid in rays.parent_idx]
         v_end = list(rays.termination)
         for w_id, v in zip(id_map, v_end):
             v_lists[w_id].append(v)
         
+    ### Fusing shape is finicky
+    #_fuse = fuse_shapes
+    _fuse = make_compound
     shapes=[]    
     for vlist in v_lists:
-        cylinders = [make_cylinder_2(s, e, radius) for s,e in pairs(vlist)]
-        shapes.append(fuse_shapes(cylinders))
+        cylinders = (make_cylinder_2(s, e, radius) for s,e in pairs(vlist))
+        spheres = (make_sphere(p, radius) for p in vlist[1:-1])
+        interleave = list(next(it) for it in itertools.cycle([cylinders,
+                                                          spheres]))
+        shapes.append(_fuse(interleave))
         #shapes.extend(cylinders)
     return make_compound(shapes)
 
@@ -393,7 +481,7 @@ def get_color_map():
     
 def export_shapes2(shapeList, filename, colorList=[]):
     h_doc = TDocStd.Handle_TDocStd_Document()
-    app = XCAFApp.GetApplication().GetObject()
+    app = XCAFApp.XCAFApp_Application_GetApplication().GetObject()
     app.NewDocument(TCollection.TCollection_ExtendedString("MDTV-CAF"),h_doc)
     doc = h_doc.GetObject()
     h_shape_tool = XCAFDoc.XCAFDoc_DocumentTool().ShapeTool(doc.Main())
@@ -407,12 +495,15 @@ def export_shapes2(shapeList, filename, colorList=[]):
     
     tr = gp.gp_Trsf()
     loc = TopLoc.TopLoc_Location(tr)
-    
-    colorMap = dict((c, Quantity.Quantity_Color(cmap[c])) for c in colorList)
+    print(colorList)
+    print(shapeList)
+    colorMap = dict((c, Quantity.Quantity_Color(cmap.get(c, 133))) for c in colorList)
     
     for shape, color in zip(shapeList, colorList):
-        print("color:", color)
-        label = shape_tool.AddShape(shape, False)
+        if not shape:
+            continue
+        print("color:", color, "shape", shape)
+        label = shape_tool.AddShape(shape, False, True)
         ref_label = shape_tool.AddComponent(top_label, label, loc)
         c = colorMap[color]
         color_tool.SetColor(ref_label, c, XCAFDoc.XCAFDoc_ColorGen)
@@ -423,5 +514,5 @@ def export_shapes2(shapeList, filename, colorList=[]):
     writer.Write(str(filename))
     
 if __name__=="__main__":
-    cyl = make_cylinder((1,2,3),(7,6,5),5,2)
-    export_shapes([cyl]*5, "test_step_export.stp")
+    cyl = make_cylinder((1,2,3),(7,6,5),5,2, 0, (1,1,1) )
+    export_shapes2([cyl]*5, "test_step_export.stp")
