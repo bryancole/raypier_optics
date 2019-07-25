@@ -10,12 +10,20 @@ cdef extern from "math.h":
     
 cdef extern from "float.h":
     double DBL_MAX
-    
-cdef extern from "complex.h":
-    double complex csqrt(double complex)
-    double cabs(double complex)
-    double complex cexp(double complex)
-    double complex I
+
+IF UNAME_SYSNAME == "Windows":
+    cdef extern from "complex.h":
+        double complex csqrt "sqrt" (double complex)
+        double cabs "abs" (double complex)
+        double complex cexp "exp" (double complex)
+	
+    cdef double complex I = 1j
+ELSE:
+    cdef extern from "complex.h":
+        double complex csqrt (double complex)
+        double cabs (double complex)
+        double complex cexp (double complex)
+        double complex I
     
 cdef double INF=(DBL_MAX+DBL_MAX)
 

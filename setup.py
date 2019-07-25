@@ -21,43 +21,37 @@ from setuptools import find_packages, setup
 #from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 #from setuptools import find_packages
 
 ###Cython.Distutils and Distribute don't play nice so we'll create the
 ###C-modules explicitly
 import subprocess, os, sys
 
-def create_module(pyx_name):
-    cname = os.path.splitext(pyx_name)[0] + ".c"
-    if os.path.exists(cname) and \
-        os.stat(cname).st_mtime > os.stat(pyx_name).st_mtime:
-        return
-    ret = subprocess.call(['cython',pyx_name])
-    if ret < 0:
-        raise CythonError("Failed to compile %s with Cython"%pyx_name)
+# def create_module(pyx_name):
+#     cname = os.path.splitext(pyx_name)[0] + ".c"
+#     if os.path.exists(cname) and \
+#         os.stat(cname).st_mtime > os.stat(pyx_name).st_mtime:
+#         return
+#     ret = subprocess.call(['cython',pyx_name])
+#     if ret < 0:
+#         raise CythonError("Failed to compile %s with Cython"%pyx_name)
 
-for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
-    create_module("raytrace/%s"%fname)
-    
+# for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
+#     create_module("raytrace/%s"%fname)
+
 import numpy
 includes = [numpy.get_include()]
 libpath = []
 
-if sys.platform.startswith('win32'):
-    os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
-    includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
-    libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
+# if sys.platform.startswith('win32'):
+#     os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
+#     includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
+#     libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
-ext_modules=[Extension("ctracer", ["raytrace/ctracer.pyx"],
-                        include_dirs=includes,
-                        library_dirs=libpath),
-            Extension("cfaces", ["raytrace/cfaces.pyx"],
-                        include_dirs=includes,
-                        library_dirs=libpath),
-            Extension("cmaterials", ["raytrace/cmaterials.pyx"],
-                        include_dirs=includes,
-                        library_dirs=libpath)
-            ]
+ext_modules = cythonize("raytrace/*.pyx",
+                        language="c++",
+                        include_path=[numpy.get_include()])
 
 setup(
     name="raytrace",
@@ -67,18 +61,19 @@ setup(
     cmdclass = {'build_ext': build_ext},
     ext_package = "raytrace",
     ext_modules = ext_modules,
+    include_dirs = [numpy.get_include()],
     zip_safe = True, #why not!
-    
+
     install_requires = ["numpy >= 1.1",
         #"VTK",
         #"wxPython", #maybe can avoid an explicit dependancy on wx
         "Traits >= 3.0",
         "Mayavi >= 3.0", #TVTK is distributed as part of Mayavi
-        "TraitsGUI >= 3.0"
+        "TraitsUI >= 3.0"
         ],
-        
+
     package_data = {}, #none, yet
-    
+
     author = "Bryan Cole",
     author_email = "bryan.cole@teraview.com",
     description = "A optical ray-tracing package, for design, optimisation and \
@@ -89,4 +84,3 @@ surfaces is a priority",
     url = "python-raytrace@googlegroups.com",
     #download_url="http://bitbucket.org/bryancole/raytrace/get/"
     )
-    
