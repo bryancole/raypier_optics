@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from traits.api import Float, Instance, on_trait_change
+from traits.api import Float, Instance, on_trait_change, Array
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
@@ -25,7 +25,7 @@ from tvtk.api import tvtk
 from raytrace.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals
     
-from raytrace.cfaces import CircularFace, SphericalFace
+from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 
@@ -145,6 +145,106 @@ class PlanoConvexLens(BaseLens):
         self.config_pipeline()
         grid.modified()
         return transF
+    
+    
+class PlanoConicLens(BaseLens):
+    abstract = False
+    name = "Plano-Conic Section Lens"
+    
+    CT = Float(5.0, desc="centre thickness")
+    diameter = Float(15.0)
+    conic_const = Float(4.0, desc="conic constant")
+    curvature = Float(11.7, desc="radius of curvature for spherical face")
+    
+    ###An array representing the 2D profile of the lens to be revolved
+    profile = Array(shape=(None,2), dtype=numpy.double, transient=True)
+    
+    data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
+    
+    revolve = Instance(tvtk.RotationalExtrusionFilter, (), 
+                       {'capping': False,
+                        'angle': 360.0,
+                        'resolution': 60 
+                        },
+                        transient=True)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('n_inside'),
+                       Item('CT', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       Item('curvature', editor=NumEditor),
+                       Item('conic_const', editor=NumEditor)
+                       )
+                    )
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces = self.make_faces()
+        return fl
+        
+    def make_faces(self):
+        fl = [CircularFace(owner=self, diameter=self.diameter,
+                                material = self.material), 
+                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                conic_const=self.conic_const,
+                                z_height=self.CT, curvature=self.curvature)]
+        return fl
+    
+    def _CT_changed(self, new_ct):
+        self.faces.faces[1].z_height = new_ct
+        
+    def _curvature_changed(self, new_curve):
+        self.faces.faces[1].curvature = new_curve
+        
+    def _conic_const_changed(self, new_conic):
+        self.faces.faces[1].conic_const = new_conic
+        
+    def _profile_changed(self):
+        self.data_source.modified()
+        self.faces.faces = self.make_faces()
+        self.update=True
+        
+    @on_trait_change("CT, diameter, conic_const, curvature")
+    def config_profile(self):
+        n_segments = 20 #number of lines in the curved section
+        r_max = self.diameter/2 #maximum radius
+        k = self.conic_const
+        R = self.curvature
+        r = numpy.linspace(0,r_max, n_segments)
+        
+        z = self.CT + (r**2)/(R*(1 + numpy.sqrt(1 - (1+k)*(r**2)/(R**2))))
+        
+        profile = list(zip(r,z))
+        profile.extend([(r_max, 0.0), (0.0,0.0)])
+        self.profile = profile
+        
+    def _pipeline_default(self):
+        self.config_profile()
+        
+        source = self.data_source
+        def execute():
+            yz = self.profile
+            x = numpy.zeros(yz.shape[0])
+            points = numpy.column_stack((x,yz))
+            
+            cells = [list(range(len(x))),]
+            
+            output = source.poly_data_output
+            output.points = points
+            output.polys = cells
+        source.set_execute_method(execute)
+        print("Made PIPELINE")
+        
+        revolve = self.revolve
+        revolve.input_connection = source.output_port
+        
+        t = self.transform
+        transf = tvtk.TransformFilter(input_connection=revolve.output_port, 
+                                      transform=t)
+        return transf
+    
 
         
 if __name__=="__main__":

@@ -174,6 +174,7 @@ cdef class RectangularFace(Face):
         normal.z=-1
         return normal
     
+    
 cdef class SphericalFace(Face):
     cdef public double diameter, curvature, z_height
     
@@ -955,4 +956,114 @@ cdef class EllipsoidalFace(Face):
         rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
         dt = [m.get_element(i,3) for i in xrange(3)]
         self.inverse_transform = Transform(rotation=rot, translation=dt)
+    
+    
+cdef class ConicRevolutionFace(Face):
+    """This is surface of revolution formed from a conic section. Spherical and ellipsoidal faces
+    are a special case of this.
+    
+    curvature = radius of curvature
+    """
+    cdef public double diameter, curvature, z_height, conic_const
+    
+    params = ['diameter',] 
+    
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.conic_const = kwds.get('conic_const', 0.0)
+        self.curvature = kwds.get('curvature', 10.0)
+        self.diameter = kwds.get('diameter', 5.0)
+    
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double beta = 1 + self.conic_const
+            double R = self.curvature
+            double A,B,C,D
+            vector_t d, a, pt1, pt2
+            
+        s = subvv_(p2, p1) #the input ray direction, in local coords.
+        a = p1
+        a.z += self.z_height
+        
+        ###Obtained by sympy evaluation of the equations
+        ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
+        A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
+        B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
+        C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
+        
+        ##Get roots
+        D = B*B - 4*A*C
+        if D < 0: #no solution
+            return -1
+        
+        D = sqrt(D)
+        
+        #1st root
+        a1 = (-B+D)/(2*A) 
+        pt1 = addvv_(r, multvs_(s, a1))
+        #2nd root
+        a2 = (-B-D)/(2*A)
+        pt2 = addvv_(r, multvs_(s, a2))
+        
+        if self.curvature >= 0:
+            if pt1.z < -R:
+                a1 = INF
+            if pt2.z < -R:
+                a2 = INF
+        else:
+            if pt1.z > -R:
+                a1 = INF
+            if pt2.z > -R:
+                a2 = INF
+            
+        D = self.diameter*self.diameter/4.
+        
+        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
+            a1 = INF
+        if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
+            a2 = INF
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+        return a1 * sep_(p1, p2)
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            double R = self.curvature
+            double beta = 1 + self.conic_const
+            vector_t g #output gradient vector
+            
+        p.z -= self.z_height
+        
+        if self.curvature < 0:
+            p.z = -p.z
+            p.y = -p.y
+            p.x = -p.x
+            
+        g.z = -2*beta*(R-beta*p.z)
+        g.x = p.x * 2 * beta 
+        g.y = p.y * 2 * beta
+        
+        return norm_(g)
+        
+        
+        
+        
+    
     
