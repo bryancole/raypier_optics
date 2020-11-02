@@ -59,7 +59,7 @@ setup(
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
-    ext_package = "raytrace",
+    #ext_package = "raytrace", ###Not needed on linux. Is it necessary on Win64?
     ext_modules = ext_modules,
     include_dirs = [numpy.get_include()],
     zip_safe = True, #why not!

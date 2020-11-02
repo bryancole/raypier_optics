@@ -964,7 +964,9 @@ cdef class ConicRevolutionFace(Face):
     
     curvature = radius of curvature
     """
-    cdef public double diameter, curvature, z_height, conic_const
+    cdef:
+        public double diameter, curvature, z_height, conic_const
+        public int invert_normals
     
     params = ['diameter',] 
     
@@ -973,6 +975,7 @@ cdef class ConicRevolutionFace(Face):
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 10.0)
         self.diameter = kwds.get('diameter', 5.0)
+        self.invert_normals = int(kwds.get('invert_normals', 0))
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
         """Intersects the given ray with this face.
@@ -987,13 +990,13 @@ cdef class ConicRevolutionFace(Face):
         """
         cdef:
             double beta = 1 + self.conic_const
-            double R = self.curvature
+            double R = -self.curvature
             double A,B,C,D
             vector_t d, a, pt1, pt2
             
-        s = subvv_(p2, p1) #the input ray direction, in local coords.
+        d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
-        a.z += self.z_height
+        a.z -= self.z_height
         
         ###Obtained by sympy evaluation of the equations
         ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
@@ -1010,20 +1013,20 @@ cdef class ConicRevolutionFace(Face):
         
         #1st root
         a1 = (-B+D)/(2*A) 
-        pt1 = addvv_(r, multvs_(s, a1))
+        pt1 = addvv_(p1, multvs_(d, a1))
         #2nd root
         a2 = (-B-D)/(2*A)
-        pt2 = addvv_(r, multvs_(s, a2))
-        
-        if self.curvature >= 0:
-            if pt1.z < -R:
+        pt2 = addvv_(p1, multvs_(d, a2))
+        #print("roots", a1,a2, pt1.z, pt2.z, beta, R)
+        if R*beta <= 0:
+            if pt1.z < R/beta:
                 a1 = INF
-            if pt2.z < -R:
+            if pt2.z < R/beta:
                 a2 = INF
         else:
-            if pt1.z > -R:
+            if pt1.z > R/beta:
                 a1 = INF
-            if pt2.z > -R:
+            if pt2.z > R/beta:
                 a2 = INF
             
         D = self.diameter*self.diameter/4.
@@ -1045,20 +1048,23 @@ cdef class ConicRevolutionFace(Face):
         given a point on the surface (also in local coords).
         """
         cdef:
-            double R = self.curvature
+            double R = -self.curvature
             double beta = 1 + self.conic_const
             vector_t g #output gradient vector
+            int sign = -1 if self.invert_normals else 1
             
         p.z -= self.z_height
-        
-        if self.curvature < 0:
-            p.z = -p.z
-            p.y = -p.y
-            p.x = -p.x
             
-        g.z = -2*beta*(R-beta*p.z)
-        g.x = p.x * 2 * beta 
-        g.y = p.y * 2 * beta
+        g.z = 2*beta*(R-beta*p.z)
+        g.x = - p.x * 2 * beta 
+        g.y = - p.y * 2 * beta
+        
+        if (R*beta) < 0:
+            sign *= -1
+            
+        g.z *= sign
+        g.y *= sign
+        g.x *= sign
         
         return norm_(g)
         
