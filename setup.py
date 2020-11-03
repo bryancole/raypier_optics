@@ -44,13 +44,15 @@ import numpy
 includes = [numpy.get_include()]
 libpath = []
 
+Win64 = sys.platform.startswith("win")
+
 # if sys.platform.startswith('win32'):
 #     os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
 #     includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
 #     libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
 ext_modules = cythonize("raytrace/*.pyx",
-                        #language="c++",
+                        language="c++" if Win64 else None,
                         include_path=[numpy.get_include()])
 
 setup(

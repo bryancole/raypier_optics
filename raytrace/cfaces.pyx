@@ -1013,11 +1013,12 @@ cdef class ConicRevolutionFace(Face):
         
         #1st root
         a1 = (-B+D)/(2*A) 
-        pt1 = addvv_(p1, multvs_(d, a1))
+        pt1 = addvv_(a, multvs_(d, a1))
         #2nd root
         a2 = (-B-D)/(2*A)
-        pt2 = addvv_(p1, multvs_(d, a2))
-        #print("roots", a1,a2, pt1.z, pt2.z, beta, R)
+        pt2 = addvv_(a, multvs_(d, a2))
+        
+        #print("roots", pt1.z, pt2.z, beta, R, R/beta)
         if R*beta <= 0:
             if pt1.z < R/beta:
                 a1 = INF
