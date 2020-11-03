@@ -25,7 +25,7 @@ from tvtk.api import tvtk
 from raytrace.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals
     
-from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace
+from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 
@@ -320,6 +320,7 @@ class AsphericLens(SurfaceOfRotationLens):
     
     CT = Float(5.0, desc="centre thickness")
     diameter = Float(25.0)
+    offset = Float(0.0) #Fixed at zero
     
     A_curvature = Float(-25.0)
     A_conic = Float(-0.0)
@@ -363,16 +364,32 @@ class AsphericLens(SurfaceOfRotationLens):
                        )
                     )
     
+#     def make_faces(self):
+#         fl = [ConicRevolutionFace(owner=self, diameter=self.diameter,
+#                                 material=self.material,
+#                                 conic_const=self.A_conic,
+#                                 z_height=0.0, curvature=self.A_curvature,
+#                                 invert_normals=True), 
+#                 ConicRevolutionFace(owner=self, diameter=self.diameter,
+#                                 material=self.material,
+#                                 conic_const=self.B_conic,
+#                                 z_height=self.CT, curvature=self.B_curvature)]
+#         return fl
+    
     def make_faces(self):
-        fl = [ConicRevolutionFace(owner=self, diameter=self.diameter,
+        fl = [AsphericFace(owner=self, diameter=self.diameter,
                                 material=self.material,
                                 conic_const=self.A_conic,
                                 z_height=0.0, curvature=self.A_curvature,
-                                invert_normals=True), 
-                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                                A4=-self.A4, A6=-self.A6, A8=-self.A8, A10=-self.A10,
+                                invert_normals=True,
+                                atol=1e-16), 
+                AsphericFace(owner=self, diameter=self.diameter,
                                 material=self.material,
                                 conic_const=self.B_conic,
-                                z_height=self.CT, curvature=self.B_curvature)]
+                                z_height=self.CT, curvature=self.B_curvature,
+                                A4=-self.B4, A6=-self.B6, A8=-self.B8, A10=-self.B10,
+                                atol=1e-16)]
         return fl
     
     def eval_A(self, y):

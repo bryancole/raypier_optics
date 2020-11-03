@@ -956,6 +956,33 @@ cdef class EllipsoidalFace(Face):
         rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
         dt = [m.get_element(i,3) for i in xrange(3)]
         self.inverse_transform = Transform(rotation=rot, translation=dt)
+        
+        
+cdef double intersect_conic(vector_t a, vector_t d, double curvature, double conic_const):
+    cdef:
+        double beta = 1 + conic_const
+        double R = -curvature
+        double A,B,C,D
+    
+    ###Obtained by sympy evaluation of the equations
+    ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
+    A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
+    B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
+    C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
+    
+    ##Get roots
+    D = B*B - 4*A*C
+    if D < 0: #no solution
+        return -1
+    
+    D = sqrt(D)
+    
+    if R*beta*d.z <= 0:
+        #1st root
+        return (-B+D)/(2*A) 
+    else:
+        #2nd root
+        return (-B-D)/(2*A)
     
     
 cdef class ConicRevolutionFace(Face):
@@ -989,34 +1016,14 @@ cdef class ConicRevolutionFace(Face):
           intersection can be indicated by a negative value.
         """
         cdef:
-            double beta = 1 + self.conic_const
-            double R = -self.curvature
-            double A,B,C,D, a1
+            double a1
             vector_t d, a, pt1
             
         d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
         a.z -= self.z_height
         
-        ###Obtained by sympy evaluation of the equations
-        ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
-        A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
-        B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
-        C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
-        
-        ##Get roots
-        D = B*B - 4*A*C
-        if D < 0: #no solution
-            return -1
-        
-        D = sqrt(D)
-        
-        if R*beta*d.z <= 0:
-            #1st root
-            a1 = (-B+D)/(2*A) 
-        else:
-            #2nd root
-            a1 = (-B-D)/(2*A)
+        a1 = intersect_conic(a, d, self.curvature, self.conic_const)
         
         pt1 = addvv_(a, multvs_(d, a1))
             
@@ -1055,34 +1062,45 @@ cdef class ConicRevolutionFace(Face):
         return norm_(g)
     
     
-cdef double intersect_conic(vector_t a, vector_t d, curvature, conic_const):
+cdef struct aspheric_t:
+    double R #curvature
+    double beta #=1+conic const
+    double A4
+    double A6
+    double A8
+    double A10
+    vector_t a
+    vector_t d
+    
+    
+cdef double eval_aspheric_impf(aspheric_t A, double alpha):
+    cdef: 
+        double out
+        double r2 = ((A.a.x + alpha*A.d.x)**2 + (A.a.y + alpha*A.d.y)**2)
+    
+    out = r2
+    out /= A.R*(1 + sqrt(1 - A.beta*r2/(A.R**2)) )
+    out += A.A4*(r2**2) + A.A6*(r2**3) + A.A8*(r2**4) + A.A10*(r2**5) - A.a.z - alpha*A.d.z
+    return out
+
+
+cdef double eval_aspheric_grad(aspheric_t A, double alpha):
     cdef:
-        double beta = 1 + conic_const
-        double R = -curvature
-        double A,B,C,D
-    
-    ###Obtained by sympy evaluation of the equations
-    ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
-    A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
-    B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
-    C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
-    
-    ##Get roots
-    D = B*B - 4*A*C
-    if D < 0: #no solution
-        return -1
-    
-    D = sqrt(D)
-    
-    if R*beta*d.z <= 0:
-        #1st root
-        return (-B+D)/(2*A) 
-    else:
-        #2nd root
-        return (-B-D)/(2*A)
-    
+        double out
+        double r2 = ((A.a.x + alpha*A.d.x)**2 + (A.a.y + alpha*A.d.y)**2)
+        double dx = A.d.x*(A.a.x + alpha*A.d.x)
+        double dy = A.d.y*(A.a.y + alpha*A.d.y)
         
-        
+    out = A.A10*(10*dx + 10*dy) *(r2**4)
+    out +=  A.A4*(4*dx + 4*dy)*(r2)  
+    out +=  A.A6*(6*dx + 6*dy)*(r2**2)  
+    out +=  A.A8*(8*dx + 8*dy)*(r2**3) - A.d.z  
+    out += (2*dx + 2*dy)/(A.R*(sqrt(1 - A.beta*(r2)/A.R**2) + 1))  
+    out += A.beta*(2*dx + 2*dy)*(r2)/(2*(A.R**3)*sqrt(1 - A.beta*r2/(A.R**2))*(sqrt(1 - A.beta*r2/(A.R**2)) + 1)**2)
+    return out
+
+    
+    
 cdef class AsphericFace(Face):
     """This is the general aspheric lens surface formula.
     
@@ -1090,6 +1108,7 @@ cdef class AsphericFace(Face):
     """
     cdef:
         public double diameter, curvature, z_height, conic_const, A4, A6, A8, A10
+        public double atol
         public int invert_normals
     
     params = ['diameter',] 
@@ -1104,9 +1123,84 @@ cdef class AsphericFace(Face):
         self.A6 = kwds.get('A6',0.0)
         self.A8 = kwds.get('A8',0.0)
         self.A10 = kwds.get('A10',0.0)
+        self.atol = kwds.get("atol", 1.0e-8)
         
-    cdef intersect_conic():
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        """Intersects the given ray with this face.
         
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double a1, dz 
+            double tol = self.atol**2
+            vector_t d, a, pt1
+            aspheric_t A
+            
+        d = subvv_(p2, p1) #the input ray direction, in local coords.
+        a = p1
+        a.z -= self.z_height
         
+        a1 = intersect_conic(a, d, self.curvature, self.conic_const)
+        
+        A.R = -self.curvature
+        A.beta = 1 + self.conic_const
+        A.A4 = self.A4
+        A.A6 = self.A6
+        A.A8 = self.A8
+        A.A10 = self.A10
+        A.a = a
+        A.d = d
+         
+        dz = - eval_aspheric_impf(A, a1) / eval_aspheric_grad(A, a1)
+        print("Start:", dz, a1)
+        for i in range(100):
+            a1 += dz
+            if dz*dz < tol:
+                break
+            dz = - eval_aspheric_impf(A, a1) / eval_aspheric_grad(A, a1)
+             
+        print("Converged:", dz, a1, i)
+        
+        pt1 = addvv_(a, multvs_(d, a1))
+        
+        D = self.diameter*self.diameter/4.
+        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
+            a1 = INF
+            
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+        
+        print("Ret:", a1 * sep_(p1, p2))
+        return a1 * sep_(p1, p2)
     
-    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        FIXME: This is taken from Conic face class
+        """
+        cdef:
+            double R = -self.curvature
+            double beta = 1 + self.conic_const
+            vector_t g #output gradient vector
+            int sign = -1 if self.invert_normals else 1
+            
+        p.z -= self.z_height
+            
+        g.z = 2*beta*(R-beta*p.z)
+        g.x = - p.x * 2 * beta 
+        g.y = - p.y * 2 * beta
+        
+        if (R*beta) < 0:
+            sign *= -1
+            
+        g.z *= sign
+        g.y *= sign
+        g.x *= sign
+        
+        return norm_(g)
