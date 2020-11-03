@@ -991,8 +991,8 @@ cdef class ConicRevolutionFace(Face):
         cdef:
             double beta = 1 + self.conic_const
             double R = -self.curvature
-            double A,B,C,D
-            vector_t d, a, pt1, pt2
+            double A,B,C,D, a1
+            vector_t d, a, pt1
             
         d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
@@ -1011,37 +1011,22 @@ cdef class ConicRevolutionFace(Face):
         
         D = sqrt(D)
         
-        #1st root
-        a1 = (-B+D)/(2*A) 
-        pt1 = addvv_(a, multvs_(d, a1))
-        #2nd root
-        a2 = (-B-D)/(2*A)
-        pt2 = addvv_(a, multvs_(d, a2))
-        
-        #print("roots", pt1.z, pt2.z, beta, R, R/beta)
-        if R*beta <= 0:
-            if pt1.z < R/beta:
-                a1 = INF
-            if pt2.z < R/beta:
-                a2 = INF
+        if R*beta*d.z <= 0:
+            #1st root
+            a1 = (-B+D)/(2*A) 
         else:
-            if pt1.z > R/beta:
-                a1 = INF
-            if pt2.z > R/beta:
-                a2 = INF
+            #2nd root
+            a1 = (-B-D)/(2*A)
+        
+        pt1 = addvv_(a, multvs_(d, a1))
             
         D = self.diameter*self.diameter/4.
-        
         if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
             a1 = INF
-        if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
-            a2 = INF
-        
-        if a2 < a1:
-            a1 = a2
-        
+            
         if a1>1.0 or a1<self.tolerance:
             return -1
+        
         return a1 * sep_(p1, p2)
     
     cdef vector_t compute_normal_c(self, vector_t p):
@@ -1068,8 +1053,59 @@ cdef class ConicRevolutionFace(Face):
         g.x *= sign
         
         return norm_(g)
+    
+    
+cdef double intersect_conic(vector_t a, vector_t d, curvature, conic_const):
+    cdef:
+        double beta = 1 + conic_const
+        double R = -curvature
+        double A,B,C,D
+    
+    ###Obtained by sympy evaluation of the equations
+    ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
+    A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
+    B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
+    C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
+    
+    ##Get roots
+    D = B*B - 4*A*C
+    if D < 0: #no solution
+        return -1
+    
+    D = sqrt(D)
+    
+    if R*beta*d.z <= 0:
+        #1st root
+        return (-B+D)/(2*A) 
+    else:
+        #2nd root
+        return (-B-D)/(2*A)
+    
         
         
+cdef class AsphericFace(Face):
+    """This is the general aspheric lens surface formula.
+    
+    curvature = radius of curvature
+    """
+    cdef:
+        public double diameter, curvature, z_height, conic_const, A4, A6, A8, A10
+        public int invert_normals
+    
+    params = ['diameter',] 
+    
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.conic_const = kwds.get('conic_const', 0.0)
+        self.curvature = kwds.get('curvature', 25.0)
+        self.diameter = kwds.get('diameter', 15.0)
+        self.invert_normals = int(kwds.get('invert_normals', 0))
+        self.A4 = kwds.get('A4',0.0)
+        self.A6 = kwds.get('A6',0.0)
+        self.A8 = kwds.get('A8',0.0)
+        self.A10 = kwds.get('A10',0.0)
+        
+    cdef intersect_conic():
         
         
     

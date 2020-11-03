@@ -11,20 +11,20 @@ lens = PlanoConicLens(centre=(20,0,0),
                        diameter=25.4,
                        conic_const = 0.0,
                        CT=6.0)
+# 
+# lens = AsphericLens(centre=(20,0,0),
+#                     direction=(1,0,0),
+#                     CT=12.0,
+#                     )
 
-lens = AsphericLens(centre=(20,0,0),
-                    direction=(1,0,0),
-                    CT=12.0,
-                    )
-
-# lens = BiConicLens(centre=(20,0,0),
-#                        direction=(1,0,0),
-#                        curvature=25.0,
-#                        curvature2=-25.0,
-#                        diameter=25.4,
-#                        conic_const = 0.0,
-#                        conic_const2 = 0.0,
-#                        CT=12.0)
+lens = BiConicLens(centre=(20,0,0),
+                       direction=(1,0,0),
+                       curvature=25.0,
+                       curvature2=-25.0,
+                       diameter=25.4,
+                       conic_const = 0.0,
+                       conic_const2 = 0.0,
+                       CT=12.0)
 
 # lens2 = PlanoConvexLens(centre=(20,0,0),
 #                        direction=(1,0,0),
