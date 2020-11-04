@@ -311,8 +311,8 @@ cdef class ExtrudedPlanarFace(Face):
     cdef calc_normal(self):
         cdef vector_t n
             
-        n.y = self.x2 - self.x1
-        n.x = self.y1 - self.y2
+        n.y = self.x2_ - self.x1_
+        n.x = self.y1_ - self.y2_
         n.z = 0
         self.normal = norm_(n)
         
@@ -321,11 +321,11 @@ cdef class ExtrudedPlanarFace(Face):
             vector_t s, u, v
             double a, dz
             
-        u.x = self.x1
-        u.y = self.y1
+        u.x = self.x1_
+        u.y = self.y1_
         
-        v.x = self.x2 - u.x
-        v.y = self.y2 - u.y
+        v.x = self.x2_ - u.x
+        v.y = self.y2_ - u.y
         
         s = subvv_(p2, r)
         
