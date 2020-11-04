@@ -24,7 +24,7 @@ cdef extern from "math.h":
 cdef extern from "float.h":
     double DBL_MAX
 
-cdef INF=(DBL_MAX+DBL_MAX)
+cdef double INF=(DBL_MAX+DBL_MAX)
 
 from ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
@@ -1158,14 +1158,14 @@ cdef class AsphericFace(Face):
         A.d = d
          
         dz = - eval_aspheric_impf(A, a1) / eval_aspheric_grad(A, a1)
-        print("Start:", dz, a1)
+        #print("Start:", dz, a1)
         for i in range(100):
             a1 += dz
             if dz*dz < tol:
                 break
             dz = - eval_aspheric_impf(A, a1) / eval_aspheric_grad(A, a1)
              
-        print("Converged:", dz, a1, i)
+        #print("Converged:", dz, a1, i)
         
         pt1 = addvv_(a, multvs_(d, a1))
         
@@ -1176,7 +1176,7 @@ cdef class AsphericFace(Face):
         if a1>1.0 or a1<self.tolerance:
             return -1
         
-        print("Ret:", a1 * sep_(p1, p2))
+        #print("Ret:", a1 * sep_(p1, p2))
         return a1 * sep_(p1, p2)
     
     cdef vector_t compute_normal_c(self, vector_t p):

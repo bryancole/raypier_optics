@@ -305,7 +305,7 @@ class RayTraceModel(HasQueue):
         self.render_vtk()
         self._updating = False
         
-    def trace_detail(self, async=False):
+    def trace_detail(self, _async=False):
         optics = [o.clone_traits() for o in self.optics]
         for child, parent in zip(optics, self.optics):
             child.shadow_parent = parent
@@ -315,7 +315,7 @@ class RayTraceModel(HasQueue):
         probes = [p.clone_traits() for p in self.probes]
         for child, parent in zip(probes, self.probes):
             child.shadow_parent = parent
-        if async:
+        if _async:
             self.thd = threading.Thread(target=self.async_trace, 
                                 args=(optics, sources, probes))
             self.thd.start()
