@@ -78,6 +78,7 @@ class BaseRaySource(BaseBase):
     
     normals_source = Instance(tvtk.ProgrammableSource, transient=True)
     normals_actor = Instance(tvtk.Actor, transient=True)
+    normals_glyph = Instance(tvtk.Glyph3D, transient=True)
     
     ray_actor = Instance(tvtk.Actor, transient=True)
     start_actor = Instance(tvtk.Actor, transient=True)
@@ -207,16 +208,28 @@ class BaseRaySource(BaseBase):
         
     def _scale_factor_changed(self, scale):
         self.tube.radius = scale
+        self.normals_glyph.scale_factor=self.scale_factor*10
         self.render = True
+        
+    def _show_normals_changed(self):
+        self.update=True
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
         return actors
         #return actors[:2]  #makeshift turning off of normal glyphs
+        
+    def _normals_glyph_default(self):
+        glyph =  tvtk.Glyph3D(scale_factor=self.scale_factor*10,
+                                    vector_mode='use_normal'
+                                    )
+        return glyph
     
     def _normals_source_default(self):
         source = tvtk.ProgrammableSource()
         def execute():
+            if not self.show_normals:
+                return
             output = source.poly_data_output
             points = numpy.vstack([p.origin for p in self.TracedRays])
             normals = numpy.vstack([p.normal for p in self.TracedRays])
@@ -230,10 +243,8 @@ class BaseRaySource(BaseBase):
     def _normals_actor_default(self):
         source = self.normals_source
         glyph = tvtk.ArrowSource(tip_radius=0.3, shaft_radius=0.1)
-        glyph_filter = tvtk.Glyph3D(input_connection = source.output_port,
-                                    scale_factor=2.0,
-                                    vector_mode='use_normal'
-                                    )
+        glyph_filter = self.normals_glyph
+        glyph_filter.set_input_connection(source.output_port)
         glyph_filter.set_source_connection(glyph.output_port)
         map = tvtk.PolyDataMapper(input_connection=glyph_filter.output_port)
         act = tvtk.Actor(mapper=map)
