@@ -1182,23 +1182,28 @@ cdef class AsphericFace(Face):
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
-        FIXME: This is taken from Conic face class
         """
         cdef:
             double R = -self.curvature
             double beta = 1 + self.conic_const
             vector_t g #output gradient vector
             int sign = -1 if self.invert_normals else 1
+            double r2, r, df, root
             
         p.z -= self.z_height
-            
-        g.z = 2*beta*(R-beta*p.z)
-        g.x = - p.x * 2 * beta 
-        g.y = - p.y * 2 * beta
         
-        if (R*beta) < 0:
-            sign *= -1
+        r2 = p.x*p.x + p.y*p.y
+        r = sqrt(r2)
+        root = sqrt(1-(beta*(r2)/(R*R)))
+        df = 10*self.A10*(r2**5) + 8*self.A8*(r2**4) + 6*self.A6*(r2**3) + 4*self.A4*(r2**2)
+        df /= r
+        df += (2*r)/(R*(1+root))
+        df += beta*(r2**2)/(r*(R**3)*root*((1+root)**2))
             
+        g.z = 1.0
+        g.x = - df*p.x/r 
+        g.y = - df*p.y/r
+             
         g.z *= sign
         g.y *= sign
         g.x *= sign
