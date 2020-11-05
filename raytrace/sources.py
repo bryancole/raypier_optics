@@ -209,6 +209,7 @@ class BaseRaySource(BaseBase):
     def _scale_factor_changed(self, scale):
         self.tube.radius = scale
         self.normals_glyph.scale_factor=self.scale_factor*10
+        self.sphere.radius = self.scale_factor*3
         self.render = True
         
     def _show_normals_changed(self):
