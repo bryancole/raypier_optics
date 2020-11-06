@@ -78,6 +78,7 @@ class BaseRaySource(BaseBase):
     
     normals_source = Instance(tvtk.ProgrammableSource, transient=True)
     normals_actor = Instance(tvtk.Actor, transient=True)
+    normals_glyph = Instance(tvtk.Glyph3D, transient=True)
     
     ray_actor = Instance(tvtk.Actor, transient=True)
     start_actor = Instance(tvtk.Actor, transient=True)
@@ -207,16 +208,29 @@ class BaseRaySource(BaseBase):
         
     def _scale_factor_changed(self, scale):
         self.tube.radius = scale
+        self.normals_glyph.scale_factor=self.scale_factor*10
+        self.sphere.radius = self.scale_factor*3
         self.render = True
+        
+    def _show_normals_changed(self):
+        self.update=True
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
         return actors
         #return actors[:2]  #makeshift turning off of normal glyphs
+        
+    def _normals_glyph_default(self):
+        glyph =  tvtk.Glyph3D(scale_factor=self.scale_factor*10,
+                                    vector_mode='use_normal'
+                                    )
+        return glyph
     
     def _normals_source_default(self):
         source = tvtk.ProgrammableSource()
         def execute():
+            if not self.show_normals:
+                return
             output = source.poly_data_output
             points = numpy.vstack([p.origin for p in self.TracedRays])
             normals = numpy.vstack([p.normal for p in self.TracedRays])
@@ -230,10 +244,8 @@ class BaseRaySource(BaseBase):
     def _normals_actor_default(self):
         source = self.normals_source
         glyph = tvtk.ArrowSource(tip_radius=0.3, shaft_radius=0.1)
-        glyph_filter = tvtk.Glyph3D(input_connection = source.output_port,
-                                    scale_factor=2.0,
-                                    vector_mode='use_normal'
-                                    )
+        glyph_filter = self.normals_glyph
+        glyph_filter.set_input_connection(source.output_port)
         glyph_filter.set_source_connection(glyph.output_port)
         map = tvtk.PolyDataMapper(input_connection=glyph_filter.output_port)
         act = tvtk.Actor(mapper=map)
@@ -637,49 +649,54 @@ class GaussianBeamRaySource(SingleRaySource):
     
     @cached_property
     def _get_InputRays(self):
-        origin = numpy.array(self.origin)
-        direction = numpy.array(self.direction)
-        count = self.number
-        radius = self.beam_waist/2000.0 #convert to mm
-        max_axis = numpy.abs(direction).argmax()
-        if max_axis==0:
-            v = numpy.array([0.,1.,0.])
-        else:
-            v = numpy.array([1.,0.,0.])
-        d1 = numpy.cross(direction, v)
-        d1 = normaliseVector(d1)
-        d2 = numpy.cross(direction, d1)
-        d2 = normaliseVector(d2)
-
-        E_vector = numpy.cross(self.E_vector, direction)
-        E_vector = numpy.cross(E_vector, direction)
-
-        ray_data = numpy.zeros((2*count)+1, dtype=ray_dtype)
-        
-        theta0 = self.wavelength/(numpy.pi*radius*1000.0)
-        lr = numpy.array([1,-1])[:,None,None]
-        eye = numpy.array([1,1])[:,None,None]
-        alpha = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
-        origins = eye*radius*(d1*numpy.sin(alpha) + d2*numpy.cos(alpha))
-        directions = theta0*lr*(d1*numpy.cos(alpha) - d2*numpy.sin(alpha))
-        
-        origins.shape = (-1,3)
-        directions.shape = (-1,3)
-        directions += direction
-        directions = normaliseVector(directions)
-        origins = origins - (self.working_distance*directions)
+        try:
+            origin = numpy.array(self.origin)
+            direction = numpy.array(self.direction)
+            count = self.number
+            radius = self.beam_waist/2000.0 #convert to mm
+            max_axis = numpy.abs(direction).argmax()
+            if max_axis==0:
+                v = numpy.array([0.,1.,0.])
+            else:
+                v = numpy.array([1.,0.,0.])
+            d1 = numpy.cross(direction, v)
+            d1 = normaliseVector(d1)
+            d2 = numpy.cross(direction, d1)
+            d2 = normaliseVector(d2)
+    
+            E_vector = numpy.cross(self.E_vector, direction)
+            E_vector = numpy.cross(E_vector, direction)
+    
+            ray_data = numpy.zeros((2*count)+1, dtype=ray_dtype)
             
-        ray_data['origin'][1:] = origins
-        ray_data['origin'] += origin + (self.working_distance*direction)
-        ray_data['direction'][1:] = directions
-        ray_data['direction'][0] = direction
-        ray_data['wavelength_idx'] = 0
-        ray_data['E_vector'] = [normaliseVector(E_vector)]
-        ray_data['E1_amp'] = self.E1_amp
-        ray_data['E2_amp'] = self.E2_amp
-        ray_data['refractive_index'] = 1.0+0.0j
-        ray_data['normal'] = [[0,1,0]]
-        rays = RayCollection.from_array(ray_data)
+            theta0 = self.wavelength/(numpy.pi*radius*1000.0)
+            lr = numpy.array([1,-1])[:,None,None]
+            eye = numpy.array([1,1])[:,None,None]
+            alpha = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
+            origins = eye*radius*(d1*numpy.sin(alpha) + d2*numpy.cos(alpha))
+            directions = theta0*lr*(d1*numpy.cos(alpha) - d2*numpy.sin(alpha))
+            
+            origins.shape = (-1,3)
+            directions.shape = (-1,3)
+            directions += direction
+            directions = normaliseVector(directions)
+            origins = origins - (self.working_distance*directions)
+                
+            ray_data['origin'][1:] = origins
+            ray_data['origin'] += origin + (self.working_distance*direction)
+            ray_data['direction'][1:] = directions
+            ray_data['direction'][0] = direction
+            ray_data['wavelength_idx'] = 0
+            ray_data['E_vector'] = [normaliseVector(E_vector)]
+            ray_data['E1_amp'] = self.E1_amp
+            ray_data['E2_amp'] = self.E2_amp
+            ray_data['refractive_index'] = 1.0+0.0j
+            ray_data['normal'] = [[0,1,0]]
+            rays = RayCollection.from_array(ray_data)
+        except:
+            import traceback
+            traceback.print_exc()
+            return RayCollection(5)
         return rays
     
 

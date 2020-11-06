@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from traits.api import Float, Instance, on_trait_change
+from traits.api import Float, Instance, on_trait_change, Array
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
@@ -25,7 +25,7 @@ from tvtk.api import tvtk
 from raytrace.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals
     
-from raytrace.cfaces import CircularFace, SphericalFace
+from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 
@@ -145,6 +145,287 @@ class PlanoConvexLens(BaseLens):
         self.config_pipeline()
         grid.modified()
         return transF
+    
+    
+class SurfaceOfRotationLens(BaseLens):
+    ###An array representing the 2D profile of the lens to be revolved
+    profile = Array(shape=(None,2), dtype=numpy.double, transient=True)
+    
+    data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
+    
+    revolve = Instance(tvtk.RotationalExtrusionFilter, (), 
+                       {'capping': False,
+                        'angle': 360.0,
+                        'resolution': 60 
+                        },
+                        transient=True)
+    
+    def _pipeline_default(self):
+        self.config_profile()
+        
+        source = self.data_source
+        def execute():
+            yz = self.profile
+            x = numpy.zeros(yz.shape[0])
+            points = numpy.column_stack((x,yz))
+            
+            cells = [list(range(len(x))),]
+            
+            output = source.poly_data_output
+            output.points = points
+            output.polys = cells
+        source.set_execute_method(execute)
+        print("Made PIPELINE")
+        
+        revolve = self.revolve
+        revolve.input_connection = source.output_port
+        
+        t = self.transform
+        transf = tvtk.TransformFilter(input_connection=revolve.output_port, 
+                                      transform=t)
+        return transf
+    
+    def _profile_changed(self):
+        self.data_source.modified()
+        self.faces.faces = self.make_faces()
+        self.update=True
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces = self.make_faces()
+        return fl
+    
+    def config_profile(self):
+        pass
+    
+    def make_faces(self):
+        return []
+    
+    
+class PlanoConicLens(SurfaceOfRotationLens):
+    abstract = False
+    name = "Plano-Conic Section Lens"
+    
+    CT = Float(5.0, desc="centre thickness")
+    diameter = Float(15.0)
+    offset = Float(0.0) #Fixed at zero
+    conic_const = Float(4.0, desc="conic constant")
+    curvature = Float(11.7, desc="radius of curvature for spherical face")
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('n_inside'),
+                       Item('CT', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       Item('curvature', editor=NumEditor),
+                       Item('conic_const', editor=NumEditor)
+                       )
+                    )
+    
+    def make_faces(self):
+        fl = [CircularFace(owner=self, diameter=self.diameter,
+                                material = self.material), 
+                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                conic_const=self.conic_const,
+                                z_height=self.CT, curvature=self.curvature)]
+        return fl
+    
+    def _CT_changed(self, new_ct):
+        self.faces.faces[1].z_height = new_ct
+        
+    def _curvature_changed(self, new_curve):
+        self.faces.faces[1].curvature = new_curve
+        
+    def _conic_const_changed(self, new_conic):
+        self.faces.faces[1].conic_const = new_conic
+        
+    @on_trait_change("CT, diameter, conic_const, curvature")
+    def config_profile(self):
+        n_segments = 20 #number of lines in the curved section
+        r_max = self.diameter/2 #maximum radius
+        k = self.conic_const
+        R = self.curvature
+        r = numpy.linspace(0,r_max, n_segments)
+        
+        z = self.CT - (r**2)/(R*(1 + numpy.sqrt(1 - (1+k)*(r**2)/(R**2))))
+        
+        profile = list(zip(r,z))
+        profile.extend([(r_max, 0.0), (0.0,0.0)])
+        self.profile = profile
+        
+    
+    
+    
+class BiConicLens(PlanoConicLens):
+    name = "Bi-Conic Section Lens"
+    
+    conic_const2 = Float(-4.0, desc="conic constant, lower face")
+    curvature2 = Float(11.7, desc="radius of curvature for spherical face")
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('n_inside'),
+                       Item('CT', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       Item('curvature', editor=NumEditor),
+                       Item('conic_const', editor=NumEditor),
+                       Item('curvature2', editor=NumEditor),
+                       Item('conic_const2', editor=NumEditor)
+                       )
+                    )
+    
+    def _curvature2_changed(self, new_curve):
+        self.faces.faces[0].curvature = new_curve
+        
+    def _conic_const2_changed(self, new_conic):
+        self.faces.faces[0].conic_const = new_conic
+    
+    def make_faces(self):
+        fl = [ConicRevolutionFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                conic_const=self.conic_const2,
+                                z_height=0.0, curvature=self.curvature2,
+                                invert_normals=True), 
+                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                conic_const=self.conic_const,
+                                z_height=self.CT, curvature=self.curvature)]
+        return fl
+
+    @on_trait_change("CT, diameter, conic_const, curvature, conic_const2, curvature2")
+    def config_profile(self):
+        n_segments = 20 #number of lines in the curved section
+        r_max = self.diameter/2 #maximum radius
+        k = self.conic_const
+        k2 = self.conic_const2
+        R = self.curvature
+        R2 = self.curvature2
+        r = numpy.linspace(0,r_max, n_segments)
+        
+        #top surface
+        z = self.CT - (r**2)/(R*(1 + numpy.sqrt(1 - (1+k)*(r**2)/(R**2))))
+        z2 = - (r**2)/(R2*(1 + numpy.sqrt(1 - (1+k2)*(r**2)/(R2**2))))
+        
+        profile = list(zip(r,z))
+        profile2 = list(zip(r,z2))
+        
+        profile.extend(profile2[-1::-1])
+        self.profile = profile
+        
+        
+class AsphericLens(SurfaceOfRotationLens):
+    abstract = False
+    name = "Bi-Aspheric Lens"
+    
+    CT = Float(5.0, desc="centre thickness")
+    diameter = Float(25.0)
+    offset = Float(0.0) #Fixed at zero
+    
+    A_curvature = Float(-25.0)
+    A_conic = Float(-0.0)
+    A4 = Float(0.0)
+    A6 = Float(0.0)
+    A8 = Float(0.0)
+    A10 = Float(0.0)
+    A12 = Float(0.0)
+    A14 = Float(0.0)
+    A16 = Float(0.0)
+    
+    B_curvature = Float(25.0)
+    B_conic = Float(-0.0)
+    B4 = Float(0.0)
+    B6 = Float(0.0)
+    B8 = Float(0.0)
+    B10 = Float(0.0)
+    B12 = Float(0.0)
+    B14 = Float(0.0)
+    B16 = Float(0.0)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('n_inside'),
+                       Item('CT', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       VGroup(
+                           Item('A_curvature', editor=NumEditor),
+                           Item('A_conic', editor=NumEditor),
+                           Item('A4', editor=NumEditor),
+                           Item('A6', editor=NumEditor),
+                           Item('A8', editor=NumEditor),
+                           Item('A10', editor=NumEditor),
+                           label="A Surface",
+                           show_border = True
+                           ),
+                       VGroup(
+                           Item('B_curvature', editor=NumEditor),
+                           Item('B_conic', editor=NumEditor),
+                           Item('B4', editor=NumEditor),
+                           Item('B6', editor=NumEditor),
+                           Item('B8', editor=NumEditor),
+                           Item('B10', editor=NumEditor),
+                           label="B Surface",
+                           show_border = True
+                           ),
+                       )
+                    )
+    
+#     def make_faces(self):
+#         fl = [ConicRevolutionFace(owner=self, diameter=self.diameter,
+#                                 material=self.material,
+#                                 conic_const=self.A_conic,
+#                                 z_height=0.0, curvature=self.A_curvature,
+#                                 invert_normals=True), 
+#                 ConicRevolutionFace(owner=self, diameter=self.diameter,
+#                                 material=self.material,
+#                                 conic_const=self.B_conic,
+#                                 z_height=self.CT, curvature=self.B_curvature)]
+#         return fl
+    
+    def make_faces(self):
+        fl = [AsphericFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                conic_const=self.A_conic,
+                                z_height=0.0, curvature=self.A_curvature,
+                                A4=-self.A4, A6=-self.A6, A8=-self.A8, A10=-self.A10,
+                                A12=-self.A12, A14=-self.A14, A16=-self.A16,
+                                invert_normals=True,
+                                atol=1e-16), 
+                AsphericFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                conic_const=self.B_conic,
+                                z_height=self.CT, curvature=self.B_curvature,
+                                A4=-self.B4, A6=-self.B6, A8=-self.B8, A10=-self.B10,
+                                A12=-self.B12, A14=-self.B14, A16=-self.B16,
+                                atol=1e-16)]
+        return fl
+    
+    def eval_A(self, y):
+        y2=numpy.asarray(y)**2
+        R = self.A_curvature
+        beta = (1 + self.A_conic)
+        z = self.A4*(y2**2) + self.A6*(y2**3) + self.A8*(y2**4) + self.A10*(y2**5) + y2 / (R*(1 + numpy.sqrt(1 - beta*y2/(R**2))))
+        return -z
+    
+    def eval_B(self, y):
+        y2=numpy.asarray(y)**2
+        R = self.B_curvature
+        beta = (1 + self.B_conic)
+        z = self.B4*(y2**2) + self.B6*(y2**3) + self.B8*(y2**4) + self.B10*(y2**5) + y2 / (R*(1 + numpy.sqrt(1 - beta*y2/(R**2))))
+        return self.CT - z
+    
+    @on_trait_change("CT, diameter, A_conic, A_curvature, A4, A6, A8, A10, B_conic, B_curvature, B4, B6, B8, B10")
+    def config_profile(self):
+        n_segments = 20 #number of lines in the curved section
+        r_max = self.diameter/2 #maximum radius
+        r = numpy.linspace(0,r_max, n_segments)
+        
+        profile = list(zip(r, self.eval_A(r)))
+        profile2 = list(zip(r, self.eval_B(r)))
+        
+        profile.extend(profile2[-1::-1])
+        self.profile = profile
+    
 
         
 if __name__=="__main__":

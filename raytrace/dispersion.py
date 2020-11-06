@@ -79,10 +79,19 @@ class NamedDispersionCurve(BaseDispersionCurve):
                                                   wavelen_max
                                                   )
         
+    @classmethod
+    def get_glass_names(cls):
+        sql  = "select name from dispersion"
+        conn = sqlite3.connect(MATERIAL_DATABASE)
+        rows = list(conn.execute(sql))
+        return [r[0] for r in rows]
+        
         
 if __name__=="__main__":
     
     BK7 = NamedDispersionCurve("N-LAK22")
     print(BK7.formula_id, list(BK7.coefs))
     print(BK7.evaluate_n([1.0, 1.5]))
+    
+    print([a for a in NamedDispersionCurve.get_glass_names() if a.startswith("D")])
         

@@ -118,6 +118,17 @@ cdef double sellmeier_2(double wavelen, double[:] coefs ):
         n2 += coefs[2*i + 1] * wl2 / (wl2 - coefs[2*i + 2])
     return sqrt(n2)
 
+### Polynomia formula
+cdef double sellmeier_3(double wavelen, double[:] coefs ):
+    cdef:
+        double n2=coefs[0]
+        int i, n_coefs = coefs.shape[0]
+        
+    for i in range(1,n_coefs-1,2):
+        n2 += coefs[i]*( wavelen**(coefs[i+1]) )
+    return sqrt(n2)
+        
+
 cdef double sellmeier_5(double wavelen, double[:] coefs):
     cdef:
         double n= coefs[0]
@@ -145,6 +156,8 @@ cdef class BaseDispersionCurve(object):
             self.curve = &sellmeier_1
         elif formula_id==2:
             self.curve = &sellmeier_2
+        elif formula_id==3:
+            self.curve = &sellmeier_3
         elif formula_id==5:
             self.curve = &sellmeier_5
         elif formula_id==0:

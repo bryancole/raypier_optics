@@ -44,13 +44,16 @@ import numpy
 includes = [numpy.get_include()]
 libpath = []
 
+
+Win64 = sys.platform.startswith("win")
+
 # if sys.platform.startswith('win32'):
 #     os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
 #     includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
 #     libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
 ext_modules = cythonize("raytrace/*.pyx",
-                        language="c++",
+                        language="c++" if Win64 else None,
                         include_path=[numpy.get_include()])
 
 setup(
@@ -59,7 +62,7 @@ setup(
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
-    ext_package = "raytrace",
+    #ext_package = "raytrace", ###Not needed on linux. Is it necessary on Win64?
     ext_modules = ext_modules,
     include_dirs = [numpy.get_include()],
     zip_safe = True, #why not!

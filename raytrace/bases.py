@@ -55,6 +55,12 @@ class Float(BaseFloat):
         return float(value)
 
 
+class Direction(HasTraits):
+    x = Float
+    y = Float
+    z = Float
+
+
 class RaytraceObjectMetaclass(MetaHasTraits):
     """
     The metaclass for YAMLObject.
@@ -102,14 +108,10 @@ class RaytraceObject(object, metaclass=RaytraceObjectMetaclass):
         return dumper.represent_yaml_object(cls.yaml_tag, data, cls,
                 flow_style=cls.yaml_flow_style)
     to_yaml = classmethod(to_yaml)
-
-
-
-
-class Direction(HasTraits):
-    x = Float
-    y = Float
-    z = Float
+    
+    @classmethod
+    def class_trait_view_elements(cls):
+        return None
 
 
 class Renderable(HasQueue, RaytraceObject, metaclass=RaytraceObjectMetaclass):
