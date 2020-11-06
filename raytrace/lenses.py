@@ -328,6 +328,9 @@ class AsphericLens(SurfaceOfRotationLens):
     A6 = Float(0.0)
     A8 = Float(0.0)
     A10 = Float(0.0)
+    A12 = Float(0.0)
+    A14 = Float(0.0)
+    A16 = Float(0.0)
     
     B_curvature = Float(25.0)
     B_conic = Float(-0.0)
@@ -335,6 +338,9 @@ class AsphericLens(SurfaceOfRotationLens):
     B6 = Float(0.0)
     B8 = Float(0.0)
     B10 = Float(0.0)
+    B12 = Float(0.0)
+    B14 = Float(0.0)
+    B16 = Float(0.0)
     
     traits_view = View(VGroup(
                        Traceable.uigroup,  

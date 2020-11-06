@@ -1,5 +1,5 @@
 
-from raytrace.aspherics import Thorlabs355440, Thorlabs352440
+from raytrace.aspherics import Thorlabs355440_B, Thorlabs352440
 from raytrace.tracer import RayTraceModel
 from raytrace.sources import ConfocalRaySource
 from raytrace.mirrors import PlanarDispersiveWindow, PlanarWindow
@@ -11,7 +11,7 @@ from raytrace.find_focus import find_ray_focus
 import numpy
 import time
 
-lens = Thorlabs355440(centre=(0,0,0),
+lens = Thorlabs355440_B(centre=(0,0,0),
                     direction=(1,0,0))
 #lens.centre = (lens.CT,0,0)
 
@@ -27,7 +27,7 @@ source = ConfocalRaySource(focus = (-7.09,0,0),
                            theta=12.0,
                            wavelen=0.78)
  
-model = RayTraceModel(optics=[lens],
+model = RayTraceModel(optics=[lens, window],
                       sources=[source])
 
 model.configure_traits()
@@ -50,7 +50,7 @@ start = time.clock()
 for x in x1:
     source.focus = (-x,0,0)
     window.centre = (-x + 0.5, 0.0, 0.0)
-    source.theta = 9.0 * numpy.arctan2(2.,x)/0.2
+    source.theta = 8.0 * numpy.arctan2(2.,x)/0.2
     model.trace_all()
     last_rays = source.TracedRays[-1]
     focus = find_ray_focus(last_rays)
@@ -70,8 +70,8 @@ from matplotlib import pyplot as pp
 pp.plot(x1,x2,'b-', label="focus")
 pp.grid(True)
 ax = pp.gca()
-#ax.set_title(f"{lens.name} - reversed - with 0.25mm laser window")
-ax.set_title(f"{lens.name} - no laser window")
+ax.set_title(f"{lens.name} - reversed - with 0.25mm laser window")
+#ax.set_title(f"{lens.name} - no laser window")
 ax.set_xlabel("S1 Working dist /mm")
 ax.set_ylabel("S2 Working dist /mm")
 

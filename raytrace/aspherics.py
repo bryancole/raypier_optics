@@ -7,7 +7,7 @@ from .dispersion import NamedDispersionCurve, NondispersiveCurve
 
 
 class DispersiveAsphericLens(AsphericLens):
-    glass_type = Str("D-ZLAF52LA")
+    glass_type = Str("N-BK7")
     coating_thickness = Float(0.283) #microns
     coating_refractive_index = Float(1.37)
     
@@ -33,13 +33,60 @@ class Thorlabs355440(DispersiveAsphericLens):
     A6 = 1.981378E-3
     A8 = -4.782553E-4
     A10 = 7.328134E-5
+    A12 = -5.920460E-6
+    A14 = 9.104334E-8
+    A16 = 1.291935E-8
+    
     B_curvature = 3.200655
     B_conic = -4.321649
     B4 = 5.521153E-3
     B6 = -1.981378E-3
     B8 = 4.782553E-4
     B10 = -7.328134E-5
+    B12 = 5.920460E-6
+    B14 = -9.104334E-8
+    B16 = -1.291935E-8
     glass_type = "D-ZLAF52LA"
+    
+    
+class Thorlabs355440_B(AsphericLens):
+    name = "Thorlabs#355440"
+    diameter = 4.7
+    CT = 3.8
+    A_curvature = -3.200655
+    A_conic = -4.321649
+    A4 = -5.521153E-3
+    A6 = 1.981378E-3
+    A8 = -4.782553E-4
+    A10 = 7.328134E-5
+    A12 = -5.920460E-6
+    A14 = 9.104334E-8
+    A16 = 1.291935E-8
+    
+    B_curvature = 3.200655
+    B_conic = -4.321649
+    B4 = 5.521153E-3
+    B6 = -1.981378E-3
+    B8 = 4.782553E-4
+    B10 = -7.328134E-5
+    B12 = 5.920460E-6
+    B14 = -9.104334E-8
+    B16 = -1.291935E-8
+    
+    coating_thickness = Float(0.283) #microns
+    coating_refractive_index = Float(1.37)
+    
+    def _material_default(self):
+        ### ECO-550 is not in the database :(
+        glass = NondispersiveCurve(1.7902)
+        cri = self.coating_refractive_index
+        coating = NondispersiveCurve(refractive_index=cri)
+        air = NondispersiveCurve(1.0)
+        
+        m = CoatedDispersiveMaterial(dispersion_inside=glass,
+                                     dispersion_outside=air,
+                                     dispersion_coating=coating)
+        return m
     
     
 class Thorlabs352440(AsphericLens):
