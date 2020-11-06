@@ -963,7 +963,9 @@ cdef double intersect_conic(vector_t a, vector_t d, double curvature, double con
         double beta = 1 + conic_const
         double R = -curvature
         double A,B,C,D
+        #double pt1, pt2
     
+    #print("inputs:", a.x, a.y, a.z, d.x, d.y, d.z, beta, R)
     ###Obtained by sympy evaluation of the equations
     ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
     A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
@@ -977,13 +979,39 @@ cdef double intersect_conic(vector_t a, vector_t d, double curvature, double con
     
     D = sqrt(D)
     
+### This turns out to not be necessary
+#     #1st root
+#     a1 = (-B+D)/(2*A) 
+#     pt1 = a.z + d.z*a1 #addvv_(a, multvs_(d, a1))
+#     #2nd root
+#     a2 = (-B-D)/(2*A)
+#     pt2 = a.z + d.z*a2 #addvv_(a, multvs_(d, a2))
+#     
+#     print("R.beta.dz:", R*beta*d.z, a1, pt1, a2, pt2, A, B, C, D)
+#     if R*beta*d.z <= 0:
+#         if pt1 < R/beta:
+#             a1 = INF
+#         if pt2 < R/beta:
+#             a2 = INF
+#     else:
+#         if pt1 > R/beta:
+#             a1 = INF
+#         if pt2 > R/beta:
+#             a2 = INF
+#             
+#     if a2 < a1:
+#         return a2
+#     else:
+#         return a1
+    
+    #print("R.beta.dz:", R*beta*d.z)
     if R*beta*d.z <= 0:
         #1st root
         return (-B+D)/(2*A) 
     else:
         #2nd root
         return (-B-D)/(2*A)
-    
+     
     
 cdef class ConicRevolutionFace(Face):
     """This is surface of revolution formed from a conic section. Spherical and ellipsoidal faces
@@ -1137,7 +1165,7 @@ cdef class AsphericFace(Face):
           intersection can be indicated by a negative value.
         """
         cdef:
-            double a1, dz 
+            double a1, dz, f, f_last
             double tol = self.atol**2
             vector_t d, a, pt1
             aspheric_t A
@@ -1156,19 +1184,30 @@ cdef class AsphericFace(Face):
         A.A10 = self.A10
         A.a = a
         A.d = d
+
+        ### Find root using Newton's method. Typically only a 3-4 iterations are required.
          
-        dz = - eval_aspheric_impf(A, a1) / eval_aspheric_grad(A, a1)
+        f = f_last = eval_aspheric_impf(A, a1)
+        dz = - f / eval_aspheric_grad(A, a1)
         #print("Start:", dz, a1)
+
+        #### If we've not converged after 100 iterations, then it ain't going converge ever.
         for i in range(100):
             a1 += dz
             if dz*dz < tol:
                 break
-            dz = - eval_aspheric_impf(A, a1) / eval_aspheric_grad(A, a1)
-             
+            f = eval_aspheric_impf(A, a1)
+            if fabs(f) > fabs(f_last): #We're not converging
+                return -1
+            f_last = f
+            dz = - f / eval_aspheric_grad(A, a1)
+        else:
+            return -1     
+        
         #print("Converged:", dz, a1, i)
         
         pt1 = addvv_(a, multvs_(d, a1))
-        
+        #print("a1:", a1_init, a1, pt1.z, i)
         D = self.diameter*self.diameter/4.
         if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
             a1 = INF
