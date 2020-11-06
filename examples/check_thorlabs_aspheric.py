@@ -1,5 +1,5 @@
 
-from raytrace.aspherics import Thorlabs355440_B, Thorlabs352440
+from raytrace.aspherics import Thorlabs355440_B, Thorlabs355440, Thorlabs352440
 from raytrace.tracer import RayTraceModel
 from raytrace.sources import ConfocalRaySource
 from raytrace.mirrors import PlanarDispersiveWindow, PlanarWindow
@@ -15,7 +15,7 @@ lens = Thorlabs355440_B(centre=(0,0,0),
                     direction=(1,0,0))
 #lens.centre = (lens.CT,0,0)
 
-window = PlanarWindow(centre=(-6.0,0,0),
+window = PlanarWindow(centre=(-1.0,0,0),
                         direction=(1,0,0),
                         thickness=0.25,
                         diameter=5.0,
@@ -27,7 +27,7 @@ source = ConfocalRaySource(focus = (-7.09,0,0),
                            theta=12.0,
                            wavelen=0.78)
  
-model = RayTraceModel(optics=[lens, window],
+model = RayTraceModel(optics=[lens],
                       sources=[source])
 
 model.configure_traits()
@@ -49,15 +49,13 @@ model.trace_all()
 start = time.clock()
 for x in x1:
     source.focus = (-x,0,0)
-    window.centre = (-x + 0.5, 0.0, 0.0)
-    source.theta = 8.0 * numpy.arctan2(2.,x)/0.2
+    #window.centre = (-x + 0.5, 0.0, 0.0)
+    source.theta = 6.0 * numpy.arctan2(2.,x)/0.2
     model.trace_all()
     last_rays = source.TracedRays[-1]
     focus = find_ray_focus(last_rays)
     x_offset = focus[0]
     x2.append( x_offset - lens.CT )
-    if x2[-1] < 1.0:
-        model.configure_traits()
     
     rms = find_rms_spread(last_rays, x_offset)
     spr.append( rms )

@@ -89,18 +89,18 @@ class OffAxisParabloid(BaseMirror):
         cyl = self.vtk_cylinder
         cyl.transform = trans
         
-        clip1 = tvtk.ClipVolume(input=grid.structured_points_output,
+        clip1 = tvtk.ClipVolume(input_connection=grid.output_port,
                                  clip_function=self.vtk_cylinder,
                                  inside_out=1)
         
-        clip2 = tvtk.ClipDataSet(input = clip1.output,
+        clip2 = tvtk.ClipDataSet(input_connection = clip1.output_port,
                                  clip_function=self.vtk_quadric,
                                  inside_out=1)
         
-        topoly = tvtk.GeometryFilter(input=clip2.output)
-        norms = tvtk.PolyDataNormals(input=topoly.output)
+        topoly = tvtk.GeometryFilter(input_connection=clip2.output_port)
+        norms = tvtk.PolyDataNormals(input_connection=topoly.output_port)
         
-        transF = tvtk.TransformFilter(input=norms.output, transform=self.transform)
+        transF = tvtk.TransformFilter(input_connection=norms.output_port, transform=self.transform)
         self.config_pipeline()
         #clip1.update()
         grid.modified()

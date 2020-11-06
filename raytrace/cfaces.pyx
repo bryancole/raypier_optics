@@ -1097,9 +1097,9 @@ cdef struct aspheric_t:
     double A6
     double A8
     double A10
-    #double A12
-    #double A14
-    #double A16
+    double A12
+    double A14
+    double A16
     vector_t a
     vector_t d
     
@@ -1112,7 +1112,7 @@ cdef double eval_aspheric_impf(aspheric_t A, double alpha):
     out = r2
     out /= A.R*(1 + sqrt(1 - A.beta*r2/(A.R**2)) )
     out -= A.a.z + alpha*A.d.z
-    out += A.A4*(r2**2) + A.A6*(r2**3) + A.A8*(r2**4) + A.A10*(r2**5) #+ A.A12*(r2**6) + A.A14*(r2**7) + A.A16*(r2**8)
+    out += A.A4*(r2**2) + A.A6*(r2**3) + A.A8*(r2**4) + A.A10*(r2**5) + A.A12*(r2**6) + A.A14*(r2**7) + A.A16*(r2**8)
     return out
 
 
@@ -1124,9 +1124,9 @@ cdef double eval_aspheric_grad(aspheric_t A, double alpha):
         double dy = A.d.y*(A.a.y + alpha*A.d.y)
         
     out = A.A10*(10*dx + 10*dy) *(r2**4)
-    #out += A.A12*(12*dx + 12*dy) *(r2**5)
-    #out += A.A14*(14*dx + 14*dy) *(r2**6)
-    #out += A.A16*(16*dx + 16*dy) *(r2**7)
+    out += A.A12*(12*dx + 12*dy) *(r2**5)
+    out += A.A14*(14*dx + 14*dy) *(r2**6)
+    out += A.A16*(16*dx + 16*dy) *(r2**7)
     out +=  A.A4*(4*dx + 4*dy)*(r2)  
     out +=  A.A6*(6*dx + 6*dy)*(r2**2)  
     out +=  A.A8*(8*dx + 8*dy)*(r2**3) - A.d.z  
@@ -1192,9 +1192,9 @@ cdef class AsphericFace(Face):
         A.A6 = self.A6
         A.A8 = self.A8
         A.A10 = self.A10
-        #A.A12 = self.A12
-        #A.A14 = self.A14
-        #A.A16 = self.A16
+        A.A12 = self.A12
+        A.A14 = self.A14
+        A.A16 = self.A16
         A.a = a
         A.d = d
 
@@ -1248,7 +1248,7 @@ cdef class AsphericFace(Face):
         r = sqrt(r2)
         root = sqrt(1-(beta*(r2)/(R*R)))
         df = 10*self.A10*(r2**5) + 8*self.A8*(r2**4) + 6*self.A6*(r2**3) + 4*self.A4*(r2**2)
-        #df += 16*self.A16*(r2**8) + 14*self.A14*(r2**7) + 12*self.A12*(r2**6) 
+        df += 16*self.A16*(r2**8) + 14*self.A14*(r2**7) + 12*self.A12*(r2**6) 
         df /= r
         df += (2*r)/(R*(1+root))
         df += beta*(r2**2)/(r*(R**3)*root*((1+root)**2))

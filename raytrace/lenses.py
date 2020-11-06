@@ -388,6 +388,7 @@ class AsphericLens(SurfaceOfRotationLens):
                                 conic_const=self.A_conic,
                                 z_height=0.0, curvature=self.A_curvature,
                                 A4=-self.A4, A6=-self.A6, A8=-self.A8, A10=-self.A10,
+                                A12=-self.A12, A14=-self.A14, A16=-self.A16,
                                 invert_normals=True,
                                 atol=1e-16), 
                 AsphericFace(owner=self, diameter=self.diameter,
@@ -395,6 +396,7 @@ class AsphericLens(SurfaceOfRotationLens):
                                 conic_const=self.B_conic,
                                 z_height=self.CT, curvature=self.B_curvature,
                                 A4=-self.B4, A6=-self.B6, A8=-self.B8, A10=-self.B10,
+                                A12=-self.B12, A14=-self.B14, A16=-self.B16,
                                 atol=1e-16)]
         return fl
     
