@@ -11,9 +11,11 @@ from raytrace.find_focus import find_ray_focus
 import numpy
 import time
 
-lens = Thorlabs355440_B(centre=(0,0,0),
+lens = Thorlabs355440_B(centre=(0,0.0,0),
                     direction=(1,0,0))
 #lens.centre = (lens.CT,0,0)
+
+print("N:", lens.material.dispersion_inside.evaluate_n([0.78, 0.98]))
 
 window = PlanarWindow(centre=(-1.0,0,0),
                         direction=(1,0,0),
@@ -25,9 +27,9 @@ source = ConfocalRaySource(focus = (-7.09,0,0),
                            direction = (1,0,0),
                            working_dist= 10.0,
                            theta=12.0,
-                           wavelen=0.78)
+                           wavelen=0.98)
  
-model = RayTraceModel(optics=[lens],
+model = RayTraceModel(optics=[lens, window],
                       sources=[source])
 
 model.configure_traits()
@@ -68,8 +70,8 @@ from matplotlib import pyplot as pp
 pp.plot(x1,x2,'b-', label="focus")
 pp.grid(True)
 ax = pp.gca()
-ax.set_title(f"{lens.name} - reversed - with 0.25mm laser window")
-#ax.set_title(f"{lens.name} - no laser window")
+#ax.set_title(f"{lens.name} - with 0.25mm laser window")
+ax.set_title(f"{lens.name} - 780nm - no laser window")
 ax.set_xlabel("S1 Working dist /mm")
 ax.set_ylabel("S2 Working dist /mm")
 

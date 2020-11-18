@@ -21,7 +21,7 @@ import itertools
 
 from traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
-     Instance, on_trait_change, Trait, Enum, Title, Complex
+     Instance, on_trait_change, Trait, Enum, Title, Complex, Dict
 
 from traitsui.api import View, Item, Tabbed, VGroup, Include, \
     Group
@@ -67,6 +67,11 @@ class BaseRaySource(BaseBase):
     show_polarisation = Bool(False)
     show_direction = Bool(False)
     show_normals = Bool(False)
+    
+    ### A dict which maps each RayCollection instance in the TracedRays
+    ### list to a list/array of bools of the same length as the RayCollection
+    ### This bool array indicates if a ray should be hidden in the display
+    ray_mask = Dict()
     
     #idx selector for the input ways which should be visualised
     #making this transient because pyYAML fails to serialise arrays
@@ -214,6 +219,9 @@ class BaseRaySource(BaseBase):
         
     def _show_normals_changed(self):
         self.update=True
+        
+    def _ray_mask_changed(self):
+        self.update = True
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
@@ -257,9 +265,13 @@ class BaseRaySource(BaseBase):
         def execute():
             output = source.poly_data_output
             pointArrayList = []
-            for rays in self.TracedRays:                
-                start_pos = [r.origin for r in rays]
-                end_pos = [r.termination for r in rays]
+            mask = self.ray_mask
+            for rays in self.TracedRays:
+                vis = mask.get(rays, [])
+                if len(vis) != len(rays):
+                    vis = itertools.repeat(True)
+                start_pos = [r.origin for r,v in zip(rays, vis) if v]
+                end_pos = [r.termination for r,v in zip(rays, vis) if v]
                 #print "start", start_pos
                 #print "end", end_pos
                 interleaved = numpy.array([start_pos, end_pos]).swapaxes(0,1).reshape(-1,3)
