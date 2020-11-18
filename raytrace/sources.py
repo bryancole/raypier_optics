@@ -866,12 +866,18 @@ class AdHocSource(BaseRaySource):
         return self.rays
 
 
-class HaxagonalRayFieldSource(SingleRaySource):
+class HexagonalRayFieldSource(SingleRaySource):
     radius = Float(10.,editor=NumEditor)
     spacing = Float(0.5, editor=NumEditor)
     
     InputRays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, spacing, radius, max_ray_len, E_vector")
+    
+    neighbours = Array(transient=True)
+    
+    show_mesh = Bool(True)
+    mesh_source = Instance(tvtk.ProgrammableSource, transient=True)
+    mesh_actor = Instance(tvtk.Actor, transient=True)
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -887,7 +893,57 @@ class HaxagonalRayFieldSource(SingleRaySource):
     @on_trait_change("direction, spacing, radius, max_ray_len")
     def on_update(self):
         self.data_source.modified()
+        self.mesh_source.modified()
         self.update=True
+        
+    def _get_actors(self):
+        actors = [self.ray_actor, self.start_actor, self.normals_actor, self.mesh_actor]
+        return actors
+        
+    def _mesh_source_default(self):
+        source = tvtk.ProgrammableSource()
+        def execute():
+            if not self.show_mesh:
+                return
+            output = source.poly_data_output
+            points = self.InputRays.origin
+            neighbours = self.neighbours
+#             i = len(points)//2
+#             nb = neighbours[i]
+#             nb1, nb2, nb3, nb4, nb5, nb6 = nb
+#             tris = numpy.array([ (i, nb1, nb2 ),
+#                              (i, nb2, nb3 ),
+#                              (i, nb3, nb4),
+#                              (i, nb4, nb5),
+#                              (i, nb5, nb6),
+#                              (i, nb6, nb1) 
+#                             ])
+            tris = []
+            for i in range(points.shape[0]):
+                nb = neighbours[i]
+                if any(a<=0 for a in nb):
+                    continue
+                nb1, nb2, nb3, nb4, nb5, nb6 = nb
+                tris.extend([ [i, nb1, nb2],
+                              [i, nb2, nb3],
+                              [i, nb3, nb4],
+                              [i, nb4, nb5],
+                              [i, nb5, nb6],
+                              [i, nb6, nb1] 
+                             ])
+            output.points = points
+            output.polys = tris
+            #print("calc normals GLYPH")
+        source.set_execute_method(execute)
+        return source
+    
+    def _mesh_actor_default(self):
+        source = self.mesh_source
+        map = tvtk.PolyDataMapper(input_connection=source.output_port)
+        act = tvtk.Actor(mapper=map)
+        act.property.color = (0.0,1.0,0.0)
+        act.property.representation = "wireframe"
+        return act
     
     @cached_property
     def _get_InputRays(self):
@@ -913,21 +969,33 @@ class HaxagonalRayFieldSource(SingleRaySource):
         d2 = cosV*d2 + sinV*d1
         
         nsteps = int(radius/(spacing*numpy.cos(numpy.pi*30/180.)))
-        i = numpy.arange(-nsteps, nsteps+1)
-        j = numpy.arange(-nsteps, nsteps+1)
+        i = numpy.arange(-nsteps-1, nsteps+2)
+        j = numpy.arange(-nsteps-1, nsteps+2)
         
         vi, vj = numpy.meshgrid(i,j)
-        #label = numpy.arange(vx.size).reshape(*vx.shape) #give each point a unique index
-        #neighbours = numpy.dstack((label[] ))
+        label = numpy.arange(vi.size).reshape(*vi.shape) #give each point a unique index
+        neighbours = numpy.full((label.shape[0], label.shape[1], 6), -1, 'i')
+        neighbours[1:,:,3] = label[:-1,:]
+        neighbours[:-1,:,0] = label[1:,:]
+        neighbours[:,1:,4] = label[:,:-1]
+        neighbours[:,:-1,1] = label[:,1:]
+        neighbours[1:,:-1,2] = label[:-1,1:]
+        neighbours[:-1,1:,5] = label[1:,:-1]
+        
+        neighbours.shape = -1,6
         
         vi.shape = -1
         vj.shape = -1
         
         select = ((vi + sinV*vj)**2 + (cosV*vj**2)) < (radius/spacing)**2
-        #label = numpy.arange(len(select))
         
         xi = vi[select]
         yj = vj[select]
+        
+        backmap = numpy.full(vi.shape, -1, 'i')
+        backmap[select] = numpy.arange(len(xi))
+        selnb = backmap[neighbours]
+        self.neighbours = selnb
         
         offsets = xi[:,None]*d1 + yj[:,None]*d2
         
