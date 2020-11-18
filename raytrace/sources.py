@@ -865,3 +865,82 @@ class AdHocSource(BaseRaySource):
         #i actually don't understand traits well at all.  this whole class is a hack.
         return self.rays
 
+
+class HaxagonalRayFieldSource(SingleRaySource):
+    radius = Float(10.,editor=NumEditor)
+    spacing = Float(0.5, editor=NumEditor)
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, spacing, radius, max_ray_len, E_vector")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item('spacing'),
+                       Item('radius'),
+                       label="Geometry")
+
+    @on_trait_change("direction, spacing, radius, max_ray_len")
+    def on_update(self):
+        self.data_source.modified()
+        self.update=True
+    
+    @cached_property
+    def _get_InputRays(self):
+        origin = numpy.array(self.origin)
+        direction = numpy.array(self.direction)
+        spacing = self.spacing
+        radius = self.radius
+        max_axis = numpy.abs(direction).argmax()
+        if max_axis==0:
+            v = numpy.array([0.,1.,0.])
+        else:
+            v = numpy.array([1.,0.,0.])
+        d1 = numpy.cross(direction, v)
+        d1 = normaliseVector(d1)
+        d2 = numpy.cross(direction, d1)
+        d2 = normaliseVector(d2)
+
+        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(E_vector, direction)
+        
+        cosV = numpy.cos(numpy.pi*30/180.)
+        sinV = numpy.sin(numpy.pi*30/180.)
+        d2 = cosV*d2 + sinV*d1
+        
+        nsteps = int(radius/(spacing*numpy.cos(numpy.pi*30/180.)))
+        i = numpy.arange(-nsteps, nsteps+1)
+        j = numpy.arange(-nsteps, nsteps+1)
+        
+        vi, vj = numpy.meshgrid(i,j)
+        #label = numpy.arange(vx.size).reshape(*vx.shape) #give each point a unique index
+        #neighbours = numpy.dstack((label[] ))
+        
+        vi.shape = -1
+        vj.shape = -1
+        
+        select = ((vi + sinV*vj)**2 + (cosV*vj**2)) < (radius/spacing)**2
+        #label = numpy.arange(len(select))
+        
+        xi = vi[select]
+        yj = vj[select]
+        
+        offsets = xi[:,None]*d1 + yj[:,None]*d2
+        
+        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+            
+        ray_data['origin'] = offsets*spacing
+        ray_data['origin'] += origin
+        ray_data['direction'] = direction
+        ray_data['wavelength_idx'] = 0
+        ray_data['E_vector'] = [normaliseVector(E_vector)]
+        ray_data['E1_amp'] = self.E1_amp
+        ray_data['E2_amp'] = self.E2_amp
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        rays = RayCollection.from_array(ray_data)
+        return rays
