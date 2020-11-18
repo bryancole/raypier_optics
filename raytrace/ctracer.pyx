@@ -39,7 +39,8 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('phase', np.double),
                         ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
-                        ('end_face_idx', np.uint32)
+                        ('end_face_idx', np.uint32),
+                        ('ray_type_id', np.uint32) #No point using a smaller type here as it'll probably get padded by the compiler
                         ])
                         
 
@@ -68,7 +69,8 @@ cdef packed struct ray_t:
     #simple attribs
     double length
     #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx
+    unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
+    
     ##objects
     #object face, end_face, child_refl, child_trans
     
@@ -440,7 +442,7 @@ cdef class Ray:
         def __get__(self):
             return self.ray.parent_idx
         
-        def __set__(self, int v):
+        def __set__(self, unsigned int v):
             self.ray.parent_idx = v
             
     property end_face_idx:
@@ -450,8 +452,17 @@ cdef class Ray:
         def __get__(self):
             return self.ray.end_face_idx
         
-        def __set__(self, int v):
+        def __set__(self, unsigned int v):
             self.ray.end_face_idx = v
+            
+    property ray_type_id:
+        """Used to distinguish rays created by reflection vs transmission or some other mechanism.
+        Transmission->0, Reflection->1"""
+        def __get__(self):
+            return self.ray.ray_type_id
+        
+        def __set__(self, unsigned int v):
+            self.ray.ray_type_id = v
             
     property power:
         """Optical power for the ray"""
@@ -798,6 +809,17 @@ cdef class RayCollection:
                 unsigned int v
             for i in xrange(self.n_rays):
                 v = self.rays[i].end_face_idx
+                out[i] = v
+            return out
+        
+    property ray_type_id:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
+                int i
+                unsigned int v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].ray_type_id
                 out[i] = v
             return out
         

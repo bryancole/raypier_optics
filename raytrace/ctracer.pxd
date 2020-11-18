@@ -22,12 +22,14 @@ cdef struct vector_t:
 cdef struct orientation_t:
     vector_t normal, tangent
 
+
 IF UNAME_SYSNAME == "Windows":
     ctypedef double complex complex_t
 ELSE:
     cdef struct complex_t:
         double real
         double imag
+
 
 cdef packed struct ray_t:
     #vectors
@@ -37,7 +39,8 @@ cdef packed struct ray_t:
     #simple attribs
     double length, phase
     #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx
+    unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
+    
     ##objects
     #object face, end_face, child_refl, child_trans
 

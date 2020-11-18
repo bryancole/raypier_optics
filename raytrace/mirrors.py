@@ -30,7 +30,7 @@ from raytrace.sources import RayCollection
 from raytrace.cfaces import CircularFace, RectangularFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial, \
-        CoatedDispersiveMaterial
+        CoatedDispersiveMaterial, PECMaterial
 from raytrace.dispersion import BaseDispersionCurve, NondispersiveCurve
 
 import math, numpy
@@ -64,6 +64,9 @@ class PECMirror(BaseMirror):
                        Item('offset', editor=NumEditor)
                         ),
                    )
+    
+    def _material_default(self):
+        return PECMaterial()
     
     def _faces_default(self):
         m = self.material

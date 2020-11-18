@@ -25,7 +25,10 @@ ELSE:
         double complex cexp (double complex)
         double complex I
     
-cdef double INF=(DBL_MAX+DBL_MAX)
+cdef:
+    double INF=(DBL_MAX+DBL_MAX)
+    unsigned int TRANS_RAY=0
+    unsigned int REFL_RAY=1
 
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
@@ -232,6 +235,7 @@ cdef class TransparentMaterial(InterfaceMaterial):
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray)
 
 
@@ -269,6 +273,7 @@ cdef class PECMaterial(InterfaceMaterial):
         #sp_ray.E2_amp.real = -sp_ray.E2_amp.real
         #sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = REFL_RAY
         new_rays.add_ray_c(sp_ray)
         
         
@@ -311,6 +316,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = 0.0
         sp_ray.E2_amp.imag = 0.0
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = REFL_RAY
         new_rays.add_ray_c(sp_ray)
             
         #Transmit the P-polarisation
@@ -322,6 +328,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray2.E1_amp.real = 0.0
         sp_ray2.E1_amp.imag = 0.0
         sp_ray2.parent_idx = idx
+        sp_ray2.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray2)
         
         
@@ -402,7 +409,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         out_ray.direction = in_direction
         out_ray.length = INF
         out_ray.parent_idx = idx
-        
+        out_ray.ray_type_id = TRANS_RAY
         out_ray = self.apply_retardance_c(out_ray)
         
         new_rays.add_ray_c(out_ray)
@@ -500,6 +507,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= -1
             sp_ray.E2_amp.imag *= -1
             sp_ray.parent_idx = idx
+            sp_ray.ray_type_id = REFL_RAY
         else:
             #normal transmission            
             tangent = subvv_(in_direction, cosThetaNormal)
@@ -526,6 +534,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= T_p
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
+            sp_ray.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray)
         
 
@@ -642,6 +651,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id = REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -674,6 +684,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
+            sp_ray.ray_type_id = TRANS_RAY
             new_rays.add_ray_c(sp_ray)
             
             
@@ -806,6 +817,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id = REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -833,6 +845,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
+            sp_ray.ray_type_id = TRANS_RAY
             new_rays.add_ray_c(sp_ray)
     
 vacuum = BaseDispersionCurve(0,np.array([1.0,]))
@@ -995,6 +1008,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id = REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -1022,6 +1036,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n3.real
             sp_ray.refractive_index.imag = n3.imag
+            sp_ray.ray_type_id = TRANS_RAY
             new_rays.add_ray_c(sp_ray)
             
 
@@ -1111,6 +1126,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = sp_ray.E2_amp.real * self.efficiency
         sp_ray.E2_amp.imag = sp_ray.E2_amp.imag * self.efficiency
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = REFL_RAY
         
         ### This is the mysterious Grating Phase
         #Need to convert origin offset to microns since line-spacing is in microns
