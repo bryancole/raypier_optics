@@ -875,6 +875,9 @@ class HexagonalRayFieldSource(SingleRaySource):
     
     neighbours = Array(transient=True)
     
+    neighbour_list = Property(List(Array),
+                              depends_on="TracedRays, neighbours")
+    
     show_mesh = Bool(True)
     mesh_source = Instance(tvtk.ProgrammableSource, transient=True)
     mesh_actor = Instance(tvtk.Actor, transient=True)
@@ -899,6 +902,27 @@ class HexagonalRayFieldSource(SingleRaySource):
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor, self.mesh_actor]
         return actors
+    
+    def iter_neighbours(self):
+        neighbours = self.neighbours
+        yield neighbours
+        last_rays = self.TracedRays[0]
+        for rays in self.TracedRays[1:]:
+            labels = numpy.arange(len(rays))
+            children = numpy.full((len(last_rays),2), -1)
+            parent_idx = rays.parent_idx
+            ray_type_id = rays.ray_type_id
+            transmitted = ray_type_id==0
+            reflected = ray_type_id==1
+            children[parent_idx[transmitted],0] = labels[transmitted]
+            children[parent_idx[reflected],1] = labels[reflected]
+            #children gives the indices in the child ray array for each parent
+            
+            new_neighbours = numpy.full((len(rays),6), -1)
+            ch2 = children[neighbours,:] #Should have shape Nx6x2
+            new_neighbours[parent_idx[transmitted],:] = ch2[parent_idx[transmitted]]
+            
+        
         
     def _mesh_source_default(self):
         source = tvtk.ProgrammableSource()
@@ -995,7 +1019,7 @@ class HexagonalRayFieldSource(SingleRaySource):
         backmap = numpy.full(vi.shape[0]+1, -1, 'i')
         backmap[:-1][select] = numpy.arange(len(xi))
         selnb = backmap[neighbours]
-        self.neighbours = selnb
+        self.neighbours = selnb[select,:]
         
         offsets = xi[:,None]*d1 + yj[:,None]*d2
         
