@@ -909,18 +909,24 @@ class HexagonalRayFieldSource(SingleRaySource):
         last_rays = self.TracedRays[0]
         for rays in self.TracedRays[1:]:
             labels = numpy.arange(len(rays))
-            children = numpy.full((len(last_rays),2), -1)
+            children = numpy.full((len(last_rays)+1,2), -1)
             parent_idx = rays.parent_idx
             ray_type_id = rays.ray_type_id
             transmitted = ray_type_id==0
             reflected = ray_type_id==1
-            children[parent_idx[transmitted],0] = labels[transmitted]
-            children[parent_idx[reflected],1] = labels[reflected]
+            t_parents = parent_idx[transmitted]
+            r_parents = parent_idx[reflected]
+            children[t_parents,0] = labels[transmitted]
+            children[r_parents,1] = labels[reflected]
             #children gives the indices in the child ray array for each parent
             
             new_neighbours = numpy.full((len(rays),6), -1)
             ch2 = children[neighbours,:] #Should have shape Nx6x2
-            new_neighbours[parent_idx[transmitted],:] = ch2[parent_idx[transmitted]]
+            new_neighbours[t_parents,:] = ch2[t_parents,:,0]
+            new_neighbours[r_parents,:] = ch2[r_parents,:,1]
+            yield new_neighbours
+            last_rays = rays
+            neighbours = new_neighbours
             
         
         
