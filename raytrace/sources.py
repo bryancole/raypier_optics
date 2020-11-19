@@ -992,8 +992,8 @@ class HexagonalRayFieldSource(SingleRaySource):
         xi = vi[select]
         yj = vj[select]
         
-        backmap = numpy.full(vi.shape, -1, 'i')
-        backmap[select] = numpy.arange(len(xi))
+        backmap = numpy.full(vi.shape[0]+1, -1, 'i')
+        backmap[:-1][select] = numpy.arange(len(xi))
         selnb = backmap[neighbours]
         self.neighbours = selnb
         
