@@ -77,8 +77,8 @@ def evaluate_neighbours(rays, neighbours_idx):
     offsets = n_origin - origin
     alpha = -(offsets * direction).sum(axis=-1)/(n_direction * direction).sum(axis=-1)
     projected = (offsets + alpha[:,:,None]*n_direction)
-    x = (projected[:,None] * E).sum(axis=-1)
-    y = (projected[:,None] * H).sum(axis=-1)
+    x = (projected * E).sum(axis=-1)
+    y = (projected * H).sum(axis=-1)
     
     dz = (n_direction * direction).sum(axis=-1)
     dx = (n_direction * E).sum(axis=-1)/dz 
@@ -86,19 +86,36 @@ def evaluate_neighbours(rays, neighbours_idx):
     return (rays[mask], x,y,dx,dy)
     
     
-def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dz):
+def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     """For each ray in rays, use its nearest neighbours
     to compute the best fit for the Astigmatic Gaussian Beam
     parameters.
+    
+    rays - an array of ray_t with shape (N,)
+    x,y,dx,dy - array of shape (N,6)
+    
     For N rays, return a Nx3 complex array of coeffs"""
     ### Do linear least squares on each ray and neighbours
     
     x = neighbour_x
     y = neighbour_y
+    
     M = block_diag(numpy.dstack((x**2, 2*x*y, y**2)))
     b = numpy.ones(M.shape[0])
     fit = lsqr(M,b)
     im_coefs = fit[0].reshape(x.shape[0],3)
+
+    O = numpy.zeros_like(x)
+    upper = numpy.dstack((x,y,O))
+    lower = numpy.dstack((O,x,y))
+    combined = numpy.hstack((upper,lower))
+    b = numpy.dstack( (dx,dy) ).reshape(-1)
+    M = block_diag(combined)
+    fit = lsqr(M,b)
+    re_coefs = fit[0].reshape(x.shape[0],3)
+    
+    return (1j*im_coefs) + re_coefs
+    
     
     
 def evaluate_E(rays, mode_coeffs, points):
