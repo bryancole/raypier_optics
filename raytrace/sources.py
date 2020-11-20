@@ -32,6 +32,7 @@ from raytrace.ctracer import RayCollection, Ray, ray_dtype
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
 from raytrace.bases import Renderable, RaytraceObject, NumEditor
+from traitsui.examples.demo.Advanced import Settable_cached_property
 
 Vector = Array(shape=(3,))
 
@@ -878,6 +879,10 @@ class HexagonalRayFieldSource(SingleRaySource):
     neighbour_list = Property(List(Array),
                               depends_on="TracedRays, neighbours")
     
+    ### These are the phases at the origin of each ray, relative to the source origin
+    cumulative_phases = Property(List(Array),
+                                 depends_on="TracedRays")
+    
     show_mesh = Bool(True)
     mesh_source = Instance(tvtk.ProgrammableSource, transient=True)
     mesh_actor = Instance(tvtk.Actor, transient=True)
@@ -902,6 +907,21 @@ class HexagonalRayFieldSource(SingleRaySource):
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor, self.mesh_actor]
         return actors
+    
+    @cached_property
+    def _get_cumulative_phases(self):
+        all_wavelengths = numpy.asarray(self.wavelength_list)
+        phases = []
+        optical_path = numpy.zeros(len(self.TracedRays[0]))
+        for rays in self.TracedRays:
+            k = (1000.0*2*numpy.pi)/all_wavelengths[rays.wavelength_idx]
+            phases.append(rays.phase + optical_path*k)
+            optical_path += rays.length * rays.refractive_index.real
+        return phases
+    
+    @cached_property
+    def _get_neighbour_list(self):
+        return list(self.iter_neighbours())
     
     def iter_neighbours(self):
         neighbours = self.neighbours

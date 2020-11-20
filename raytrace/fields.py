@@ -15,22 +15,86 @@ from raytrace.sources import RayCollection, BaseRaySource
 
 import numpy
 
+from scipy.spares.linalg import lsqr
+from scipt.sparse import block_diag
 
-def project_to_sphere(rays, centre=(0,0,0), radius=10.0):
+
+def project_to_sphere(rays, phase, wavelengths, centre=(0,0,0), radius=10.0):
     """project the given set of rays back to their intercept 
     with a sphere at the given centre and radius.
-    Returns a new RayCollection"""
+    
+    rays - an array of ray_t dtype
+    phase - an array of phase values at the ray origins
+    wavelengths - an array of wavelengths taken from the source
+    """
+    all_wavelengths = numpy.asarray(wavelengths)
+    centre = numpy.asarray(centre).reshape(1,3)
+    origin = rays['origin'] - centre
+    direction = rays['direction'] #assume this is already normalised
+    c = (origin**2).sum(axis=1) - (radius**2)
+    b = 2*(direction @ origin)
+    a = 1 
+    
+    d = b**2 - 4*c
+    selector = (d>=0.0)
+    d = numpy.sqrt(d[selector])
+    b = b[selector]
+    root1 = (-b + d)/2
+    root2 = (-b - d)/2
+    #choose most negative path to intersection
+    alpha = numpy.column_stack((root1, root2)).min(axis=1)
+    
+    rays = rays[selector]
+    rays['origin'] += alpha[:,None]*direction[selector]
+    
+    wl = all_wavelengths[rays['wavelength_idx']]
+    phase += (2000.0*numpy.pi)*alpha*rays['refractive_index'].real / wl
+    return rays, phase 
+    
+
+def evaluate_neighbours(rays, neighbours_idx):
+    """For each of a rays neighbours, we need to project the neighbour back
+    onto the plane containing the main rays origin, to obtain the (x,y)
+    cordinate for the neighbour ray, relative to the main ray origin
+    
+    returns - a 4-tuple (x,y,dx,dy) where x,y are N*6 arrays for the coordinate of each neighbour.
+              dx and dy represent the change in direction of the neighbouring rays (i.e. 
+              curvature of the wavefront)."""
+    
+    n_origin = rays['origin'][neighbours_idx,:]
+    n_direction = rays['direction'][neighbours_idx,:]
+    origin = rays['origin']
+    direction = rays['direction']
+    E = rays['E_vector'] #Assume normalised
+    H = numpy.cross(E, rays['direction']) #Should also be unit length
+    offsets = n_origin - rays['origin']
+    alpha = -(offsets @ direction)/(n_direction @ direction)
+    projected = (offsets + alpha*n_direction)
+    x = projected @ E
+    y = projected @ H
+    
+    dz = n_direction @ direction
+    dx = (n_direction @ E)/dz 
+    dy = (n_direction @ H)/dz
+    return (x,y,dx,dz)
     
     
-def evaluate_modes(rays, neighbours):
+def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dz):
     """For each ray in rays, use its nearest neighbours
     to compute the best fit for the Astigmatic Gaussian Beam
     parameters.
     For N rays, return a Nx3 complex array of coeffs"""
     ### Do linear least squares on each ray and neighbours
     
+    x = neighbour_x
+    y = neighbour_y
+    M = block_diag(numpy.dstack((x**2, 2*x*y, y**2)))
+    b = numpy.ones(M.shape[0])
+    fit = lsqr(M,b)
+    im_coefs = fit[0].reshape(x.shape[0],3)
     
-def evaluate__E(rays, mode_coeffs, points):
+    
+def evaluate_E(rays, mode_coeffs, points):
     """Evaluate the E-field at each position in the
     _points_ array.
     """
@@ -98,11 +162,11 @@ class EFieldPlane(Probe):
         return actors
         
     def evaluate(self, ray_src):
-        c = 2.99792458e8 * 1e-9 #convert to mm/ps
         traced_rays = ray_src.TracedRays
         all_wavelengths = numpy.asarray(ray_src.wavelength_list)
         all_rays = [r.copy_as_array() for r in traced_rays]
-        neighbours = list(ray_src.iter_neighbours())
+        neighbours = ray_src.neighbour_list
+        phases = ray_src.cumulative_phases
         
         intersections = [self.intersect_plane(rays) for rays in all_rays]
             
