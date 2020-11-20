@@ -15,8 +15,8 @@ from raytrace.sources import RayCollection, BaseRaySource
 
 import numpy
 
-from scipy.spares.linalg import lsqr
-from scipt.sparse import block_diag
+from scipy.sparse.linalg import lsqr
+from scipy.sparse import block_diag
 
 
 def project_to_sphere(rays, phase, wavelengths, centre=(0,0,0), radius=10.0):
@@ -32,7 +32,7 @@ def project_to_sphere(rays, phase, wavelengths, centre=(0,0,0), radius=10.0):
     origin = rays['origin'] - centre
     direction = rays['direction'] #assume this is already normalised
     c = (origin**2).sum(axis=1) - (radius**2)
-    b = 2*(direction @ origin)
+    b = 2*(direction * origin).sum(axis=1)
     a = 1 
     
     d = b**2 - 4*c
@@ -57,26 +57,33 @@ def evaluate_neighbours(rays, neighbours_idx):
     onto the plane containing the main rays origin, to obtain the (x,y)
     cordinate for the neighbour ray, relative to the main ray origin
     
-    returns - a 4-tuple (x,y,dx,dy) where x,y are N*6 arrays for the coordinate of each neighbour.
+    rays - a ray_t array of length N
+    neighbours_idx - a array on ints of shape (N,6)
+    
+    returns - a 5-tuple (rays, x,y,dx,dy) where x,y are N*6 arrays for the coordinate of each neighbour.
               dx and dy represent the change in direction of the neighbouring rays (i.e. 
-              curvature of the wavefront)."""
+              curvature of the wavefront). The returns rays are the subset of the input rays with
+              6 neighbours (i.e. edge-rays are dropped).
+              """
     
-    n_origin = rays['origin'][neighbours_idx,:]
-    n_direction = rays['direction'][neighbours_idx,:]
-    origin = rays['origin']
-    direction = rays['direction']
-    E = rays['E_vector'] #Assume normalised
-    H = numpy.cross(E, rays['direction']) #Should also be unit length
-    offsets = n_origin - rays['origin']
-    alpha = -(offsets @ direction)/(n_direction @ direction)
-    projected = (offsets + alpha*n_direction)
-    x = projected @ E
-    y = projected @ H
+    mask = (neighbours_idx>=0).all(axis=1)
+    nb = neighbours_idx[mask,:]
+    n_origin = rays['origin'][nb,:]
+    n_direction = rays['direction'][nb,:]
+    origin = rays['origin'][mask,None,:]
+    direction = rays['direction'][mask,None,:]
+    E = rays['E_vector'][mask,None,:] #Assume normalised
+    H = numpy.cross(E, direction) #Should also be unit length
+    offsets = n_origin - origin
+    alpha = -(offsets * direction).sum(axis=-1)/(n_direction * direction).sum(axis=-1)
+    projected = (offsets + alpha[:,:,None]*n_direction)
+    x = (projected[:,None] * E).sum(axis=-1)
+    y = (projected[:,None] * H).sum(axis=-1)
     
-    dz = n_direction @ direction
-    dx = (n_direction @ E)/dz 
-    dy = (n_direction @ H)/dz
-    return (x,y,dx,dz)
+    dz = (n_direction * direction).sum(axis=-1)
+    dx = (n_direction * E).sum(axis=-1)/dz 
+    dy = (n_direction * H).sum(axis=-1)/dz
+    return (rays[mask], x,y,dx,dy)
     
     
 def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dz):
