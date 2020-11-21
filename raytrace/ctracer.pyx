@@ -5,12 +5,12 @@
 #cython: cdivision=True
 
 cdef extern from "math.h":
-    double sqrt(double arg)
-    double fabs(double arg)
-    double atan2(double y, double x)
-    double atan(double arg)
-    double sin(double arg)
-    double cos(double arg)
+    double sqrt(double arg) nogil
+    double fabs(double arg) nogil
+    double atan2(double y, double x) nogil
+    double atan(double arg) nogil
+    double sin(double arg) nogil
+    double cos(double arg) nogil
     #double INFINITY
     
 cdef extern from "float.h":
@@ -83,14 +83,14 @@ cdef struct transform_t:
 ### Vector maths functions ###
 ##############################
 
-cdef inline vector_t transform_c(transform_t t, vector_t p):
+cdef inline vector_t transform_c(transform_t t, vector_t p) nogil:
     cdef vector_t out
     out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02 + t.tx
     out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12 + t.ty
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22 + t.tz
     return out
 
-cdef inline vector_t rotate_c(transform_t t, vector_t p):
+cdef inline vector_t rotate_c(transform_t t, vector_t p) nogil:
     cdef vector_t out
     out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02
     out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12
@@ -109,7 +109,7 @@ def py_set_v(O):
     v_ = set_v(O)
     return (v_.x, v_.y, v_.z)
 
-cdef inline double sep_(vector_t p1, vector_t p2):
+cdef inline double sep_(vector_t p1, vector_t p2) nogil:
     cdef double a,b
     a = (p2.x-p1.x)
     b = (p2.y-p1.y)
@@ -120,7 +120,7 @@ def sep(a, b):
     cdef vector_t a_ = set_v(a), b_ = set_v(b)
     return sep_(a_, b_)
 
-cdef inline vector_t invert_(vector_t v):
+cdef inline vector_t invert_(vector_t v) nogil:
     v.x = -v.x
     v.y = -v.y
     v.z = -v.z
@@ -131,7 +131,7 @@ def invert(v):
     v_ = invert_(v_)
     return (v_.x, v_.y, v_.z)
 
-cdef inline vector_t multvv_(vector_t a, vector_t b):
+cdef inline vector_t multvv_(vector_t a, vector_t b) nogil:
     cdef vector_t out
     out.x = a.x*b.x
     out.y = a.y*b.y
@@ -145,7 +145,7 @@ def multvv(a, b):
     c_ = multvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t multvs_(vector_t a, double b):
+cdef inline vector_t multvs_(vector_t a, double b) nogil:
     cdef vector_t out
     out.x = a.x*b
     out.y = a.y*b
@@ -158,7 +158,7 @@ def multvs(a, b):
     c_ = multvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t addvv_(vector_t a, vector_t b):
+cdef inline vector_t addvv_(vector_t a, vector_t b) nogil:
     cdef vector_t out
     out.x = a.x+b.x
     out.y = a.y+b.y
@@ -172,7 +172,7 @@ def addvv(a, b):
     c_ = addvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
     
-cdef inline vector_t addvs_(vector_t a, double b):
+cdef inline vector_t addvs_(vector_t a, double b) nogil:
     cdef vector_t out
     out.x = a.x+b
     out.y = a.y+b
@@ -185,7 +185,7 @@ def addvs(a, b):
     c_ = addvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t subvv_(vector_t a, vector_t b):
+cdef inline vector_t subvv_(vector_t a, vector_t b) nogil:
     cdef vector_t out
     out.x = a.x-b.x
     out.y = a.y-b.y
@@ -199,7 +199,7 @@ def subvv(a, b):
     c_ = subvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t subvs_(vector_t a, double b):
+cdef inline vector_t subvs_(vector_t a, double b) nogil:
     cdef vector_t out
     out.x = a.x-b
     out.y = a.y-b
@@ -212,7 +212,7 @@ def subvs(a, b):
     c_ = subvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline double mag_(vector_t a):
+cdef inline double mag_(vector_t a) nogil:
     return sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
 
 def mag(a):
@@ -220,7 +220,7 @@ def mag(a):
     a_ = set_v(a)
     return mag_(a_)
 
-cdef inline double mag_sq_(vector_t a):
+cdef inline double mag_sq_(vector_t a) nogil:
     return a.x*a.x + a.y*a.y + a.z*a.z
 
 def mag_sq(a):
@@ -228,7 +228,7 @@ def mag_sq(a):
     a_ = set_v(a)
     return mag_sq_(a_)
 
-cdef inline double dotprod_(vector_t a, vector_t b):
+cdef inline double dotprod_(vector_t a, vector_t b) nogil:
     return a.x*b.x + a.y*b.y + a.z*b.z
 
 def dotprod(a, b):
@@ -237,7 +237,7 @@ def dotprod(a, b):
     b_ = set_v(b)
     return dotprod_(a_,b_)
 
-cdef inline vector_t cross_(vector_t a, vector_t b):
+cdef inline vector_t cross_(vector_t a, vector_t b) nogil:
     cdef vector_t c
     c.x = a.y*b.z - a.z*b.y
     c.y = a.z*b.x - a.x*b.z
@@ -251,7 +251,7 @@ def cross(a, b):
     c_ = cross_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef vector_t norm_(vector_t a):
+cdef vector_t norm_(vector_t a) nogil:
     cdef double mag=sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
     a.x /= mag
     a.y /= mag

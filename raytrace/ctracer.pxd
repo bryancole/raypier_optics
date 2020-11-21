@@ -55,22 +55,22 @@ cdef struct ray_pair_t:
 ### Vector maths functions ###
 ##############################
 
-cdef  vector_t transform_c(transform_t t, vector_t p)
-cdef  vector_t rotate_c(transform_t t, vector_t p)
+cdef  vector_t transform_c(transform_t t, vector_t p) nogil
+cdef  vector_t rotate_c(transform_t t, vector_t p) nogil
 cdef  vector_t set_v(object O)
-cdef  double sep_(vector_t p1, vector_t p2)
-cdef  vector_t multvv_(vector_t a, vector_t b)
-cdef  vector_t multvs_(vector_t a, double b)
-cdef  vector_t addvv_(vector_t a, vector_t b)
-cdef  vector_t addvs_(vector_t a, double b)
-cdef  vector_t subvv_(vector_t a, vector_t b)
-cdef  vector_t subvs_(vector_t a, double b)
-cdef  double dotprod_(vector_t a, vector_t b)
-cdef  vector_t cross_(vector_t a, vector_t b)
-cdef  vector_t norm_(vector_t a)
-cdef  double mag_(vector_t a)
-cdef  double mag_sq_(vector_t a)
-cdef  vector_t invert_(vector_t v)
+cdef  double sep_(vector_t p1, vector_t p2) nogil
+cdef  vector_t multvv_(vector_t a, vector_t b) nogil
+cdef  vector_t multvs_(vector_t a, double b) nogil
+cdef  vector_t addvv_(vector_t a, vector_t b) nogil
+cdef  vector_t addvs_(vector_t a, double b) nogil
+cdef  vector_t subvv_(vector_t a, vector_t b) nogil
+cdef  vector_t subvs_(vector_t a, double b) nogil
+cdef  double dotprod_(vector_t a, vector_t b) nogil
+cdef  vector_t cross_(vector_t a, vector_t b) nogil
+cdef  vector_t norm_(vector_t a) nogil
+cdef  double mag_(vector_t a) nogil
+cdef  double mag_sq_(vector_t a) nogil
+cdef  vector_t invert_(vector_t v) nogil
 
 
 ##################################
