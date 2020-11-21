@@ -600,7 +600,7 @@ cdef class RayCollection:
     def reset_length(self):
         """Sets the length of all rays in this RayCollection to Infinity
         """
-        cdef int i
+        cdef size_t i
         for i in xrange(self.n_rays):
             self.rays[i].length = INF
         
@@ -612,11 +612,11 @@ cdef class RayCollection:
     def add_ray_list(self, list rays):
         """Adds the given list of Rays to this collection
         """
-        cdef int i
-        for i in xrange(len(rays)):
+        cdef long int i
+        for i in range(len(rays)):
             if not isinstance(rays[i], Ray):
                 raise TypeError("ray list contains non-Ray instance at index %d"%i)
-        for i in xrange(len(rays)):
+        for i in range(len(rays)):
             self.add_ray_c((<Ray>rays[i]).ray)
         
     def clear_ray_list(self):
@@ -627,16 +627,16 @@ cdef class RayCollection:
     def get_ray_list(self):
         """Returns the contents of this RayCollection as a list of Rays
         """
-        cdef int i
+        cdef size_t i
         cdef list ray_list = []
         cdef Ray r
-        for i in xrange(self.n_rays):
+        for i in range(self.n_rays):
             r = Ray()
             r.ray = self.rays[i]
             ray_list.append(r)
         return ray_list
     
-    def __getitem__(self, int idx):
+    def __getitem__(self, size_t idx):
         cdef Ray r
         if idx >= self.n_rays:
             raise IndexError("Requested index %d from a size %d array"%(idx, self.n_rays))
@@ -644,7 +644,7 @@ cdef class RayCollection:
         r.ray = self.rays[idx]
         return r
     
-    def __setitem__(self, int idx, Ray r):
+    def __setitem__(self, size_t idx, Ray r):
         if idx >= self.n_rays:
             raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
         self.rays[idx] = r.ray
@@ -664,7 +664,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].origin
@@ -677,7 +677,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].direction
@@ -690,7 +690,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].normal
@@ -703,7 +703,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].E_vector
@@ -717,7 +717,7 @@ cdef class RayCollection:
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
                 np_.ndarray rr,ii
-                int i
+                size_t i
                 complex_t n
             rr = out.real
             ii = out.imag
@@ -732,7 +732,7 @@ cdef class RayCollection:
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
                 np_.ndarray rr,ii
-                int i
+                size_t i
                 complex_t n
             rr = out.real
             ii = out.imag
@@ -747,7 +747,7 @@ cdef class RayCollection:
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
                 np_.ndarray rr,ii
-                int i
+                size_t i
                 complex_t n
             rr = out.real
             ii = out.imag
@@ -761,7 +761,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype='d')
-                int i
+                size_t i
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].length
@@ -772,7 +772,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype='d')
-                int i
+                size_t i
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].phase
@@ -783,7 +783,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].wavelength_idx
@@ -794,7 +794,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 unsigned int v
             for i in xrange(self.n_rays):
                 v = self.rays[i].parent_idx
@@ -805,7 +805,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 unsigned int v
             for i in xrange(self.n_rays):
                 v = self.rays[i].end_face_idx
@@ -816,7 +816,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 unsigned int v
             for i in xrange(self.n_rays):
                 v = self.rays[i].ray_type_id
@@ -827,7 +827,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = addvv_(self.rays[i].origin, 
@@ -1086,10 +1086,11 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     float max_length):
     cdef:
         FaceList face_set #a FaceList
-        unsigned int size, i, j
+        size_t size
+        size_t i, j, n_sets=len(face_sets)
         vector_t P1, point
         orientation_t orient
-        int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
+        int idx, nearest_set=-1, nearest_idx=-1
         ray_t new_ray
         ray_t *ray
         RayCollection new_rays
@@ -1106,7 +1107,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                             multvs_(ray.direction, 
                                     max_length))
         #print "points", P1, P2
-        for j in xrange(n_sets):
+        for j in range(n_sets):
             face_set = face_sets[j]
             #intersect_c returns the face idx of the intersection, or -1 otherwise
             idx = (<FaceList>face_set).intersect_c(ray, point, max_length)

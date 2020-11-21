@@ -85,6 +85,7 @@ cdef class Ray:
 
 cdef class RayCollection:
     cdef ray_t *rays
+    #cdef ray_t[:] rays
     cdef readonly unsigned long n_rays, max_size
     cdef public RayCollection parent
 

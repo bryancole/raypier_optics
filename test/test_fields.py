@@ -63,5 +63,5 @@ class TestEvalModes(unittest.TestCase):
         rays, x, y, dx, dy = evaluate_neighbours(rays_in, nb_idx)
         print(x.shape)
         Z = evaluate_modes(rays, x, y, dx, dy)
+        print(Z.shape)
         
-        print(Z)

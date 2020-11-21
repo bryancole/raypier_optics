@@ -78,7 +78,7 @@ setup(
     package_data = {}, #none, yet
 
     author = "Bryan Cole",
-    author_email = "bryan.cole@teraview.com",
+    author_email = "bryancole.cam@gmail.com",
     description = "A optical ray-tracing package, for design, optimisation and \
 visualisation of mirror/lens systems. Good support for off-axis aspheric \
 surfaces is a priority",
