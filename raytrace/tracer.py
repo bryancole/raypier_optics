@@ -295,8 +295,8 @@ class RayTraceModel(HasQueue):
                 o.intersections = []
             for ray_source in self.sources:
                 self.trace_ray_source(ray_source, optics)
-                for probe in self.probes:
-                    probe.evaluate(ray_source)
+            for probe in self.probes:
+                probe.evaluate()
             for o in optics:
                 o.update_complete()
             for r in self.results:

@@ -6,7 +6,15 @@ summation of General Astigmatic Gaussian Beams
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
         Property, Button, Str, Array
 
-from traitsui.api import View, Item, VGroup, DropEditor
+from traitsui.api import View, Item, VGroup, DropEditor, Tabbed
+
+from traits.api import Float, Instance, Bool
+from traitsui.api import View, Item, VGroup
+from chaco.api import GridDataSource, GridMapper, ImageData, Spectral,\
+        DataRange1D, CMapImagePlot, DataRange2D
+        
+from enable.api import ComponentEditor
+from chaco.tools.api import PanTool, ZoomTool
 
 from tvtk.api import tvtk
 
@@ -119,7 +127,8 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
 
     
     
-class EFieldPlane(Probe):    
+class EFieldPlane(Probe):
+    source = Instance(BaseRaySource)    
     width = Float(0.5) #in mm
     size = Int(30)
             
@@ -136,22 +145,58 @@ class EFieldPlane(Probe):
     
     update = Event() #request re-tracing
     
+    
+    img_data = Instance(ImageData)
+    index = Instance(GridDataSource)
+    plot = Instance(CMapImagePlot)
+    
     _plane_src = Instance(tvtk.PlaneSource, (), 
                     {"x_resolution":1, "y_resolution":1},
                     transient=True)
                     
-    traits_view = View(VGroup(
+    traits_view = View(Tabbed(
+                        VGroup(
                        Traceable.uigroup,
                        Item('size', editor=NumEditor),
                        Item('width', editor=NumEditor),
                         ),
+                        Item("plot", editor=ComponentEditor())
+                        )
                    )
     
+    def _plot_default(self):
+        side = self.width/2
+        x = numpy.linspace(-side,side, self.size)
+        index = GridDataSource(xdata=x, ydata=x)
+        imap = GridMapper(range=DataRange2D(index))
+        self.index = index
+        csrc = ImageData(data=self.intensity, value_depth=1)
+        self.img_data = csrc
+        cmap = Spectral(DataRange1D(csrc))
+        plot = CMapImagePlot(index=index,
+                             index_mapper=imap,
+                             value=csrc,
+                             value_mapper=cmap)
+        return plot
         
     def __eval_btn_fired(self):
         source = self.ray_source
         
         pass
+    
+    @on_trait_change("E_field")
+    def on_new_E_field(self):
+        img_data = self.img_data
+        if img_data is not None:
+            self.img_data.data = self.intensity
+            side = self.width/2
+            x = numpy.linspace(-side,side, self.size)
+            self.index.xdata = x
+            self.index.ydata = x
+            
+            if self.plot is not None:
+                self.plot.request_redraw()
+            
     
     @on_trait_change("size, width")
     def config_pipeline(self):
@@ -166,11 +211,11 @@ class EFieldPlane(Probe):
         src.x_resolution = size
         src.y_resolution = size
         
-        self.update = True
+        self.evaluate()
         
     @on_trait_change("centre, direction, orientation, exit_pupil_offset")
     def on_change(self):
-        self.update = True
+        self.evaluate()
     
     def _actors_default(self):
         source = self._plane_src
@@ -187,9 +232,12 @@ class EFieldPlane(Probe):
         
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
-    def evaluate(self, ray_src):
+    def evaluate(self):
+        ray_src = self.source
         start = time.clock()
         traced_rays = ray_src.TracedRays
+        if not traced_rays:
+            return
         wavelengths = numpy.asarray(ray_src.wavelength_list)
         all_rays = [r.copy_as_array() for r in traced_rays]
         neighbours = ray_src.neighbour_list

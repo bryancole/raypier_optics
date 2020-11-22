@@ -13,7 +13,8 @@ lens = PlanoConvexLens(centre=(0,0,20),
 
 src = HexagonalRayFieldSource(spacing=2.0, direction=(0,0,1))
 
-probe = EFieldPlane(centre=(0,0,70),
+probe = EFieldPlane(source=src,
+                    centre=(0,0,70),
                     direction=(0,0,1),
                     width=30,
                     size=30)
