@@ -12,19 +12,20 @@ from tvtk.api import tvtk
 
 from raytrace.bases import Probe, Traceable, NumEditor, Vector
 from raytrace.sources import RayCollection, BaseRaySource
+from raytrace.cfields import sum_gaussian_modes, check_this
 
 import numpy
 
 from scipy.sparse.linalg import lsqr
 from scipy.sparse import block_diag
+import time
 
 
-def project_to_sphere(rays, phase, wavelengths, centre=(0,0,0), radius=10.0):
+def project_to_sphere(rays, wavelengths, centre=(0,0,0), radius=10.0):
     """project the given set of rays back to their intercept 
     with a sphere at the given centre and radius.
     
     rays - an array of ray_t dtype
-    phase - an array of phase values at the ray origins
     wavelengths - an array of wavelengths taken from the source
     """
     all_wavelengths = numpy.asarray(wavelengths)
@@ -48,8 +49,8 @@ def project_to_sphere(rays, phase, wavelengths, centre=(0,0,0), radius=10.0):
     rays['origin'] += alpha[:,None]*direction[selector]
     
     wl = all_wavelengths[rays['wavelength_idx']]
-    phase += (2000.0*numpy.pi)*alpha*rays['refractive_index'].real / wl
-    return rays, phase 
+    rays['phase'] += (2000.0*numpy.pi)*alpha*rays['refractive_index'].real / wl
+    return rays 
     
 
 def evaluate_neighbours(rays, neighbours_idx):
@@ -115,13 +116,7 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     re_coefs = fit[0].reshape(x.shape[0],3)
     
     return (1j*im_coefs) + re_coefs
-    
-    
-    
-def evaluate_E(rays, mode_coeffs, points):
-    """Evaluate the E-field at each position in the
-    _points_ array.
-    """
+
     
     
 class EFieldPlane(Probe):    
@@ -134,6 +129,8 @@ class EFieldPlane(Probe):
     
     ###The output of the probe
     E_field = Array()
+    
+    intensity = Property()
     
     _eval_btn = Button("calculate")
     
@@ -184,15 +181,55 @@ class EFieldPlane(Probe):
         actors = tvtk.ActorCollection()
         actors.append(act)
         return actors
+    
+    def _get_intensity(self):
+        E = self.E_field
+        
+        return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
     def evaluate(self, ray_src):
+        start = time.clock()
         traced_rays = ray_src.TracedRays
-        all_wavelengths = numpy.asarray(ray_src.wavelength_list)
+        wavelengths = numpy.asarray(ray_src.wavelength_list)
         all_rays = [r.copy_as_array() for r in traced_rays]
         neighbours = ray_src.neighbour_list
-        phases = ray_src.cumulative_phases
         
-        intersections = [self.intersect_plane(rays) for rays in all_rays]
+        for ray, phase in zip(all_rays, ray_src.cumulative_phases):
+            ray['phase'] = phase
+        
+        #intersections = [self.intersect_plane(rays) for rays in all_rays]
+        rays = all_rays[-1]
+        centre = self.centre
+        radius = self.exit_pupil_offset
+        
+        projected = project_to_sphere(rays, wavelengths, centre, radius)
+        
+        neighbours_idx = neighbours[-1]
+        rays, x, y, dx, dy = evaluate_neighbours(rays, neighbours_idx)
+        modes = evaluate_modes(rays, x, y, dx, dy)
+        
+        size = self.size
+        side = self.width/2.
+        px = numpy.linspace(-side,side,size)
+        points = numpy.dstack(numpy.meshgrid(px,px,0)).reshape(-1,3)
+        
+        ###What a chore
+        trns = self.transform
+        pts_in = tvtk.Points()
+        pts_out = tvtk.Points()
+        pts_in.from_array(points)
+        trns.transform_points(pts_in, pts_out)
+        points2 = pts_out.to_array().astype('d')
+        
+        print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
+        
+        _rays = RayCollection.from_array(rays)
+        E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
+        
+        self.E_field = E.reshape(self.size, self.size, 3)
+        end = time.clock()
+        print("Took:", end-start)
+        
             
     def intersect_plane(self, rays):
         """

@@ -4,6 +4,8 @@ import unittest
 from raytrace.sources import HexagonalRayFieldSource
 from raytrace.fields import evaluate_neighbours, project_to_sphere,\
         evaluate_modes
+        
+from raytrace.cfields import inv_area_of_ellipse
 
 import numpy
 
@@ -65,3 +67,26 @@ class TestEvalModes(unittest.TestCase):
         Z = evaluate_modes(rays, x, y, dx, dy)
         print(Z.shape)
         
+        
+class TestAreaOfEllipse(unittest.TestCase):
+    def test_area_of_ellipse(self):
+        ra = 3.0
+        rb = 8.0
+        angle = 30*numpy.pi/180.0
+        
+        a=ra #(1/(ra**2))
+        b=rb #(1/(rb**2))
+        
+        sin = numpy.sin(angle)
+        cos = numpy.cos(angle)
+        
+        A = (a**2)*(sin**2) + (b**2)*(cos**2)
+        B = 2*(b**2 - a**2)*sin*cos
+        C = (a**2)*(cos**2) + (b**2)*(sin**2)
+        
+        area = numpy.pi*ra*rb
+        print("True area:", area)
+        
+        area2 = (inv_area_of_ellipse(A, B, C)**1)
+        
+        self.assertAlmostEqual(area, area2)
