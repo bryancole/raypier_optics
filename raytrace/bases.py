@@ -141,6 +141,8 @@ class Renderable(HasQueue, RaytraceObject, metaclass=RaytraceObjectMetaclass):
 class ModelObject(Renderable):
     name = Str("A traceable component")
     
+    update = Event() #request re-tracing
+    
     centre = Tuple(0.,0.,0.) #position
     
     _orientation = Tuple(Float, Float)
@@ -236,8 +238,6 @@ class Probe(ModelObject):
     
 class Traceable(ModelObject):
     vtkproperty = Instance(tvtk.Property, transient=True)
-
-    update = Event() #request re-tracing
     
     intersections = List([], transient=True)
     

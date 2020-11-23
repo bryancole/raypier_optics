@@ -198,7 +198,7 @@ class EFieldPlane(Probe):
                 self.plot.request_redraw()
             
     
-    @on_trait_change("size, width")
+    @on_trait_change("size, width, exit_pupil_offset")
     def config_pipeline(self):
         src = self._plane_src
         size = self.size
@@ -211,9 +211,9 @@ class EFieldPlane(Probe):
         src.x_resolution = size
         src.y_resolution = size
         
-        self.evaluate()
+        self.update=True
         
-    @on_trait_change("centre, direction, orientation, exit_pupil_offset")
+    @on_trait_change("update")
     def on_change(self):
         self.evaluate()
     
@@ -269,8 +269,8 @@ class EFieldPlane(Probe):
         trns.transform_points(pts_in, pts_out)
         points2 = pts_out.to_array().astype('d')
         
-        print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
-        
+        #print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
+        print( "Centre:", points2.mean(axis=0) )
         _rays = RayCollection.from_array(rays)
         E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
         
