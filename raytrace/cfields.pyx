@@ -62,55 +62,55 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         double complex U, A, B, C, detG0, denom, AA, CC
         double x,y,z, phase, k, inv_root_area
     
-    with nogil:
-        for iray in range(Nray):
+    #with nogil:
+    for iray in range(Nray):
+        
+        ray = rays.rays[iray]
+        E = ray.E_vector
+        H = cross_(E, ray.direction)
+        k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
+        A = modes[iray, 0]
+        B = modes[iray, 1]
+        C = modes[iray, 2]
+        detG0 = (A*C) - (B*B)
+        phase = ray.phase
+        
+        ###normalisation factor 1/root(area)
+        inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag)))/M_PI
+        
+        for ipt in range(Npt):
+            pt.x = points[ipt,0]
+            pt.y = points[ipt,1]
+            pt.z = points[ipt,2]
+            pt = subvv_(pt, ray.origin)
+            x = dotprod_(pt, E)
+            y = dotprod_(pt, H)
+            z = dotprod_(pt, ray.direction)
             
-            ray = rays.rays[iray]
-            E = ray.E_vector
-            H = cross_(E, ray.direction)
-            A = modes[iray, 0]
-            B = modes[iray, 1]
-            C = modes[iray, 2]
-            detG0 = (A*C) - (B*B)
-            phase = ray.phase
-            k = 2*M_PI/wavelengths[ray.wavelength_idx]
+            denom = 1 + (z*(A+C)) + (z**2)*detG0
+            AA = (A + z*detG0)/denom
+            CC = (C + z*detG0)/denom
+            U = cexp( (I*phase) + I*k*(z + AA*(x**2) + (2*B*x*y)/denom + CC*(y**2) ) )
+            ###Normalisation factor
+            U /= csqrt((1 + z*A)*(1 + z*C) - (z*B)*(z*B))
             
-            ###normalisation factor 1/root(area)
-            inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag)))/M_PI
+            ###normalise by ray initial area
+            U *= inv_root_area
             
-            for ipt in range(Npt):
-                pt.x = points[ipt,0]
-                pt.y = points[ipt,1]
-                pt.z = points[ipt,2]
-                pt = subvv_(pt, ray.origin)
-                x = dotprod_(pt, E)
-                y = dotprod_(pt, H)
-                z = dotprod_(pt, ray.direction)
-                
-                denom = 1 + (z*(A+C)) + (z**2)*detG0
-                AA = (A + z*detG0)/denom
-                CC = (C + z*detG0)/denom
-                U = cexp((I*phase) + I*k*(z +  AA*(x**2) + (2*B*x*y) + CC*(y**2) ))
-                ###Normalisation factor
-                U /= csqrt((1 + z*A)*(1 + z*C) - (z*B)*(z*B))
-                
-                ###normalise by ray initial area
-                U *= inv_root_area
-                
-                ###reuse AA and CC
-                AA.real = ray.E1_amp.real
-                AA.imag = ray.E1_amp.imag
-                AA *= U
-                CC.real = ray.E2_amp.real
-                CC.imag = ray.E2_amp.imag
-                CC *= U
-                 
-                out[ipt,0].real += (AA.real * E.x) + (CC.real * H.x) 
-                out[ipt,0].imag += (AA.imag * E.x) + (CC.imag * H.x)
-                out[ipt,1].real += (AA.real * E.y) + (CC.real * H.y)
-                out[ipt,1].imag += (AA.imag * E.y) + (CC.imag * H.y)
-                out[ipt,2].real += (AA.real * E.z) + (CC.real * H.z)
-                out[ipt,2].imag += (AA.imag * E.z) + (CC.imag * H.z)
+            ###reuse AA and CC
+            AA.real = ray.E1_amp.real
+            AA.imag = ray.E1_amp.imag
+            AA *= U
+            CC.real = ray.E2_amp.real
+            CC.imag = ray.E2_amp.imag
+            CC *= U
+             
+            out[ipt,0].real += (AA.real * E.x) + (CC.real * H.x) 
+            out[ipt,0].imag += (AA.imag * E.x) + (CC.imag * H.x)
+            out[ipt,1].real += (AA.real * E.y) + (CC.real * H.y)
+            out[ipt,1].imag += (AA.imag * E.y) + (CC.imag * H.y)
+            out[ipt,2].real += (AA.real * E.z) + (CC.real * H.z)
+            out[ipt,2].imag += (AA.imag * E.z) + (CC.imag * H.z)
             
     return np.asarray(out)
 

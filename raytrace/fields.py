@@ -95,7 +95,7 @@ def evaluate_neighbours(rays, neighbours_idx):
     return (rays[mask], x,y,dx,dy)
     
     
-def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
+def evaluate_modes(rays, k, neighbour_x, neighbour_y, dx, dy):
     """For each ray in rays, use its nearest neighbours
     to compute the best fit for the Astigmatic Gaussian Beam
     parameters.
@@ -110,16 +110,14 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     y = neighbour_y
     
     M = block_diag(numpy.dstack((x**2, 2*x*y, y**2)))
-    b = numpy.ones(M.shape[0])
+    b = numpy.ones(M.shape[0])/k
     fit = lsqr(M,b)
     im_coefs = fit[0].reshape(x.shape[0],3)
 
     O = numpy.zeros_like(x)
-    upper = numpy.dstack((x,y,O))
-    lower = numpy.dstack((O,x,y))
-    combined = numpy.hstack((upper,lower))
-    b = numpy.dstack( (dx,dy) ).reshape(-1)
-    M = block_diag(combined)
+    M_ = numpy.dstack((2*x,2*y,O, O,2*x,2*y)).reshape(-1,12,3)
+    b = numpy.dstack( (dx,dy) ).reshape(-1)/k
+    M = block_diag(M_)
     fit = lsqr(M,b)
     re_coefs = fit[0].reshape(x.shape[0],3)
     
@@ -254,7 +252,13 @@ class EFieldPlane(Probe):
         
         neighbours_idx = neighbours[-1]
         rays, x, y, dx, dy = evaluate_neighbours(rays, neighbours_idx)
-        modes = evaluate_modes(rays, x, y, dx, dy)
+        print("X:", x)
+        print("Y:", y)
+        print("dx:", dx)
+        print("dy:", dy)
+        k = 2000.0*numpy.pi/wavelengths[rays['wavelength_idx']]
+        modes = evaluate_modes(rays, k, x, y, dx, dy)
+        
         
         size = self.size
         side = self.width/2.
@@ -271,7 +275,11 @@ class EFieldPlane(Probe):
         
         #print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
         print( "Centre:", points2.mean(axis=0) )
+        print(rays)
         _rays = RayCollection.from_array(rays)
+        
+        print("Modes:", modes)
+        print("wavelengths:", wavelengths)
         E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
         
         self.E_field = E.reshape(self.size, self.size, 3)
