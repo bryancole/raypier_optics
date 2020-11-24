@@ -10,7 +10,7 @@ from traitsui.api import View, Item
 
 
 lens = PlanoConvexLens(centre=(0,0,20),
-                       direction=(0,0,1),
+                       direction=(0,0,-1),
                        diameter=25.0,
                        thickness=6.0,
                        curvature=40.0,
@@ -20,9 +20,9 @@ lens = PlanoConvexLens(centre=(0,0,20),
 #                               radius=10.0,
 #                               wavelength=100.0)
 
-src = ConfocalRayFieldSource(angle_step=0.5, direction=(0,0,1),
-                              angle=5.0,
-                              wavelength=100.0)
+src = ConfocalRayFieldSource(angle_step=0.1, direction=(0,0,1),
+                              angle=1.0,
+                              wavelength=1.0)
 src.InputRays
 
 probe = EFieldPlane(source=src,
@@ -44,7 +44,7 @@ class FocalPlane(BaseConstraint):
         
         
 
-model = RayTraceModel(sources=[src], optics=[],
+model = RayTraceModel(sources=[src], optics=[lens],
                       probes=[probe], constraints=[FocalPlane()])
 
 

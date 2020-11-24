@@ -255,13 +255,8 @@ class EFieldPlane(Probe):
         
         neighbours_idx = neighbours[-1]
         rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
-        #print("X:", x)
-        #print("Y:", y)
-        #print("dx:", dx)
-        #print("dy:", dy)
-        #k = 2000.0*numpy.pi/wavelengths[rays['wavelength_idx']]
+
         modes = evaluate_modes(rays, x, y, dx, dy)
-        
         
         size = self.size
         side = self.width/2.

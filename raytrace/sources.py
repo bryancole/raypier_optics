@@ -1063,7 +1063,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
     working_dist = Float(100.0)
     
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, angle, angle_step, working_dist, max_ray_len, E_vector")
+                         depends_on="origin, direction, angle, angle_step, working_dist, max_ray_len, E_vector, wavelength")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -1100,9 +1100,6 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
         d1 = normaliseVector(d1)
         d2 = numpy.cross(direction, d1)
         d2 = normaliseVector(d2)
-
-        E_vector = numpy.cross(self.E_vector, direction)
-        E_vector = numpy.cross(E_vector, direction)
         
         cosV = numpy.cos(numpy.pi*30/180.)
         sinV = numpy.sin(numpy.pi*30/180.)
@@ -1141,27 +1138,30 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
         offsets = xi[:,None]*d1 + yj[:,None]*d2
         offsets *= spacing
         
-        directions = direction - offsets
-        directions /= numpy.sqrt((directions**2).sum(axis=-1,keepdims=True))
+        directions = direction[None,:] - offsets
+        directions = normaliseVector(directions)
+        
+        E_vector = numpy.cross(self.E_vector, directions)
+        E_vector = numpy.cross(E_vector, directions)
+        E_vector = normaliseVector(E_vector)
         
         gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
         
         ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
             
-        path_length = numpy.sqrt(((offsets + directions)**2).sum(axis=-1))*self.working_dist
-        
-        phase = -2*numpy.pi*((1000*path_length/self.wavelength)%1.0)
-        
+        wl = self.wavelength
+        path_length = numpy.sqrt(((offsets + direction[None,:])**2).sum(axis=-1))*self.working_dist
+        phase = -2*numpy.pi*((1000*path_length/wl))#%1.0)
         ray_data['origin'] = offsets*self.working_dist
         ray_data['origin'] += origin
         ray_data['direction'] = directions
         ray_data['wavelength_idx'] = 0
-        ray_data['E_vector'] = [normaliseVector(E_vector)]
+        ray_data['E_vector'] = E_vector
         ray_data['E1_amp'] = self.E1_amp * gauss
         ray_data['E2_amp'] = self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
-        ray_data['phase'] -= 2*numpy.pi*((1000*path_length/self.wavelength)%1.0)
+        ray_data['phase'] = phase
         rays = RayCollection.from_array(ray_data)
         print("MADE")
         return rays
