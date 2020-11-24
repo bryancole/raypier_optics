@@ -56,6 +56,10 @@ ext_modules = cythonize("raytrace/*.pyx",
                         language="c++" if Win64 else None,
                         include_path=[numpy.get_include()])
 
+for module in ext_modules:
+    module.extra_compile_args.append('-fopenmp')
+    module.extra_link_args.append('-fopenmp')
+
 setup(
     name="raytrace",
     version="0.1dev",

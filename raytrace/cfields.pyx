@@ -23,6 +23,8 @@ ELSE:
         double cabs (double complex) nogil
         double complex cexp (double complex) nogil
         double complex I    
+        
+from cython.parallel import prange
 
 
 from ctracer cimport Face, sep_, \
@@ -59,79 +61,78 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         ray_t ray
         np_.npy_complex128[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
         vector_t pt, H, E
-        double complex U, A, B, C, detG0, denom, AA, CC
+        double complex U, A, B, C, E1, E2, detG0
         double x,y,z, phase, k, inv_root_area
     
-    #with nogil:
-    for iray in range(Nray):
-        
-        ray = rays.rays[iray]
-        E = ray.E_vector
-        H = cross_(E, ray.direction)
-        k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
-        A = modes[iray, 0]
-        B = modes[iray, 1]
-        C = modes[iray, 2]
-        A.imag /= k
-        B.imag /= k
-        C.imag /= k
-        detG0 = (A*C) - (B*B)
-        phase = ray.phase
-        
-        ###normalisation factor 1/root(area)
-        inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag)))/M_PI
-        
-        for ipt in range(Npt):
-            pt.x = points[ipt,0]
-            pt.y = points[ipt,1]
-            pt.z = points[ipt,2]
-            pt = subvv_(pt, ray.origin)
-            x = dotprod_(pt, E)
-            y = dotprod_(pt, H)
-            z = dotprod_(pt, ray.direction)
+    with nogil:
+        for iray in range(Nray):
             
-            denom = 1 + (z*(A+C)) + (z**2)*detG0
-            AA = (A + z*detG0)/denom
-            CC = (C + z*detG0)/denom
-            U = cexp( (I*phase) + I*k*(z + AA*(x**2) + (2*B*x*y)/denom + CC*(y**2) ) )
-            ###Normalisation factor
-            U /= csqrt((1 + z*A)*(1 + z*C) - (z*B)*(z*B))
+            ray = rays.rays[iray]
+            E = ray.E_vector
+            H = cross_(E, ray.direction)
+            k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
+            A = modes[iray, 0]
+            B = modes[iray, 1]
+            C = modes[iray, 2]
+            A.imag /= k
+            B.imag /= k
+            C.imag /= k
+            detG0 = (A*C) - (B*B)
+            phase = ray.phase
             
-            ###normalise by ray initial area
-            U *= inv_root_area
+            ###normalisation factor 1/root(area)
+            inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag)))/M_PI
             
-            ###reuse AA and CC
-            AA.real = ray.E1_amp.real
-            AA.imag = ray.E1_amp.imag
-            AA *= U
-            CC.real = ray.E2_amp.real
-            CC.imag = ray.E2_amp.imag
-            CC *= U
-             
-            out[ipt,0].real += (AA.real * E.x) + (CC.real * H.x) 
-            out[ipt,0].imag += (AA.imag * E.x) + (CC.imag * H.x)
-            out[ipt,1].real += (AA.real * E.y) + (CC.real * H.y)
-            out[ipt,1].imag += (AA.imag * E.y) + (CC.imag * H.y)
-            out[ipt,2].real += (AA.real * E.z) + (CC.real * H.z)
-            out[ipt,2].imag += (AA.imag * E.z) + (CC.imag * H.z)
+            for ipt in prange(Npt):
+                pt.x = points[ipt,0]
+                pt.y = points[ipt,1]
+                pt.z = points[ipt,2]
+                pt = subvv_(pt, ray.origin)
+                
+                U = calc_mode_U(A,B,C, detG0, pt, E, H, ray.direction, k, phase, inv_root_area)
+                
+                E1 = (ray.E1_amp.real + I*ray.E1_amp.imag) * U
+                E2 = (ray.E2_amp.real + I*ray.E2_amp.imag) * U
+                 
+                out[ipt,0].real += (E1.real * E.x) + (E2.real * H.x) 
+                out[ipt,0].imag += (E1.imag * E.x) + (E2.imag * H.x)
+                out[ipt,1].real += (E1.real * E.y) + (E2.real * H.y)
+                out[ipt,1].imag += (E1.imag * E.y) + (E2.imag * H.y)
+                out[ipt,2].real += (E1.real * E.z) + (E2.real * H.z)
+                out[ipt,2].imag += (E1.imag * E.z) + (E2.imag * H.z)
             
     return np.asarray(out)
 
         
-cpdef double inv_area_of_ellipse(double A, double B, double C) nogil:
-    """Compute 1/area of an ellipse defined by the coefficients A,B,C
-    where 
-        A*(x**2) + 2*B*x*y + C*(y**2) = 1
+cdef double complex calc_mode_U(double complex A,
+                                double complex B,
+                                double complex C,
+                                double complex detG0,
+                                vector_t pt, 
+                                vector_t E, 
+                                vector_t H,
+                                vector_t direction,
+                                double k,
+                                double phase, 
+                                double inv_root_area) nogil:
+    cdef:
+        double complex denom, AA, CC, U
+        double x,y,z
         
-    Taken from wikipedia, since deriving it proved too hard for me.
-    """
-    cdef double out
+    x = dotprod_(pt, E)
+    y = dotprod_(pt, H)
+    z = dotprod_(pt, direction)
+    denom = 1 + (z*(A+C)) + (z**2)*detG0
+    AA = (A + z*detG0)/denom
+    CC = (C + z*detG0)/denom
+    U = cexp( (I*phase) + I*k*(z + AA*(x**2) + (2*B*x*y)/denom + CC*(y**2) ) )
+    ###Normalisation factor
+    U /= csqrt((1 + z*A)*(1 + z*C) - (z*B)*(z*B))
     
-    out = sqrt(2*(A**2) + 2*(C**2) - B**2)
-    out *= (8*A*C - 2*(B**2))
-    out /= (B**2 - 4*A*C)**2
+    ###normalise by ray initial area
+    U *= inv_root_area
     
-    return out*M_PI
+    return U
     
     
     

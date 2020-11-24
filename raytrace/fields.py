@@ -254,10 +254,10 @@ class EFieldPlane(Probe):
         
         neighbours_idx = neighbours[-1]
         rays, x, y, dx, dy = evaluate_neighbours(rays, neighbours_idx)
-        print("X:", x)
-        print("Y:", y)
-        print("dx:", dx)
-        print("dy:", dy)
+        #print("X:", x)
+        #print("Y:", y)
+        #print("dx:", dx)
+        #print("dy:", dy)
         #k = 2000.0*numpy.pi/wavelengths[rays['wavelength_idx']]
         modes = evaluate_modes(rays, x, y, dx, dy)
         
@@ -276,12 +276,12 @@ class EFieldPlane(Probe):
         points2 = pts_out.to_array().astype('d')
         
         #print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
-        print( "Centre:", points2.mean(axis=0) )
-        print(rays)
+        #print( "Centre:", points2.mean(axis=0) )
+        #print(rays)
         _rays = RayCollection.from_array(rays)
         
-        print("Modes:", modes)
-        print("wavelengths:", wavelengths)
+        #print("Modes:", modes)
+        #print("wavelengths:", wavelengths)
         E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
         
         self.E_field = E.reshape(self.size, self.size, 3)

@@ -16,13 +16,15 @@ lens = PlanoConvexLens(centre=(0,0,20),
                        curvature=40.0,
                        n_inside=1.5)
 
-src = HexagonalRayFieldSource(spacing=7.0, direction=(0,0,1))
+src = HexagonalRayFieldSource(spacing=2.0, direction=(0,0,1),
+                              radius=10.0,
+                              wavelength=100.0)
 
 probe = EFieldPlane(source=src,
                     centre=(0,0,70),
                     direction=(0,0,1),
                     exit_pupil_offset=100.,
-                    width=1,
+                    width=10.0,
                     size=100)
 
 
