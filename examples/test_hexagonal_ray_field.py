@@ -27,7 +27,7 @@ probe = EFieldPlane(source=src,
 
 
 class FocalPlane(BaseConstraint):
-    z_pos = Range(20.0,100.0)
+    z_pos = Range(50.0,130.0)
     
     traits_view = View(Item("z_pos"))
     

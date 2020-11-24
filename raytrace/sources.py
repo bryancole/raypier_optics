@@ -1037,7 +1037,8 @@ class HexagonalRayFieldSource(SingleRaySource):
         vi.shape = -1
         vj.shape = -1
         
-        select = ((vi + sinV*vj)**2 + (cosV*vj**2)) < (radius/spacing)**2
+        ri = ((vi + sinV*vj)**2 + (cosV*vj**2))
+        select = ri < (radius/spacing)**2
         
         xi = vi[select]
         yj = vj[select]
@@ -1048,16 +1049,19 @@ class HexagonalRayFieldSource(SingleRaySource):
         self.neighbours = selnb[select,:]
         
         offsets = xi[:,None]*d1 + yj[:,None]*d2
+        offsets *= spacing
+        
+        gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
         
         ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
             
-        ray_data['origin'] = offsets*spacing
+        ray_data['origin'] = offsets
         ray_data['origin'] += origin
         ray_data['direction'] = direction
         ray_data['wavelength_idx'] = 0
         ray_data['E_vector'] = [normaliseVector(E_vector)]
-        ray_data['E1_amp'] = self.E1_amp
-        ray_data['E2_amp'] = self.E2_amp
+        ray_data['E1_amp'] = self.E1_amp * gauss
+        ray_data['E2_amp'] = self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
         rays = RayCollection.from_array(ray_data)

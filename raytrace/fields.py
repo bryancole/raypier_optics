@@ -95,7 +95,7 @@ def evaluate_neighbours(rays, neighbours_idx):
     return (rays[mask], x,y,dx,dy)
     
     
-def evaluate_modes(rays, k, neighbour_x, neighbour_y, dx, dy):
+def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     """For each ray in rays, use its nearest neighbours
     to compute the best fit for the Astigmatic Gaussian Beam
     parameters.
@@ -106,17 +106,19 @@ def evaluate_modes(rays, k, neighbour_x, neighbour_y, dx, dy):
     For N rays, return a Nx3 complex array of coeffs"""
     ### Do linear least squares on each ray and neighbours
     
-    x = neighbour_x
-    y = neighbour_y
+    x = neighbour_x*2
+    y = neighbour_y*2
     
     M = block_diag(numpy.dstack((x**2, 2*x*y, y**2)))
-    b = numpy.ones(M.shape[0])/k
+    b = numpy.ones(M.shape[0])
     fit = lsqr(M,b)
     im_coefs = fit[0].reshape(x.shape[0],3)
 
+    x = neighbour_x
+    y = neighbour_y
     O = numpy.zeros_like(x)
-    M_ = numpy.dstack((2*x,2*y,O, O,2*x,2*y)).reshape(-1,12,3)
-    b = numpy.dstack( (dx,dy) ).reshape(-1)/k
+    M_ = numpy.dstack((x,y,O, O,x,y)).reshape(-1,12,3)
+    b = numpy.dstack( (dx,dy) ).reshape(-1)
     M = block_diag(M_)
     fit = lsqr(M,b)
     re_coefs = fit[0].reshape(x.shape[0],3)
@@ -241,7 +243,7 @@ class EFieldPlane(Probe):
         neighbours = ray_src.neighbour_list
         
         for ray, phase in zip(all_rays, ray_src.cumulative_phases):
-            ray['phase'] = phase
+            ray['phase'] = -phase
         
         #intersections = [self.intersect_plane(rays) for rays in all_rays]
         rays = all_rays[-1]
@@ -256,8 +258,8 @@ class EFieldPlane(Probe):
         print("Y:", y)
         print("dx:", dx)
         print("dy:", dy)
-        k = 2000.0*numpy.pi/wavelengths[rays['wavelength_idx']]
-        modes = evaluate_modes(rays, k, x, y, dx, dy)
+        #k = 2000.0*numpy.pi/wavelengths[rays['wavelength_idx']]
+        modes = evaluate_modes(rays, x, y, dx, dy)
         
         
         size = self.size

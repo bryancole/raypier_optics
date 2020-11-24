@@ -72,6 +72,9 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         A = modes[iray, 0]
         B = modes[iray, 1]
         C = modes[iray, 2]
+        A.imag /= k
+        B.imag /= k
+        C.imag /= k
         detG0 = (A*C) - (B*B)
         phase = ray.phase
         
