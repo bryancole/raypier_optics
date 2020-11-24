@@ -865,17 +865,10 @@ class AdHocSource(BaseRaySource):
     def _get_InputRays(self):
         #i actually don't understand traits well at all.  this whole class is a hack.
         return self.rays
-
-
-class HexagonalRayFieldSource(SingleRaySource):
-    radius = Float(10.,editor=NumEditor)
-    spacing = Float(0.5, editor=NumEditor)
     
-    InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, spacing, radius, max_ray_len, E_vector")
     
+class RayFieldSource(SingleRaySource):
     neighbours = Array(transient=True)
-    
     neighbour_list = Property(List(Array),
                               depends_on="TracedRays, neighbours")
     
@@ -887,23 +880,6 @@ class HexagonalRayFieldSource(SingleRaySource):
     mesh_source = Instance(tvtk.ProgrammableSource, transient=True)
     mesh_actor = Instance(tvtk.Actor, transient=True)
     
-    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
-                            show_border=True,
-                            label="Origin position",
-                            padding=0),
-                       Group(Item('direction', show_label=False, resizable=True),
-                            show_border=True,
-                            label="Direction"),
-                       Item('spacing'),
-                       Item('radius'),
-                       label="Geometry")
-
-    @on_trait_change("direction, spacing, radius, max_ray_len")
-    def on_update(self):
-        self.data_source.modified()
-        self.mesh_source.modified()
-        self.update=True
-        
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor, self.mesh_actor]
         return actors
@@ -947,8 +923,6 @@ class HexagonalRayFieldSource(SingleRaySource):
             yield new_neighbours
             last_rays = rays
             neighbours = new_neighbours
-            
-        
         
     def _mesh_source_default(self):
         source = tvtk.ProgrammableSource()
@@ -958,16 +932,6 @@ class HexagonalRayFieldSource(SingleRaySource):
             output = source.poly_data_output
             points = self.InputRays.origin
             neighbours = self.neighbours
-#             i = len(points)//2
-#             nb = neighbours[i]
-#             nb1, nb2, nb3, nb4, nb5, nb6 = nb
-#             tris = numpy.array([ (i, nb1, nb2 ),
-#                              (i, nb2, nb3 ),
-#                              (i, nb3, nb4),
-#                              (i, nb4, nb5),
-#                              (i, nb5, nb6),
-#                              (i, nb6, nb1) 
-#                             ])
             tris = []
             for i in range(points.shape[0]):
                 nb = neighbours[i]
@@ -994,6 +958,31 @@ class HexagonalRayFieldSource(SingleRaySource):
         act.property.color = (0.0,1.0,0.0)
         act.property.representation = "wireframe"
         return act
+    
+
+class HexagonalRayFieldSource(RayFieldSource):
+    radius = Float(10.,editor=NumEditor)
+    spacing = Float(0.5, editor=NumEditor)
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, spacing, radius, max_ray_len, E_vector")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item('spacing'),
+                       Item('radius'),
+                       label="Geometry")
+
+    @on_trait_change("direction, spacing, radius, max_ray_len")
+    def on_update(self):
+        self.data_source.modified()
+        self.mesh_source.modified()
+        self.update=True
     
     @cached_property
     def _get_InputRays(self):
@@ -1066,3 +1055,114 @@ class HexagonalRayFieldSource(SingleRaySource):
         ray_data['normal'] = [[0,1,0]]
         rays = RayCollection.from_array(ray_data)
         return rays
+    
+    
+class ConfocalRayFieldSource(HexagonalRayFieldSource):
+    angle = Float(10.0)
+    angle_step = Float(1.0)
+    working_dist = Float(100.0)
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, angle, angle_step, working_dist, max_ray_len, E_vector")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item('angle'),
+                       Item('angle_step'),
+                       Item('working_dist'),
+                       label="Geometry")
+
+    @on_trait_change("direction, angle, angle_step, working_dist, max_ray_len")
+    def on_update(self):
+        self.data_source.modified()
+        self.mesh_source.modified()
+        self.update=True
+    
+    @cached_property
+    def _get_InputRays(self):
+        origin = numpy.array(self.origin)
+        direction = numpy.array(self.direction)
+        
+        spacing = numpy.tan(self.angle_step*numpy.pi/180)
+        radius = numpy.tan(self.angle*numpy.pi/180)
+        
+        max_axis = numpy.abs(direction).argmax()
+        if max_axis==0:
+            v = numpy.array([0.,1.,0.])
+        else:
+            v = numpy.array([1.,0.,0.])
+        d1 = numpy.cross(direction, v)
+        d1 = normaliseVector(d1)
+        d2 = numpy.cross(direction, d1)
+        d2 = normaliseVector(d2)
+
+        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(E_vector, direction)
+        
+        cosV = numpy.cos(numpy.pi*30/180.)
+        sinV = numpy.sin(numpy.pi*30/180.)
+        d2 = cosV*d2 + sinV*d1
+        
+        nsteps = int(radius/(spacing*numpy.cos(numpy.pi*30/180.)))
+        i = numpy.arange(-nsteps-1, nsteps+2)
+        j = numpy.arange(-nsteps-1, nsteps+2)
+        
+        vi, vj = numpy.meshgrid(i,j)
+        label = numpy.arange(vi.size).reshape(*vi.shape) #give each point a unique index
+        neighbours = numpy.full((label.shape[0], label.shape[1], 6), -1, 'i')
+        neighbours[1:,:,3] = label[:-1,:]
+        neighbours[:-1,:,0] = label[1:,:]
+        neighbours[:,1:,4] = label[:,:-1]
+        neighbours[:,:-1,1] = label[:,1:]
+        neighbours[1:,:-1,2] = label[:-1,1:]
+        neighbours[:-1,1:,5] = label[1:,:-1]
+        
+        neighbours.shape = -1,6
+        
+        vi.shape = -1
+        vj.shape = -1
+        
+        ri = ((vi + sinV*vj)**2 + (cosV*vj**2))
+        select = ri < (radius/spacing)**2
+        
+        xi = vi[select]
+        yj = vj[select]
+        
+        backmap = numpy.full(vi.shape[0]+1, -1, 'i')
+        backmap[:-1][select] = numpy.arange(len(xi))
+        selnb = backmap[neighbours]
+        self.neighbours = selnb[select,:]
+        
+        offsets = xi[:,None]*d1 + yj[:,None]*d2
+        offsets *= spacing
+        
+        directions = direction - offsets
+        directions /= numpy.sqrt((directions**2).sum(axis=-1,keepdims=True))
+        
+        gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
+        
+        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+            
+        path_length = numpy.sqrt(((offsets + directions)**2).sum(axis=-1))*self.working_dist
+        
+        phase = -2*numpy.pi*((1000*path_length/self.wavelength)%1.0)
+        
+        ray_data['origin'] = offsets*self.working_dist
+        ray_data['origin'] += origin
+        ray_data['direction'] = directions
+        ray_data['wavelength_idx'] = 0
+        ray_data['E_vector'] = [normaliseVector(E_vector)]
+        ray_data['E1_amp'] = self.E1_amp * gauss
+        ray_data['E2_amp'] = self.E2_amp * gauss
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        ray_data['phase'] -= 2*numpy.pi*((1000*path_length/self.wavelength)%1.0)
+        rays = RayCollection.from_array(ray_data)
+        print("MADE")
+        return rays
+    

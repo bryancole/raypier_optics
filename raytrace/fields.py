@@ -106,8 +106,8 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     For N rays, return a Nx3 complex array of coeffs"""
     ### Do linear least squares on each ray and neighbours
     
-    x = neighbour_x*2
-    y = neighbour_y*2
+    x = neighbour_x
+    y = neighbour_y
     
     M = block_diag(numpy.dstack((x**2, 2*x*y, y**2)))
     b = numpy.ones(M.shape[0])
@@ -243,7 +243,7 @@ class EFieldPlane(Probe):
         neighbours = ray_src.neighbour_list
         
         for ray, phase in zip(all_rays, ray_src.cumulative_phases):
-            ray['phase'] = -phase
+            ray['phase'] = phase
         
         #intersections = [self.intersect_plane(rays) for rays in all_rays]
         rays = all_rays[-1]
@@ -251,9 +251,10 @@ class EFieldPlane(Probe):
         radius = self.exit_pupil_offset
         
         projected = project_to_sphere(rays, wavelengths, centre, radius)
+        #projected = rays
         
         neighbours_idx = neighbours[-1]
-        rays, x, y, dx, dy = evaluate_neighbours(rays, neighbours_idx)
+        rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
         #print("X:", x)
         #print("Y:", y)
         #print("dx:", dx)
@@ -278,6 +279,7 @@ class EFieldPlane(Probe):
         #print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
         #print( "Centre:", points2.mean(axis=0) )
         #print(rays)
+        
         _rays = RayCollection.from_array(rays)
         
         #print("Modes:", modes)

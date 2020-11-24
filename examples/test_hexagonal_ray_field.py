@@ -1,6 +1,6 @@
 
 from raytrace.tracer import RayTraceModel
-from raytrace.sources import HexagonalRayFieldSource
+from raytrace.sources import HexagonalRayFieldSource, ConfocalRayFieldSource
 from raytrace.lenses import PlanoConvexLens
 from raytrace.fields import EFieldPlane
 from raytrace.constraints import BaseConstraint
@@ -16,9 +16,14 @@ lens = PlanoConvexLens(centre=(0,0,20),
                        curvature=40.0,
                        n_inside=1.5)
 
-src = HexagonalRayFieldSource(spacing=2.0, direction=(0,0,1),
-                              radius=10.0,
+# src = HexagonalRayFieldSource(spacing=2.0, direction=(0,0,1),
+#                               radius=10.0,
+#                               wavelength=100.0)
+
+src = ConfocalRayFieldSource(angle_step=0.5, direction=(0,0,1),
+                              angle=5.0,
                               wavelength=100.0)
+src.InputRays
 
 probe = EFieldPlane(source=src,
                     centre=(0,0,70),
@@ -39,12 +44,10 @@ class FocalPlane(BaseConstraint):
         
         
 
-model = RayTraceModel(sources=[src], optics=[lens],
+model = RayTraceModel(sources=[src], optics=[],
                       probes=[probe], constraints=[FocalPlane()])
 
 
 
 model.configure_traits()
 
-for item in src.iter_neighbours():
-    print(item)
