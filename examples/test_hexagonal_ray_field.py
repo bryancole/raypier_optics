@@ -20,8 +20,8 @@ lens = PlanoConvexLens(centre=(0,0,20),
 #                               radius=10.0,
 #                               wavelength=100.0)
 
-src = ConfocalRayFieldSource(angle_step=0.1, direction=(0,0,1),
-                              angle=1.0,
+src = ConfocalRayFieldSource(angle_step=4.0, direction=(0,0,1),
+                              angle=5.0,
                               wavelength=1.0)
 src.InputRays
 

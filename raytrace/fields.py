@@ -27,6 +27,7 @@ import numpy
 from scipy.sparse.linalg import lsqr
 from scipy.sparse import block_diag
 import time
+import traceback
 
 
 def project_to_sphere(rays, wavelengths, centre=(0,0,0), radius=10.0):
@@ -220,7 +221,10 @@ class EFieldPlane(Probe):
         
     @on_trait_change("update")
     def on_change(self):
-        self.evaluate()
+        try:
+            self.evaluate()
+        except:
+            traceback.print_exc()
     
     def _actors_default(self):
         source = self._plane_src

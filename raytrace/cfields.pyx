@@ -69,7 +69,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             
             ray = rays.rays[iray]
             E = norm_(ray.E_vector)
-            H = norm_(cross_(E, ray.direction))
+            H = norm_(cross_(ray.direction, E))
             k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
             A = modes[iray, 0]
             B = modes[iray, 1]

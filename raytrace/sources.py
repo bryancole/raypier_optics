@@ -1088,86 +1088,90 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
         self.mesh_source.modified()
         self.update=True
     
-    @cached_property
+    #@cached_property
     def _get_InputRays(self):
-        origin = numpy.array(self.origin)
-        direction = numpy.array(self.direction)
-        
-        spacing = numpy.tan(self.angle_step*numpy.pi/180)
-        radius = numpy.tan(self.angle*numpy.pi/180)
-        
-        max_axis = numpy.abs(direction).argmax()
-        if max_axis==0:
-            v = numpy.array([0.,1.,0.])
-        else:
-            v = numpy.array([1.,0.,0.])
-        d1 = numpy.cross(direction, v)
-        d1 = normaliseVector(d1)
-        d2 = numpy.cross(direction, d1)
-        d2 = normaliseVector(d2)
-        
-        cosV = numpy.cos(numpy.pi*30/180.)
-        sinV = numpy.sin(numpy.pi*30/180.)
-        d2 = cosV*d2 + sinV*d1
-        
-        nsteps = int(radius/(spacing*numpy.cos(numpy.pi*30/180.)))
-        i = numpy.arange(-nsteps-1, nsteps+2)
-        j = numpy.arange(-nsteps-1, nsteps+2)
-        
-        vi, vj = numpy.meshgrid(i,j)
-        label = numpy.arange(vi.size).reshape(*vi.shape) #give each point a unique index
-        neighbours = numpy.full((label.shape[0], label.shape[1], 6), -1, 'i')
-        neighbours[1:,:,3] = label[:-1,:]
-        neighbours[:-1,:,0] = label[1:,:]
-        neighbours[:,1:,4] = label[:,:-1]
-        neighbours[:,:-1,1] = label[:,1:]
-        neighbours[1:,:-1,2] = label[:-1,1:]
-        neighbours[:-1,1:,5] = label[1:,:-1]
-        
-        neighbours.shape = -1,6
-        
-        vi.shape = -1
-        vj.shape = -1
-        
-        ri = ((vi + sinV*vj)**2 + (cosV*vj**2))
-        select = ri < (radius/spacing)**2
-        
-        xi = vi[select]
-        yj = vj[select]
-        
-        backmap = numpy.full(vi.shape[0]+1, -1, 'i')
-        backmap[:-1][select] = numpy.arange(len(xi))
-        selnb = backmap[neighbours]
-        self.neighbours = selnb[select,:]
-        
-        offsets = xi[:,None]*d1 + yj[:,None]*d2
-        offsets *= spacing
-        
-        directions = direction[None,:] - offsets
-        directions = normaliseVector(directions)
-        
-        E_vector = numpy.cross(self.E_vector, directions)
-        E_vector = numpy.cross(E_vector, directions)
-        E_vector = normaliseVector(E_vector)
-        
-        gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
-        
-        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+        try:
+            origin = numpy.array(self.origin)
+            direction = numpy.array(self.direction)
             
-        wl = self.wavelength
-        path_length = numpy.sqrt(((offsets + direction[None,:])**2).sum(axis=-1))*self.working_dist
-        phase = -2*numpy.pi*((1000*path_length/wl))#%1.0)
-        ray_data['origin'] = offsets*self.working_dist
-        ray_data['origin'] += origin
-        ray_data['direction'] = directions
-        ray_data['wavelength_idx'] = 0
-        ray_data['E_vector'] = E_vector
-        ray_data['E1_amp'] = self.E1_amp * gauss
-        ray_data['E2_amp'] = self.E2_amp * gauss
-        ray_data['refractive_index'] = 1.0+0.0j
-        ray_data['normal'] = [[0,1,0]]
-        ray_data['phase'] = phase
-        rays = RayCollection.from_array(ray_data)
+            spacing = numpy.tan(self.angle_step*numpy.pi/180)
+            radius = numpy.tan(self.angle*numpy.pi/180)
+            
+            max_axis = numpy.abs(direction).argmax()
+            if max_axis==0:
+                v = numpy.array([0.,1.,0.])
+            else:
+                v = numpy.array([1.,0.,0.])
+            d1 = numpy.cross(direction, v)
+            d1 = normaliseVector(d1)
+            d2 = numpy.cross(direction, d1)
+            d2 = normaliseVector(d2)
+            
+            cosV = numpy.cos(numpy.pi*30/180.)
+            sinV = numpy.sin(numpy.pi*30/180.)
+            d2 = cosV*d2 + sinV*d1
+            
+            nsteps = int(radius/(spacing*numpy.cos(numpy.pi*30/180.)))
+            i = numpy.arange(-nsteps-1, nsteps+2)
+            j = numpy.arange(-nsteps-1, nsteps+2)
+            
+            vi, vj = numpy.meshgrid(i,j)
+            label = numpy.arange(vi.size).reshape(*vi.shape) #give each point a unique index
+            neighbours = numpy.full((label.shape[0], label.shape[1], 6), -1, 'i')
+            neighbours[1:,:,3] = label[:-1,:]
+            neighbours[:-1,:,0] = label[1:,:]
+            neighbours[:,1:,4] = label[:,:-1]
+            neighbours[:,:-1,1] = label[:,1:]
+            neighbours[1:,:-1,2] = label[:-1,1:]
+            neighbours[:-1,1:,5] = label[1:,:-1]
+            
+            neighbours.shape = -1,6
+            
+            vi.shape = -1
+            vj.shape = -1
+            
+            ri = ((vi + sinV*vj)**2 + (cosV*vj**2))
+            select = ri < (radius/spacing)**2
+            
+            xi = vi[select]
+            yj = vj[select]
+            
+            backmap = numpy.full(vi.shape[0]+1, -1, 'i')
+            backmap[:-1][select] = numpy.arange(len(xi))
+            selnb = backmap[neighbours]
+            self.neighbours = selnb[select,:]
+            
+            offsets = xi[:,None]*d1 + yj[:,None]*d2
+            offsets *= spacing
+            
+            directions = direction[None,:] - offsets
+            directions = normaliseVector(directions)
+            
+            E_vector = numpy.cross(self.E_vector, directions)
+            E_vector = numpy.cross(E_vector, directions)
+            E_vector = normaliseVector(E_vector)
+            
+            gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
+            
+            ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+                
+            wl = self.wavelength
+            path_length = numpy.sqrt(((offsets + direction[None,:])**2).sum(axis=-1))*self.working_dist
+            phase = -2*numpy.pi*((1000*path_length/wl))#%1.0)
+            ray_data['origin'] = offsets*self.working_dist
+            ray_data['origin'] += origin
+            ray_data['direction'] = directions
+            ray_data['wavelength_idx'] = 0
+            ray_data['E_vector'] = E_vector
+            ray_data['E1_amp'] = self.E1_amp * gauss
+            ray_data['E2_amp'] = self.E2_amp * gauss
+            ray_data['refractive_index'] = 1.0+0.0j
+            ray_data['normal'] = [[0,1,0]]
+            ray_data['phase'] = phase
+            rays = RayCollection.from_array(ray_data)
+        except:
+            traceback.print_exc()
+            return RayCollection(0)
         print("MADE")
         return rays
     
