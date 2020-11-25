@@ -130,6 +130,7 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
 class EFieldPlane(Probe):
     source = Instance(BaseRaySource)    
     width = Float(0.5) #in mm
+    height = Float(0.5)
     size = Int(30)
             
     ray_source = Instance(klass="raytrace.sources.BaseRaySource")
@@ -159,6 +160,7 @@ class EFieldPlane(Probe):
                        Traceable.uigroup,
                        Item('size', editor=NumEditor),
                        Item('width', editor=NumEditor),
+                       Item('height', editor=NumEditor)
                         ),
                         Item("plot", editor=ComponentEditor())
                         )
@@ -166,8 +168,10 @@ class EFieldPlane(Probe):
     
     def _plot_default(self):
         side = self.width/2
+        yside = self.height/2
         x = numpy.linspace(-side,side, self.size)
-        index = GridDataSource(xdata=x, ydata=x)
+        y = numpy.linspace(-yside,yside, self.size)
+        index = GridDataSource(xdata=x, ydata=y)
         imap = GridMapper(range=DataRange2D(index))
         self.index = index
         csrc = ImageData(data=self.intensity, value_depth=1)
@@ -190,23 +194,24 @@ class EFieldPlane(Probe):
         if img_data is not None:
             self.img_data.data = self.intensity
             side = self.width/2
-            x = numpy.linspace(-side,side, self.size)
-            self.index.xdata = x
-            self.index.ydata = x
+            yside = self.height/2
+            self.index.xdata = numpy.linspace(-side,side, self.size)
+            self.index.ydata = numpy.linspace(-yside,yside, self.size)
             
             if self.plot is not None:
                 self.plot.request_redraw()
             
     
-    @on_trait_change("size, width, exit_pupil_offset")
+    @on_trait_change("size, width, height, exit_pupil_offset")
     def config_pipeline(self):
         src = self._plane_src
         size = self.size
         side = self.width/2.
+        yside = self.height/2
         
-        src.origin = (-side,-side,0)
-        src.point1 = (-side,side,0)
-        src.point2 = (side,-side,0)
+        src.origin = (-side,-yside,0)
+        src.point1 = (-side,yside,0)
+        src.point2 = (side,-yside,0)
         
         src.x_resolution = size
         src.y_resolution = size
@@ -260,8 +265,10 @@ class EFieldPlane(Probe):
         
         size = self.size
         side = self.width/2.
+        yside = self.height/2
         px = numpy.linspace(-side,side,size)
-        points = numpy.dstack(numpy.meshgrid(px,px,0)).reshape(-1,3)
+        py = numpy.linspace(-yside, yside, size)
+        points = numpy.dstack(numpy.meshgrid(px,py,0)).reshape(-1,3)
         
         ###What a chore
         trns = self.transform

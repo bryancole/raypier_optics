@@ -30,6 +30,7 @@ probe = EFieldPlane(source=src,
                     direction=(0,0,1),
                     exit_pupil_offset=100.,
                     width=10.0,
+                    height=10.0,
                     size=100)
 
 

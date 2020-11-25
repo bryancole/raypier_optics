@@ -18,6 +18,7 @@
 
 import numpy
 import itertools
+import traceback
 
 from traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
@@ -895,9 +896,13 @@ class RayFieldSource(SingleRaySource):
             optical_path += rays.length * rays.refractive_index.real
         return phases
     
-    @cached_property
+    #@cached_property
     def _get_neighbour_list(self):
-        return list(self.iter_neighbours())
+        try:
+            return list(self.iter_neighbours())
+        except:
+            traceback.print_exc()
+            return []
     
     def iter_neighbours(self):
         neighbours = self.neighbours

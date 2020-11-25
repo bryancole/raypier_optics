@@ -289,23 +289,26 @@ class RayTraceModel(HasQueue):
         optics = self.optics
         #print "trace", 
         next(counter)
-        if optics is not None:
-            self.prepare_to_trace()
-            for o in optics:
-                o.intersections = []
-            for ray_source in self.sources:
-                self.trace_ray_source(ray_source, optics)
-            for probe in self.probes:
-                probe.evaluate()
-            for o in optics:
-                o.update_complete()
-            for r in self.results:
-                try:
-                    r.calc_result(self)
-                except:
-                    traceback.print_exc()
-        self.render_vtk()
-        self._updating = False
+        try:
+            if optics is not None:
+                self.prepare_to_trace()
+                for o in optics:
+                    o.intersections = []
+                for ray_source in self.sources:
+                    self.trace_ray_source(ray_source, optics)
+                for probe in self.probes:
+                    probe.evaluate()
+                for o in optics:
+                    o.update_complete()
+                for r in self.results:
+                    try:
+                        r.calc_result(self)
+                    except:
+                        traceback.print_exc()
+            self.render_vtk()
+            self._updating = False
+        except:
+            traceback.print_exc()
         
     def trace_detail(self, _async=False):
         optics = [o.clone_traits() for o in self.optics]
