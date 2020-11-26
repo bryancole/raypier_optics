@@ -41,6 +41,9 @@ cimport numpy as np_
 cpdef check_this(ray_t[:] rays):
     return rays.shape
 
+cdef:
+    double complex rootI=csqrt(I)
+
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
@@ -125,12 +128,16 @@ cdef double complex calc_mode_U(double complex A,
     denom = 1 + (z*(A+C)) + (z**2)*detG0
     AA = (A + z*detG0)/denom
     CC = (C + z*detG0)/denom
-    U = cexp( (I*phase) + I*k*(z + AA*(x**2) + (2*B*x*y)/denom + CC*(y**2) ) )
+    U = cexp( (I*phase) + I*k*(z + AA*(x*x) + B*(2*x*y)/denom + CC*(y*y) ) )
     ###Normalisation factor
-    U /= csqrt((1 + z*A)*(1 + z*C) - (z*B)*(z*B))
+    ### I've added an extra 1I factor here in order to rotate the phase away from the 0/2pi wrapping point.
+    ### Seems like the csqrt (or cpow) functions struggle with accuracy near phase zero where we're summing 
+    ### many values straddling the wrapping point
+    U /= csqrt(((1 + z*A)*(1 + z*C) - (z*B)*(z*B))*I)
     
     ###normalise by ray initial area
-    U *= inv_root_area
+    ### multiply by sqrt(I) to reverse the effect of the I factor applied above
+    U *= inv_root_area*rootI
     
     return U
     

@@ -20,17 +20,17 @@ lens = PlanoConvexLens(centre=(0,0,20),
 #                               radius=10.0,
 #                               wavelength=100.0)
 
-src = ConfocalRayFieldSource(angle_step=4.0, direction=(0,0,1),
+src = ConfocalRayFieldSource(angle_step=0.5, direction=(0,0,1),
                               angle=5.0,
                               wavelength=1.0)
 src.InputRays
 
 probe = EFieldPlane(source=src,
                     centre=(0,0,70),
-                    direction=(0,0,1),
+                    direction=(0,1,0),
                     exit_pupil_offset=100.,
-                    width=10.0,
-                    height=10.0,
+                    width=0.1,
+                    height=0.5,
                     size=100)
 
 
