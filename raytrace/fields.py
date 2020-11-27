@@ -161,7 +161,8 @@ class EFieldPlane(Probe):
                        Traceable.uigroup,
                        Item('size', editor=NumEditor),
                        Item('width', editor=NumEditor),
-                       Item('height', editor=NumEditor)
+                       Item('height', editor=NumEditor),
+                       Item('exit_pupil_offset', editor=NumEditor),
                         ),
                         Item("plot", editor=ComponentEditor())
                         )
@@ -243,7 +244,7 @@ class EFieldPlane(Probe):
         
     def evaluate(self):
         ray_src = self.source
-        start = time.clock()
+        start = time.time()
         traced_rays = ray_src.TracedRays
         if not traced_rays:
             return
@@ -293,7 +294,7 @@ class EFieldPlane(Probe):
         E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
         
         self.E_field = E.reshape(self.size, self.size, 3)
-        end = time.clock()
+        end = time.time()
         print("Took:", end-start)
         
             
