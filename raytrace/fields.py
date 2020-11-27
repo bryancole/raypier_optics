@@ -129,6 +129,7 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     
     
 class EFieldPlane(Probe):
+    name = Str("E-Field Probe")
     source = Instance(BaseRaySource)    
     width = Float(0.5) #in mm
     height = Float(0.5)
@@ -184,11 +185,6 @@ class EFieldPlane(Probe):
                              value=csrc,
                              value_mapper=cmap)
         return plot
-        
-    def __eval_btn_fired(self):
-        source = self.ray_source
-        
-        pass
     
     @on_trait_change("E_field")
     def on_new_E_field(self):

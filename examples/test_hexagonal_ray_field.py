@@ -4,6 +4,7 @@ from raytrace.sources import HexagonalRayFieldSource, ConfocalRayFieldSource
 from raytrace.lenses import PlanoConvexLens
 from raytrace.fields import EFieldPlane
 from raytrace.constraints import BaseConstraint
+from raytrace.intensity_image import IntensityImageView
 
 from traits.api import Range, on_trait_change
 from traitsui.api import View, Item
@@ -33,6 +34,8 @@ probe = EFieldPlane(source=src,
                     height=0.5,
                     size=100)
 
+img = IntensityImageView(field_probe=probe)
+
 
 class FocalPlane(BaseConstraint):
     z_pos = Range(50.0,130.0)
@@ -46,7 +49,8 @@ class FocalPlane(BaseConstraint):
         
 
 model = RayTraceModel(sources=[src], optics=[lens],
-                      probes=[probe], constraints=[FocalPlane()])
+                      probes=[probe], constraints=[FocalPlane()],
+                      results=[img])
 
 
 
