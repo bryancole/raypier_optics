@@ -20,6 +20,15 @@ from numpy import inf
 class ProbePlanePanTool(PanTool):
     probe = Instance(EFieldPlane)
     
+    def normal_mouse_wheel(self, event):
+        print(event)
+        shift = event.mouse_wheel_delta[1]/120.0
+        probe = self.probe
+        span = min(probe.width, probe.height)
+        delta = shift * span/100.0
+        
+        probe.translate_local(0, 0, delta)
+    
     def panning_mouse_move(self, event):
         """ Handles the mouse being moved when the tool is in the 'panning'
         state.
@@ -114,6 +123,9 @@ class IntensityImageView(Result):
             #plot.
             plot.x_mapper.range.set_bounds(0,side)
             plot.y_mapper.range.set_bounds(0,yside)
+            xdata = numpy.linspace(0,side,probe.size)
+            ydata = numpy.linspace(0,yside, probe.size)
+            plot.index.set_data(xdata,ydata)
             plot.request_redraw()
             
     def _hbox_default(self):
