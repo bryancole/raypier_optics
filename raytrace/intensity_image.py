@@ -7,7 +7,7 @@ from chaco.api import GridDataSource, GridMapper, ImageData, Spectral,\
         
 from chaco.default_colormaps import Spectral
         
-from enable.api import ComponentEditor
+from enable.api import ComponentEditor, KeySpec
 from chaco.tools.api import PanTool, ZoomTool
 
 from .results import Result
@@ -56,7 +56,12 @@ class ProbePlanePanTool(PanTool):
 
                 # Use .set_bounds() so that we don't generate two range_changed
                 # events on the DataRange
-        self.probe.translate_local(deltas[0], deltas[1], deltas[2])
+        if event.control_down:
+            #do zoom
+            self.probe.width += deltas[0]
+            self.probe.height += deltas[1] 
+        else:
+            self.probe.translate_local(deltas[0], deltas[1], deltas[2])
 
         event.handled = True
 
