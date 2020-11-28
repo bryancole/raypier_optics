@@ -1,6 +1,6 @@
 
-from traits.api import Float, Instance, Bool, on_trait_change, Array
-from traitsui.api import View, Item, VGroup
+from traits.api import Float, Instance, Bool, on_trait_change, Array, Enum
+from traitsui.api import View, Item, VGroup, HGroup, EnumEditor
 from chaco.api import GridDataSource, GridMapper, ImageData, Spectral,\
         DataRange1D, CMapImagePlot, DataRange2D, PlotComponent, Plot,\
         ArrayPlotData, PlotComponent, HPlotContainer, ColorBar, LinearMapper, ImagePlot
@@ -68,6 +68,8 @@ class ProbePlanePanTool(PanTool):
 class IntensityImageView(Result):
     field_probe = Instance(EFieldPlane)
     
+    display = Enum("Intensity", "E_x", "E_y", "E_z")
+    
     hbox = Instance(HPlotContainer)
     cbar = Instance(ColorBar)
     crange = Instance(DataRange1D, ())
@@ -83,15 +85,24 @@ class IntensityImageView(Result):
     height = Float(1.0)
     
     traits_view = View(VGroup(
+            HGroup(Item("display", style="simple", show_label=False)),
             Item("hbox", editor=ComponentEditor(), show_label=False)
                 ))
     
     
     def calc_intensity(self, e_field):
         E = e_field
-        U = (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
+        mode = self.display
+        if mode=="Intensity":
+            U = (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
+        else:
+            idx = {"E_x":0, "E_y":1, "E_z":2}[mode]
+            U = E[:,:,idx]
         self.intensity_data = U
         return U
+    
+    def _display_changed(self):
+        self.on_field_changed(self.field_probe.E_field)
     
     def calc_result(self, model):
         pass
