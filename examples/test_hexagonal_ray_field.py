@@ -38,9 +38,13 @@ img = IntensityImageView(field_probe=probe)
 
 
 class FocalPlane(BaseConstraint):
-    z_pos = Range(50.0,130.0)
+    z_pos = Range(50.0,130.0, 57.73)
     
     traits_view = View(Item("z_pos"))
+    
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self.on_change_z_pos()
     
     @on_trait_change("z_pos")
     def on_change_z_pos(self):

@@ -4,23 +4,15 @@ summation of General Astigmatic Gaussian Beams
 """
 
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Button, Str, Array
+        Property, Str, Array
 
-from traitsui.api import View, Item, VGroup, DropEditor, Tabbed
-
-from traits.api import Float, Instance, Bool
-from traitsui.api import View, Item, VGroup
-from chaco.api import GridDataSource, GridMapper, ImageData, Spectral,\
-        DataRange1D, CMapImagePlot, DataRange2D
-        
-from enable.api import ComponentEditor
-from chaco.tools.api import PanTool, ZoomTool
+from traitsui.api import View, Item, VGroup, Tabbed
 
 from tvtk.api import tvtk
 
-from raytrace.bases import Probe, Traceable, NumEditor, Vector
+from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection, BaseRaySource
-from raytrace.cfields import sum_gaussian_modes, check_this
+from raytrace.cfields import sum_gaussian_modes
 
 import numpy
 
@@ -135,23 +127,13 @@ class EFieldPlane(Probe):
     height = Float(0.5)
     size = Int(30)
             
-    ray_source = Instance(klass="raytrace.sources.BaseRaySource")
-    
     exit_pupil_offset = Float(10.0) #in mm
     
     ###The output of the probe
     E_field = Array()
     
-    intensity = Property()
-    
-    _eval_btn = Button("calculate")
-    
     update = Event() #request re-tracing
     
-    
-    img_data = Instance(ImageData)
-    index = Instance(GridDataSource)
-    plot = Instance(CMapImagePlot)
     
     _plane_src = Instance(tvtk.PlaneSource, (), 
                     {"x_resolution":1, "y_resolution":1},
@@ -160,45 +142,11 @@ class EFieldPlane(Probe):
     traits_view = View(Tabbed(
                         VGroup(
                        Traceable.uigroup,
-                       Item('size', editor=NumEditor),
+                       Item('size'),
                        Item('width', editor=NumEditor),
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
-                        ),
-                        Item("plot", editor=ComponentEditor())
-                        )
-                   )
-    
-    def _plot_default(self):
-        side = self.width/2
-        yside = self.height/2
-        x = numpy.linspace(-side,side, self.size)
-        y = numpy.linspace(-yside,yside, self.size)
-        index = GridDataSource(xdata=x, ydata=y)
-        imap = GridMapper(range=DataRange2D(index))
-        self.index = index
-        csrc = ImageData(data=self.intensity, value_depth=1)
-        self.img_data = csrc
-        cmap = Spectral(DataRange1D(csrc))
-        plot = CMapImagePlot(index=index,
-                             index_mapper=imap,
-                             value=csrc,
-                             value_mapper=cmap)
-        return plot
-    
-    @on_trait_change("E_field")
-    def on_new_E_field(self):
-        img_data = self.img_data
-        if img_data is not None:
-            self.img_data.data = self.intensity
-            side = self.width/2
-            yside = self.height/2
-            self.index.xdata = numpy.linspace(-side,side, self.size)
-            self.index.ydata = numpy.linspace(-yside,yside, self.size)
-            
-            if self.plot is not None:
-                self.plot.request_redraw()
-            
+                   )))
     
     @on_trait_change("size, width, height, exit_pupil_offset")
     def config_pipeline(self):
@@ -279,14 +227,8 @@ class EFieldPlane(Probe):
         trns.transform_points(pts_in, pts_out)
         points2 = pts_out.to_array().astype('d')
         
-        #print(rays.shape, modes.shape, wavelengths.shape, points2.shape, points2.dtype)
-        #print( "Centre:", points2.mean(axis=0) )
-        #print(rays)
-        
         _rays = RayCollection.from_array(rays)
         
-        #print("Modes:", modes)
-        #print("wavelengths:", wavelengths)
         E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
         
         self.E_field = E.reshape(self.size, self.size, 3)

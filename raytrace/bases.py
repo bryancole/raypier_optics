@@ -197,6 +197,17 @@ class ModelObject(Renderable):
         #print "set transform", self._orientation
         self.update = True
         
+    def translate_local(self, du, dv, dw):
+        """Translate the object along it's local axes, where
+        dw is along the direction-vector, du and dv are along the orthogonal
+        axes to this"""
+        centre = numpy.array(self.centre)
+        w = numpy.array(self.direction)
+        u = numpy.array(self.x_axis)
+        v = numpy.cross(w,u)
+        new_centre = centre + (du*u + dv*v + dw*w)
+        self.centre = tuple(new_centre)
+        
     def _get_x_axis(self):
         temp = tvtk.Transform()
         o,e = self._orientation
