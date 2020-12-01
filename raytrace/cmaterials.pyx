@@ -6,6 +6,7 @@ cdef extern from "math.h":
     double sin(double arg)
     double cos(double arg)
     double atan2(double y, double x)
+    double erf(double arg)
     double M_PI
     
 cdef extern from "float.h":
@@ -225,10 +226,8 @@ cdef class TransparentMaterial(InterfaceMaterial):
                             orientation_t orient,
                             RayCollection new_rays):
         cdef:
-            vector_t cosThetaNormal, reflected, normal
+            vector_t normal
             ray_t sp_ray
-            complex_t cpx
-            double cosTheta
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
@@ -1131,5 +1130,44 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         ### This is the mysterious Grating Phase
         #Need to convert origin offset to microns since line-spacing is in microns
         sp_ray.phase += 1000.0*dotprod_(subvv_(self.origin_, point), tangent)*self.order*2*M_PI/line_spacing
+        
+        new_rays.add_ray_c(sp_ray)
+        
+        
+cdef class CircularApertureMaterial(InterfaceMaterial):
+    """Similar to the TransparentMaterial i.e. it generates an
+    outgoing ray with identical direction, polarisation etc.
+    to the incoming ray. The material attenuates the E_field amplitudes
+    according to the radial distance from the surface origin. 
+    """
+    cdef:
+        public double radius
+        public double edge_width
+        
+    cdef eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        cdef:
+            vector_t normal
+            ray_t sp_ray
+            double atten
+            double width = self.edge_width
+
+        atten = 0.5 + 0.5*erf(-sqrt(mag_sq_(subvv_(self.origin, point))/width))
+        
+        normal = norm_(orient.normal)
+        sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = TRANS_RAY
+        
+        sp_ray.E1_amp.real *= atten
+        sp_ray.E1_amp.imag *= atten
+        sp_ray.E2_amp.real *= atten
+        sp_ray.E2_amp.imag *= atten
         
         new_rays.add_ray_c(sp_ray)
