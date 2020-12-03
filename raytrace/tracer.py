@@ -54,7 +54,7 @@ from raytrace.qt_future_call import FutureCall
 counter = count()
 
 from raytrace import mirrors, prisms, corner_cubes, ellipsoids, sources,\
-    results, beamstop, lenses, beamsplitters, waveplates
+    results, beamstop, lenses, beamsplitters, waveplates, apertures, fields
 
 optics_classes = sorted(Traceable.subclasses, key=lambda c: c.__name__)
 

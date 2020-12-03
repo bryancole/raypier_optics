@@ -1141,8 +1141,26 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
     according to the radial distance from the surface origin. 
     """
     cdef:
+        public double outer_radius
         public double radius
         public double edge_width
+        vector_t origin_
+        
+    def __cinit__(self, **kwds):
+        self.outer_radius = kwds.get("outer_radius", 25.0)
+        self.radius = kwds.get("radius", 15.0)
+        self.edge_width = kwds.get("edge_width", 1.0)
+        self.origin = kwds.get("origin", (0.0,0.0,0.0))
+        
+    property origin: 
+        def __get__(self):
+            cdef vector_t o = self.origin_
+            return (o.x, o.y, o.z)
+        
+        def __set__(self, o):
+            self.origin_.x = o[0]
+            self.origin_.y = o[1]
+            self.origin_.z = o[2]
         
     cdef eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -1153,10 +1171,13 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         cdef:
             vector_t normal
             ray_t sp_ray
-            double atten
+            double atten, r
             double width = self.edge_width
-
-        atten = 0.5 + 0.5*erf(-sqrt(mag_sq_(subvv_(self.origin, point))/width))
+            
+        r = sqrt(mag_sq_(subvv_(self.origin_, point)))
+        if (r > self.outer_radius):
+            return
+        atten = 0.5 + 0.5*erf((self.radius - r)/width)
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
