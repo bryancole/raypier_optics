@@ -14,6 +14,8 @@ Contents:
    introduction
    cython_branch_info
    creating_new_optics
+   
+   API Reference <api_ref/index>
 
 Indices and tables
 ==================

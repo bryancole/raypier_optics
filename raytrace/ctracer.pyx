@@ -316,6 +316,12 @@ cdef class RayCollectionIterator:
 
 
 cdef class Ray:
+    """ Ray - a wrapper around the ray_t C-structure.
+    
+    The Ray extension class exists mainly as a convenience for manipulation of single or small numbers of rays 
+    from python. Large numbers of rays are more efficiently handled as either RayCollection objects, created in the
+    tracing process, or as numpy arrays with the 'ray_dtype' dtype.
+    """
     
     def __cinit__(self, **kwds):
         for k in kwds:
@@ -575,6 +581,14 @@ cdef class Ray:
         
 
 cdef class RayCollection:
+    """A list-like collection of ray_t objects.
+    
+    The RayCollection is the primary data-structure used in the ray-tracing operation. 
+    
+    The RayCollection is of variable length, in that it can grow as individual rays are added to it.
+    Internally, the memory allocated to the array of ray_t structures is re-allocated to increase
+    its capacity.
+    """
     
     def __cinit__(self, size_t max_size):
         self.rays = <ray_t*>malloc(max_size*sizeof(ray_t))
