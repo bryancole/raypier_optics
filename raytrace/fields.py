@@ -13,6 +13,7 @@ from tvtk.api import tvtk
 from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection, BaseRaySource
 from raytrace.cfields import sum_gaussian_modes
+from raytrace.find_focus import find_ray_focus
 
 import numpy
 
@@ -244,6 +245,15 @@ class EFieldPlane(Probe):
         """
         #raise NotImplementedError
         pass
+    
+    def centre_on_focus(self, idx=-1):
+        """
+        Locate the centre of the field-probe on the point of closest approach 
+        for the indicated RayCollection (by default, the last one).
+        """
+        src = self.source
+        rays = src.TracedRays[idx]
+        self.centre = tuple(find_ray_focus(rays))
     
     
     
