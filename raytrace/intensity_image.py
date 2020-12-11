@@ -75,12 +75,13 @@ class IntensityImageView(Result):
     
     display = Enum("Intensity", "E_x", "E_y", "E_z")
     
+    intensity_data = Array()
+    
     hbox = Instance(HPlotContainer)
     cbar = Instance(ColorBar)
     crange = Instance(DataRange1D, ())
     
     ds = Instance(ArrayPlotData, ())
-    intensity_data = Array()
     plot = Instance(Plot)
     image_plot = Instance(ImagePlot)
     
