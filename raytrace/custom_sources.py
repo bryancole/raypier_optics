@@ -1,10 +1,12 @@
-from traits.api import Int, Str, HasTraits, Tuple
+from traits.api import Int, Str, HasTraits, Tuple, Array
 
 from vtk.vtkCommonDataModel import vtkDataObject
 from vtk.vtkCommonExecutionModel import vtkAlgorithm
 from vtk.vtkCommonExecutionModel import vtkDemandDrivenPipeline
 from vtk.vtkCommonExecutionModel import vtkStreamingDemandDrivenPipeline
+from vtk.util import numpy_support
 
+import numpy
 import vtk
 from tvtk.api import tvtk
 
@@ -211,6 +213,42 @@ class EmptyGridSource(PythonAlgorithmBase):
         output.SetDimensions( dims )
         output.SetSpacing( *self.spacing)
         output.SetOrigin( *self.origin)
+        return 1
+    
+    
+class NumpyImageSource(EmptyGridSource):
+    number_of_input_ports = Int(0)
+    output_type = Str("vtkImageData")
+    
+    dimensions = Tuple(1, 1, 1,)
+    origin = Tuple(0.0, 0.0, 0.0)
+    spacing = Tuple(0.1, 0.1, 0.1)
+    
+    image_data = Array #Should be a 2D or 3D array
+    
+    def _image_data_changed(self, data):
+        dims = list(data.shape)
+        dims.extend([1,]*(3-len(dims)))
+        self.dimensions = tuple(dims)
+        self.modified()
+        
+    def RequestData(self, request, inInfo, outInfo):
+        output = vtk.vtkImageData.GetData(outInfo)
+        dims = self.dimensions
+        output.SetDimensions( dims )
+        output.SetSpacing( *self.spacing)
+        output.SetOrigin( *self.origin)
+        pd = output.GetPointData()
+        data = numpy_support.numpy_to_vtk(self.image_data.ravel(), 1)
+        print(data)
+        pd.SetScalars(data)
+        #wrapped = to_tvtk(output)
+        #wrapped.point_data.scalars = self.image_data.T
+        #wrapped.print_traits()
+        print(self.dimensions)
+        print(self.image_data.shape)
+        print(self.image_data.dtype)
+        print(self.image_data.max(), self.image_data.min())
         return 1
         
     
