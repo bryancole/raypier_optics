@@ -22,11 +22,13 @@ class IntensitySurface(Result):
     
     scale = Float(1.0)
     
-    #scene = Instance(SceneModel, (), {'background':(0,0,0)}, transient=True)
     scene = Instance(SceneModel, transient=True)
     
-    _data_source = Instance(NumpyImageSource, ())
-    _warp = Instance(tvtk.WarpScalar)
+    #_ds = Instance(tvtk.DepthSortPolyData, transient=True)
+    
+    _data_source = Instance(NumpyImageSource, (), transient=True)
+    _warp = Instance(tvtk.WarpScalar, transient=True)
+    _map = Instance(tvtk.PolyDataMapper, transient=True)
     
     traits_view = View(VGroup(
                         HGroup(
@@ -37,7 +39,12 @@ class IntensitySurface(Result):
                         ))
     
     def _intensity_data_changed(self, data):
-        self._data_source.image_data = data
+        sdata = data/data.ptp()
+        self._data_source.image_data = sdata
+        map = self._map
+        if map is not None:
+            map.scalar_range = (sdata.min(), sdata.max())
+        self.scene.render()
         
     def _scale_changed(self, value):
         w = self._warp
@@ -57,11 +64,27 @@ class IntensitySurface(Result):
                                scale_factor=self.scale)
         self._warp = warp
         
-        mapper = tvtk.PolyDataMapper(input_connection=warp.output_port)
+        norm = tvtk.PolyDataNormals(input_connection=warp.output_port)
+        
+#         ###Doesn't work
+#         ds = tvtk.DepthSortPolyData(input_connection=norm.output_port,
+#                                     camera=tvtk.Camera())
+#         self._ds = ds
+        
+        mapper = tvtk.PolyDataMapper(input_connection=norm.output_port)
         #mapper.scalar_range = (-2.,2.)
+        self._map = mapper
         
         act = tvtk.Actor(mapper=mapper)
         scene.add_actor(act)
+        
+#         def on_sync_camera(camera):
+#             print( "CAM")
+#             if camera is not None:
+#                 ds.camera = camera
+#                 
+#         scene.on_trait_change(on_sync_camera, "_camera")
+        
         return scene
     
     def calc_intensity(self, e_field):
@@ -71,7 +94,7 @@ class IntensitySurface(Result):
             U = (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         else:
             idx = {"E_x":0, "E_y":1, "E_z":2}[mode]
-            U = E[:,:,idx]
+            U = E[:,:,idx].real
         self.intensity_data = U
         return U
     
@@ -105,3 +128,4 @@ if __name__=="__main__":
     vm.intensity_data = z
     
     vm.configure_traits()
+    

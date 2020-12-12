@@ -30,6 +30,7 @@ cdef:
     double INF=(DBL_MAX+DBL_MAX)
     unsigned int TRANS_RAY=0
     unsigned int REFL_RAY=1
+    double SP_TOL=1.0e-10
 
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
@@ -57,7 +58,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     normal = norm_(normal)
         
     S_vector = cross_(ray.direction, normal)
-    if S_vector.x==0 and S_vector.y==0 and S_vector.z==0:
+    if fabs(S_vector.x)<SP_TOL and fabs(S_vector.y)<SP_TOL and fabs(S_vector.z)<SP_TOL:
         return ray
     S_vector = norm_(S_vector)
         

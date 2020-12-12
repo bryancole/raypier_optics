@@ -240,15 +240,7 @@ class NumpyImageSource(EmptyGridSource):
         output.SetOrigin( *self.origin)
         pd = output.GetPointData()
         data = numpy_support.numpy_to_vtk(self.image_data.ravel(), 1)
-        print(data)
         pd.SetScalars(data)
-        #wrapped = to_tvtk(output)
-        #wrapped.point_data.scalars = self.image_data.T
-        #wrapped.print_traits()
-        print(self.dimensions)
-        print(self.image_data.shape)
-        print(self.image_data.dtype)
-        print(self.image_data.max(), self.image_data.min())
         return 1
         
     
