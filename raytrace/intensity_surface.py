@@ -14,6 +14,7 @@ from raytrace.custom_sources import NumpyImageSource
 
 
 class IntensitySurface(Result):
+    name = "Field Plane Surface View"
     field_probe = Instance(EFieldPlane)
     
     display = Enum("Intensity", "E_x", "E_y", "E_z")

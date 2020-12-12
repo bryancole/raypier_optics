@@ -71,6 +71,7 @@ class ProbePlanePanTool(PanTool):
 
 
 class IntensityImageView(Result):
+    name = "Field Plane Image View"
     field_probe = Instance(EFieldPlane)
     
     display = Enum("Intensity", "E_x", "E_y", "E_z")

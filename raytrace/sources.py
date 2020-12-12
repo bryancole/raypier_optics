@@ -1063,12 +1063,18 @@ class HexagonalRayFieldSource(RayFieldSource):
     
     
 class ConfocalRayFieldSource(HexagonalRayFieldSource):
+    
     angle = Float(10.0)
-    angle_step = Float(1.0)
+    
+    ### Number of angle steps along the radius
+    resolution = Range(0, None, 10)
+    
     working_dist = Float(100.0)
     
+    numerical_aperture = Float(0.12)
+    
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, angle, angle_step, working_dist, max_ray_len, E_vector, wavelength")
+                         depends_on="origin, direction, angle, resolution, working_dist, max_ray_len, E_vector, wavelength")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -1077,12 +1083,13 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
                        Group(Item('direction', show_label=False, resizable=True),
                             show_border=True,
                             label="Direction"),
-                       Item('angle'),
-                       Item('angle_step'),
-                       Item('working_dist'),
+                       Item('numerical_aperture', editor=NumEditor),
+                       Item('angle', editor=NumEditor),
+                       Item('resolution'),
+                       Item('working_dist', editor=NumEditor),
                        label="Geometry")
 
-    @on_trait_change("direction, angle, angle_step, working_dist, max_ray_len")
+    @on_trait_change("direction, angle, resolution, numerical_aperture, working_dist, max_ray_len")
     def on_update(self):
         self.data_source.modified()
         self.mesh_source.modified()
@@ -1094,8 +1101,8 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
             origin = numpy.array(self.origin)
             direction = numpy.array(self.direction)
             
-            spacing = numpy.tan(self.angle_step*numpy.pi/180)
             radius = numpy.tan(self.angle*numpy.pi/180)
+            spacing = radius /( self.resolution + 0.5 )
             
             max_axis = numpy.abs(direction).argmax()
             if max_axis==0:
@@ -1151,7 +1158,8 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
             E_vector = numpy.cross(E_vector, directions)
             E_vector = normaliseVector(E_vector)
             
-            gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
+            r_na = numpy.tan(numpy.arcsin(self.numerical_aperture))
+            gauss = numpy.exp(-(ri[select]*(spacing**2)/((r_na)**2))) 
             
             ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
                 
