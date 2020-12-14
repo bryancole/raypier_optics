@@ -247,14 +247,14 @@ class EFieldPlane(Probe):
         #raise NotImplementedError
         pass
     
-    def centre_on_focus(self, idx=-1):
+    def centre_on_focus(self, idx=-1, offset=(0,0,0)):
         """
         Locate the centre of the field-probe on the point of closest approach 
         for the indicated RayCollection (by default, the last one).
         """
         src = self.source
         rays = src.TracedRays[idx]
-        self.centre = tuple(find_ray_focus(rays))
+        self.centre = tuple(a+b for a,b in zip(find_ray_focus(rays), offset))
     
     
     
