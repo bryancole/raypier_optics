@@ -874,7 +874,7 @@ cdef class InterfaceMaterial(object):
     def __cinit__(self):
         self.wavelengths = np.array([], dtype=np.double)
     
-    cdef eval_child_ray_c(self, ray_t *old_ray, 
+    cdef void eval_child_ray_c(self, ray_t *old_ray, 
                                 unsigned int ray_idx, 
                                 vector_t p, 
                                 orientation_t orient,

@@ -205,7 +205,7 @@ cdef class BaseDispersionCurve(object):
 cdef class OpaqueMaterial(InterfaceMaterial):
     """A perfect absorber i.e. it generates no rays
     """
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -220,7 +220,7 @@ cdef class TransparentMaterial(InterfaceMaterial):
     to the incoming ray. It does project the polarisation
     vectors to it's S- and P-directions, however.
     """
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -242,7 +242,7 @@ cdef class TransparentMaterial(InterfaceMaterial):
 cdef class PECMaterial(InterfaceMaterial):
     """Simulates a Perfect Electrical Conductor
     """
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -281,7 +281,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
     """Simulates a perfect polarising beam splitter. P-polarisation
     is 100% transmitted while S- is reflected"""
     
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -381,7 +381,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         return out
             
     
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -443,7 +443,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             self.n_outside_.real = v.real
             self.n_outside_.imag = v.imag
             
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -563,7 +563,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
     
     @cython.cdivision(True)
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -691,7 +691,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
 cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             
     @cython.cdivision(True)
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -876,7 +876,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         self.n_coating = self.dispersion_coating.c_evaluate_n(wavelengths)
     
     @cython.cdivision(True)
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -1064,7 +1064,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
             self.origin_.y = o[1]
             self.origin_.z = o[2]
     
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -1163,7 +1163,7 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
             self.origin_.y = o[1]
             self.origin_.z = o[2]
         
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
