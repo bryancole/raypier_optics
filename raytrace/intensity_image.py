@@ -101,7 +101,7 @@ class IntensityImageView(Result):
         E = e_field
         mode = self.display
         if mode=="Intensity":
-            U = (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
+            U = self.field_probe.intensity
         else:
             idx = {"E_x":0, "E_y":1, "E_z":2}[mode]
             U = E[:,:,idx]

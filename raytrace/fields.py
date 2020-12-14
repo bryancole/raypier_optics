@@ -4,7 +4,7 @@ summation of General Astigmatic Gaussian Beams
 """
 
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Str, Array
+        Property, Str, Array, cached_property
 
 from traitsui.api import View, Item, VGroup, Tabbed
 
@@ -132,6 +132,7 @@ class EFieldPlane(Probe):
     
     ###The output of the probe
     E_field = Array()
+    intensity = Property(Array, depends_on="E_field")
     
     update = Event() #request re-tracing
     
@@ -182,9 +183,9 @@ class EFieldPlane(Probe):
         actors.append(act)
         return actors
     
+    @cached_property
     def _get_intensity(self):
         E = self.E_field
-        
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
     def evaluate(self):
