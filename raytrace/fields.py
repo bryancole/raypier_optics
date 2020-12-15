@@ -188,6 +188,7 @@ class EFieldPlane(Probe):
         E = self.E_field
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
+        
     def evaluate(self):
         ray_src = self.source
         start = time.time()

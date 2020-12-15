@@ -1159,8 +1159,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
             E_vector = normaliseVector(E_vector)
             
             r_na = numpy.tan(numpy.arcsin(self.numerical_aperture))
-            s2 = spacing**2
-            gauss = spacing * numpy.exp(-(ri[select]*s2/((r_na)**2)))
+            gauss = numpy.exp(-(ri[select]*(spacing**2))/(r_na**2))*spacing
             
             ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
                 

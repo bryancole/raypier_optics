@@ -77,14 +77,15 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             A = modes[iray, 0]
             B = modes[iray, 1]
             C = modes[iray, 2]
+            
+            ###normalisation factor 1/root(area)
+            inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag))/M_PI)
+            
             A.imag /= k
             B.imag /= k
             C.imag /= k
             detG0 = (A*C) - (B*B)
             phase = ray.phase
-            
-            ###normalisation factor 1/root(area)
-            inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag)))/M_PI
             
             for ipt in prange(Npt):
                 pt.x = points[ipt,0]
