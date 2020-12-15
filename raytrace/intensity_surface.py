@@ -30,6 +30,7 @@ class IntensitySurface(Result):
     _data_source = Instance(NumpyImageSource, (), transient=True)
     _warp = Instance(tvtk.WarpScalar, transient=True)
     _map = Instance(tvtk.PolyDataMapper, transient=True)
+    _axes = Instance(tvtk.CubeAxesActor2D, transient=True)
     
     traits_view = View(VGroup(
                         HGroup(
@@ -40,7 +41,7 @@ class IntensitySurface(Result):
                         ))
     
     def _intensity_data_changed(self, data):
-        sdata = data/data.ptp()
+        sdata = data
         self._data_source.image_data = sdata
         map = self._map
         if map is not None:
@@ -49,8 +50,13 @@ class IntensitySurface(Result):
         
     def _scale_changed(self, value):
         w = self._warp
+        low = self.intensity_data.min()
+        high = self.intensity_data.max()
+        m=self._map
+        if m is not None:
+            m.scalar_range = (low, high)
         if w is not None:
-            w.scale_factor = value
+            w.scale_factor = value/(high-low)
             w.modified()
         
     def _scene_default(self):
@@ -76,8 +82,28 @@ class IntensitySurface(Result):
         #mapper.scalar_range = (-2.,2.)
         self._map = mapper
         
+        self._scale_changed(self.scale)
+        
         act = tvtk.Actor(mapper=mapper)
         scene.add_actor(act)
+        
+        bar = tvtk.ScalarBarActor(lookup_table=mapper.lookup_table,
+                                  number_of_labels=5)
+        
+        scene.add_actor(bar)
+        
+        axes = tvtk.CubeAxesActor2D(fly_mode="outer_edges",
+                                    font_factor=1.5,
+                                    scaling=True,
+                                    z_axis_visibility=True,
+                                    x_label="W",
+                                    y_label="H",
+                                    z_label="I")
+        axes.set_input_connection(norm.output_port)
+        self._axes = axes
+        #axes.camera = scene.renderer.camera
+        scene.add_actor(axes)
+        scene.on_trait_change(self.on_activated, "activated")
         
 #         def on_sync_camera(camera):
 #             print( "CAM")
@@ -87,6 +113,12 @@ class IntensitySurface(Result):
 #         scene.on_trait_change(on_sync_camera, "_camera")
         
         return scene
+    
+    def on_activated(self, obj, val, old, new):
+        a = self._axes
+        a.camera = obj.camera
+        a.use_ranges = True
+        
     
     def calc_intensity(self, e_field):
         E = e_field
@@ -112,7 +144,10 @@ class IntensitySurface(Result):
         new.on_trait_change(self.on_field_changed, "E_field")
         
     def on_field_changed(self, e_field):
-        intensity_image = self.calc_intensity(e_field)
+        self.calc_intensity(e_field)
+        p = self.field_probe
+        data = self.intensity_data
+        self._axes.ranges=[0, p.width*1000, 0, p.height*1000, data.min(), data.max()]
         
             
             
