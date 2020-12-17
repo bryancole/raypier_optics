@@ -14,6 +14,7 @@ from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection, BaseRaySource
 from raytrace.cfields import sum_gaussian_modes
 from raytrace.find_focus import find_ray_focus
+from raytrace.utils import normaliseVector
 
 import numpy
 
@@ -21,6 +22,20 @@ from scipy.sparse.linalg import lsqr
 from scipy.sparse import block_diag
 import time
 import traceback
+
+
+def find_ray_gen(probe_centre, traced_rays):
+    probe = numpy.asarray(probe_centre)
+    waypoints = [rays.origin.mean(axis=0) for rays in traced_rays]
+    waypoints.append(traced_rays[-1].termination.mean(axis=0))
+    
+    dist = [ ((wpt-probe)**2).sum() for wpt in waypoints ]
+    
+    imin = numpy.argmin(dist)
+    
+    dir1 = waypoints[imin] - waypoints[imin-1]
+    dir1 = normaliseVector(dir1)
+    ### unfinished ###
 
 
 def project_to_sphere(rays, wavelengths, centre=(0,0,0), radius=10.0):
@@ -123,7 +138,8 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy, blending=1.0):
     
 class EFieldPlane(Probe):
     name = Str("E-Field Probe")
-    source = Instance(BaseRaySource)    
+    source = Instance(BaseRaySource)
+    gen_idx = Int(-1)
     width = Float(0.5) #in mm
     height = Float(0.5)
     size = Int(30)
@@ -141,6 +157,8 @@ class EFieldPlane(Probe):
     _plane_src = Instance(tvtk.PlaneSource, (), 
                     {"x_resolution":1, "y_resolution":1},
                     transient=True)
+    
+    _attrib = Instance(tvtk.ProgrammableAttributeDataFilter,(), transient=True)
                     
     traits_view = View(Tabbed(
                         VGroup(
@@ -149,7 +167,8 @@ class EFieldPlane(Probe):
                        Item('width', editor=NumEditor),
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
-                       Item('blending', editor=NumEditor)
+                       Item('blending', editor=NumEditor),
+                       Item('gen_idx')
                    )))
     
     @on_trait_change("size, width, height, exit_pupil_offset, blending")
@@ -177,9 +196,20 @@ class EFieldPlane(Probe):
     
     def _actors_default(self):
         source = self._plane_src
-        trans_f = tvtk.TransformFilter(input_connection=source.output_port,
+        attr = self._attrib
+        attr.input_connection = source.output_port
+        
+        trans_f = tvtk.TransformFilter(input_connection=attr.output_port,
                         transform = self.transform)
         map = tvtk.PolyDataMapper(input_connection=trans_f.output_port)
+        
+        def execute():
+            dataobj = attr.poly_data_output
+            data = self.intensity.T
+            dataobj.cell_data.scalars = data.ravel()
+            map.scalar_range = (data.min(), data.max()) 
+        attr.set_execute_method(execute)
+        
         act = tvtk.Actor(mapper=map)
         actors = tvtk.ActorCollection()
         actors.append(act)
@@ -205,14 +235,15 @@ class EFieldPlane(Probe):
             ray['phase'] = phase
         
         #intersections = [self.intersect_plane(rays) for rays in all_rays]
-        rays = all_rays[-1]
+        idx = self.gen_idx
+        rays = all_rays[idx]
         centre = self.centre
         radius = self.exit_pupil_offset
         
         projected = project_to_sphere(rays, wavelengths, centre, radius)
         #projected = rays
         
-        neighbours_idx = neighbours[-1]
+        neighbours_idx = neighbours[idx]
         rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
 
         modes = evaluate_modes(rays, x, y, dx, dy, blending=self.blending)
@@ -237,6 +268,8 @@ class EFieldPlane(Probe):
         E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
         
         self.E_field = E.reshape(self.size, self.size, 3)
+        
+        self._attrib.modified()
         end = time.time()
         print("Took:", end-start)
         

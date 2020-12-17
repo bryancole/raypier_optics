@@ -74,6 +74,7 @@ class BaseRaySource(BaseBase):
     show_polarisation = Bool(False)
     show_direction = Bool(False)
     show_normals = Bool(False)
+    opacity = Range(0.0,1.0,1.0)
     
     ### A dict which maps each RayCollection instance in the TracedRays
     ### list to a list/array of bools of the same length as the RayCollection
@@ -100,13 +101,14 @@ class BaseRaySource(BaseBase):
     
     actors = Property(List, transient=True)
     
-    vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0)}, transient=True)
+    vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0), 'opacity': 1.0}, transient=True)
     
     display_grp = VGroup(Item('display'),
                        Item('show_start'),
                        Item('show_normals'),
                        Item('scale_factor'),
                        Item('export_pipes',label="export as pipes"),
+                       Item('opacity', editor=NumEditor),
                        label="Display")
     
     traits_view = View(Item('name', show_label=False),
@@ -229,6 +231,10 @@ class BaseRaySource(BaseBase):
         
     def _ray_mask_changed(self):
         self.update = True
+        
+    def _opacity_changed(self):
+        self.vtkproperty.opacity = self.opacity
+        self.render = True
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
@@ -247,14 +253,13 @@ class BaseRaySource(BaseBase):
             if not self.show_normals:
                 return
             output = source.poly_data_output
-            points = numpy.vstack([p.origin for p in self.TracedRays])
-            normals = numpy.vstack([p.normal for p in self.TracedRays])
+            points = numpy.vstack([p.origin for p in self.TracedRays[1:]])
+            normals = numpy.vstack([p.normal for p in self.TracedRays[1:]])
             output.points = points
             output.point_data.normals = normals
             #print("calc normals GLYPH")
         source.set_execute_method(execute)
         return source
-        
         
     def _normals_actor_default(self):
         source = self.normals_source
@@ -308,6 +313,7 @@ class BaseRaySource(BaseBase):
         else:
             act.visibility = False
         prop = self.vtkproperty
+        prop.opacity = self.opacity
         if prop:
             act.property = prop
         return act
@@ -1087,7 +1093,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
     angle = Float(10.0)
     
     ### Number of angle steps along the radius
-    resolution = Range(0, None, 10)
+    resolution = Range(0.0, None, 10.0)
     
     working_dist = Float(100.0)
     
@@ -1105,9 +1111,10 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
                        Group(Item('direction', show_label=False, resizable=True),
                             show_border=True,
                             label="Direction"),
+                       Item('wavelength', editor=NumEditor),
                        Item('numerical_aperture', editor=NumEditor),
                        Item('angle', editor=NumEditor),
-                       Item('resolution'),
+                       Item('resolution', editor=NumEditor),
                        Item('working_dist', editor=NumEditor),
                        label="Geometry")
 
