@@ -10,10 +10,14 @@ from raytrace.ctracer import RayCollection
 def find_ray_focus(ray_collection):
     if not isinstance(ray_collection, RayCollection):
         raise TypeError("Expecting a RayCollection object")
-    return find_focus(ray_collection.origin, ray_collection.direction)
+    E1 = ray_collection.E1_amp
+    E2 = ray_collection.E2_amp
+    weights = E1.real**2 + E1.imag**2 + E2.real**2 + E2.imag**2
+    weights /= weights.sum()
+    return find_focus(ray_collection.origin, ray_collection.direction, weights=weights)
 
 
-def find_focus(ray_origins, ray_directions):
+def find_focus(ray_origins, ray_directions, weights=None):
     """
     givens Nx3 arrays for ray origin and directions, return the 
     3D point of closest intersection, found in the least-squares 
@@ -26,6 +30,10 @@ def find_focus(ray_origins, ray_directions):
     n = ray_directions / (ray_directions**2).sum(axis=1, keepdims=True)
     
     A = np.matmul(n[:,:,np.newaxis], n[:,np.newaxis,:]) - np.eye(3)[np.newaxis,:,:]
+    # A.shape = (N,3,3), for N rays
+    if weights is not None:
+        A *= weights[:,None,None]
+        
     AA = A.sum(axis=0) #AA is a (3,3) shape matrix
     
     b = np.matmul(A,o[:,:,np.newaxis]).sum(axis=0)

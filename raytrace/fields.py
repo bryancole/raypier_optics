@@ -89,7 +89,7 @@ def evaluate_neighbours(rays, neighbours_idx):
     return (rays[mask], x,y,dx,dy)
     
     
-def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
+def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy, blending=1.0):
     """For each ray in rays, use its nearest neighbours
     to compute the best fit for the Astigmatic Gaussian Beam
     parameters.
@@ -117,7 +117,7 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy):
     fit = lsqr(M,b)
     re_coefs = fit[0].reshape(x.shape[0],3)
     
-    return (1j*im_coefs) + re_coefs
+    return ((blending*1j)*im_coefs) + re_coefs
 
     
     
@@ -129,6 +129,7 @@ class EFieldPlane(Probe):
     size = Int(30)
             
     exit_pupil_offset = Float(10.0) #in mm
+    blending = Float(1.0)
     
     ###The output of the probe
     E_field = Array()
@@ -148,9 +149,10 @@ class EFieldPlane(Probe):
                        Item('width', editor=NumEditor),
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
+                       Item('blending', editor=NumEditor)
                    )))
     
-    @on_trait_change("size, width, height, exit_pupil_offset")
+    @on_trait_change("size, width, height, exit_pupil_offset, blending")
     def config_pipeline(self):
         src = self._plane_src
         size = self.size
@@ -213,7 +215,7 @@ class EFieldPlane(Probe):
         neighbours_idx = neighbours[-1]
         rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
 
-        modes = evaluate_modes(rays, x, y, dx, dy)
+        modes = evaluate_modes(rays, x, y, dx, dy, blending=self.blending)
         
         size = self.size
         side = self.width/2.

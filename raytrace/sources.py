@@ -46,8 +46,13 @@ class BaseRaySource(BaseBase):
     abstract=True
     subclasses = set()
     name = Title("Ray Source", allow_selection=False)
+    
+    
+    ### The update event trigger a new tracing operation
     update = Event()
     display = Enum("pipes", "wires", "hidden")
+    
+    ### The render event signals that the VTK view needs to be re-rendered
     render = Event()
     mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
     
@@ -358,7 +363,7 @@ class SingleRaySource(BaseRaySource):
     def _do_wavelength_changed(self):
         self.wavelength_list = [self.wavelength]
     
-    @on_trait_change("direction, max_ray_len")
+    @on_trait_change("origin, direction, max_ray_len")
     def on_update(self):
         self.data_source.modified()
         self.update=True
@@ -879,6 +884,7 @@ class RayFieldSource(SingleRaySource):
     
     show_mesh = Bool(True)
     mesh_source = Instance(tvtk.ProgrammableSource, transient=True)
+    mesh_mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
     mesh_actor = Instance(tvtk.Actor, transient=True)
     
     def _get_actors(self):
@@ -935,34 +941,48 @@ class RayFieldSource(SingleRaySource):
             if not self.show_mesh:
                 return
             output = source.poly_data_output
-            points = self.InputRays.origin
+            rays = self.InputRays
+            points = rays.origin
             neighbours = self.neighbours
-            tris = []
+            fz = frozenset
+            tris = set()
             for i in range(points.shape[0]):
                 nb = neighbours[i]
                 if any(a<=0 for a in nb):
                     continue
                 nb1, nb2, nb3, nb4, nb5, nb6 = nb
-                tris.extend([ [i, nb1, nb2],
-                              [i, nb2, nb3],
-                              [i, nb3, nb4],
-                              [i, nb4, nb5],
-                              [i, nb5, nb6],
-                              [i, nb6, nb1] 
-                             ])
+                these = ((i, nb1, nb2),
+                             (i, nb2, nb3),
+                             (i, nb3, nb4),
+                             (i, nb4, nb5),
+                             (i, nb5, nb6),
+                             (i, nb6, nb1))
+                for tri in these:
+                    tris.add( fz(tri) )
             output.points = points
-            output.polys = tris
-            #print("calc normals GLYPH")
+            output.polys = [list(a) for a in tris]
+            
+            E1 = rays.E1_amp
+            E2 = rays.E2_amp
+            I = E1.real**2 + E1.imag**2 + E2.real**2 + E2.imag**2
+            output.point_data.scalars = I
+            self.mesh_mapper.scalar_range = (I.min(), I.max())
+
         source.set_execute_method(execute)
         return source
     
     def _mesh_actor_default(self):
         source = self.mesh_source
-        map = tvtk.PolyDataMapper(input_connection=source.output_port)
+        map = self.mesh_mapper
+        map.input_connection = source.output_port
         act = tvtk.Actor(mapper=map)
-        act.property.color = (0.0,1.0,0.0)
-        act.property.representation = "wireframe"
+        #act.property.color = (0.0,1.0,0.0)
+        act.property.representation = "surface"
         return act
+    
+    @on_trait_change("origin, direction")
+    def _on_update_mesh(self):
+        self.mesh_source.modified()
     
 
 class HexagonalRayFieldSource(RayFieldSource):
@@ -1074,7 +1094,9 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
     numerical_aperture = Float(0.12)
     
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, angle, resolution, working_dist, max_ray_len, E_vector, wavelength")
+                         depends_on="origin, direction, angle, resolution, "
+                                    "working_dist, max_ray_len, E_vector, wavelength, "
+                                    "E1_amp, E2_amp, numerical_aperture")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -1089,13 +1111,12 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
                        Item('working_dist', editor=NumEditor),
                        label="Geometry")
 
-    @on_trait_change("direction, angle, resolution, numerical_aperture, working_dist, max_ray_len")
+    @on_trait_change("angle, resolution, numerical_aperture, working_dist, max_ray_len")
     def on_update(self):
         self.data_source.modified()
         self.mesh_source.modified()
-        self.update=True
     
-    #@cached_property
+    @cached_property
     def _get_InputRays(self):
         try:
             origin = numpy.array(self.origin)
@@ -1180,6 +1201,6 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
         except:
             traceback.print_exc()
             return RayCollection(0)
-        print("MADE")
+        print("Made input rays.")
         return rays
     
