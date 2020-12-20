@@ -904,8 +904,10 @@ class RayFieldSource(SingleRaySource):
         optical_path = numpy.zeros(len(self.TracedRays[0]))
         for rays in self.TracedRays:
             k = (1000.0*2*numpy.pi)/all_wavelengths[rays.wavelength_idx]
+            optical_path = optical_path[rays.parent_idx]
             phases.append(rays.phase + optical_path*k)
             optical_path += rays.length * rays.refractive_index.real
+            #optical_path = optical_path[rays.parent_idx] + (rays.length * rays.refractive_index.real)
         return phases
     
     #@cached_property
@@ -935,6 +937,8 @@ class RayFieldSource(SingleRaySource):
             
             new_neighbours = numpy.full((len(rays),6), -1)
             ch2 = children[neighbours,:] #Should have shape Nx6x2
+            t_parents = t_parents[t_parents < len(rays)]
+            r_parents = r_parents[r_parents < len(rays)]
             new_neighbours[t_parents,:] = ch2[t_parents,:,0]
             new_neighbours[r_parents,:] = ch2[r_parents,:,1]
             yield new_neighbours
