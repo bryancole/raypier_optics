@@ -1,4 +1,5 @@
 #!/bin/env python
+from builtins import None
 
 #cython: boundscheck=False
 #cython: nonecheck=False
@@ -25,6 +26,7 @@ from libc.stdlib cimport malloc, free, realloc
 cdef extern from "stdlib.h" nogil:
     void *memcpy(void *str1, void *str2, size_t n)
 
+import time
 import numpy as np
 cimport numpy as np_
 
@@ -594,6 +596,7 @@ cdef class RayCollection:
         self.rays = <ray_t*>malloc(max_size*sizeof(ray_t))
         self.n_rays = 0
         self.max_size = max_size
+        self._mtime = 0.0
         
     def __dealloc__(self):
         free(self.rays)
@@ -673,6 +676,71 @@ cdef class RayCollection:
         cdef np_.ndarray out = np.empty(self.n_rays, dtype=ray_dtype)
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
+    
+    cdef double get_mtime(self, unsigned long guard):
+        cdef:
+            double pmtime
+            
+        if self.parent is None:
+            return self._mtime
+        if guard == id(self):
+            return self._mtime
+        
+        pmtime = self.parent.get_mtime(guard)
+        if pmtime > self._mtime:
+            self._neighbours = None
+            return pmtime
+        else:
+            return self._mtime
+        
+    cdef void _eval_neighbours(self, int[:,:] pnb):
+        cdef:
+            int i, j, pidx, rtype, child_nb
+            int[:,:] rmap
+            unsigned int nparent=self.parent.n_rays
+            
+        if pnb is None:
+            return
+        
+        rmap = np.full( (nparent, 2), -1 ,dtype=np.int32)
+        nb = np.full( (self.n_rays, pnb.shape[1]), -1, dtype=np.int32)
+        
+        for i in range(self.n_rays):
+            rtype = self.rays[i].ray_type_id
+            pidx = self.rays[i].parent_idx
+            rmap[pidx, rtype] = i
+            
+        for i in range(self.n_rays):
+            rtype = self.rays[i].ray_type_id
+            pidx = self.rays[i].parent_idx
+            for j in range(pnb.shape[1]):
+                child_nb = pnb[pidx,j]
+                if child_nb >= 0:
+                    nb[i,j] = rmap[child_nb,rtype]
+                    
+        self._neighbours = nb
+        
+        
+    property neighbours:
+        def __get__(self):
+            if self.parent is None:
+                if self._neighbours is None:
+                    return None
+                else:
+                    return np.asarray(self._neighbours)
+            else:
+                pmtime = self.parent.get_mtime(id(self))
+                if self._mtime >= pmtime:
+                    if self._neighbours is not None:
+                        return np.asarray(self._neighbours)
+                self._eval_neighbours(self.parent.neighbours)
+                self._mtime = time.monotonic()
+                return np.asarray(self._neighbours)
+                
+        def __set__(self, int[:,:] nb):
+            self._neighbours = nb
+            self._mtime = time.monotonic()
+            
     
     property origin:
         def __get__(self):
@@ -1111,6 +1179,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
    
     #need to allocate the output rays here 
     new_rays = RayCollection(rays.n_rays)
+    new_rays.parent = rays
     
     for i in range(rays.n_rays):
         ray = rays.rays + i

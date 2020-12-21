@@ -229,7 +229,6 @@ class EFieldPlane(Probe):
             return
         wavelengths = numpy.asarray(ray_src.wavelength_list)
         all_rays = [r.copy_as_array() for r in traced_rays]
-        neighbours = ray_src.neighbour_list
         
         for ray, phase in zip(all_rays, ray_src.cumulative_phases):
             ray['phase'] = phase
@@ -243,7 +242,7 @@ class EFieldPlane(Probe):
         projected = project_to_sphere(rays, wavelengths, centre, radius)
         #projected = rays
         
-        neighbours_idx = neighbours[idx]
+        neighbours_idx = traced_rays[idx].neighbours
         rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
 
         modes = evaluate_modes(rays, x, y, dx, dy, blending=self.blending)

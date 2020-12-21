@@ -84,12 +84,20 @@ cdef class Ray:
     cdef ray_t ray
 
 cdef class RayCollection:
-    cdef ray_t *rays
-    #cdef ray_t[:] rays
-    cdef readonly unsigned long n_rays, max_size
-    cdef public RayCollection parent
+    cdef: 
+        ray_t *rays
+        readonly unsigned long n_rays, max_size
+        public RayCollection parent
+        
+        int[:,:] _neighbours
+        double _mtime        
 
     cdef add_ray_c(self, ray_t r)
+    
+    cdef double get_mtime(self, unsigned long guard)
+    
+    cdef void _eval_neighbours(self, int[:,:] pnb)
+    
 
 cdef class RayCollectionIterator:
     cdef:

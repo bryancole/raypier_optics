@@ -1209,6 +1209,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
             ray_data['normal'] = [[0,1,0]]
             ray_data['phase'] = phase
             rays = RayCollection.from_array(ray_data)
+            rays.neighbours = self.neighbours
         except:
             traceback.print_exc()
             return RayCollection(0)
