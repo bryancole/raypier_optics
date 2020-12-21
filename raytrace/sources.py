@@ -879,11 +879,7 @@ class AdHocSource(BaseRaySource):
         return self.rays
     
     
-class RayFieldSource(SingleRaySource):
-    neighbours = Array(transient=True)
-    neighbour_list = Property(List(Array),
-                              depends_on="TracedRays, neighbours")
-    
+class RayFieldSource(SingleRaySource):    
     ### These are the phases at the origin of each ray, relative to the source origin
     cumulative_phases = Property(List(Array),
                                  depends_on="TracedRays")
@@ -909,41 +905,6 @@ class RayFieldSource(SingleRaySource):
             optical_path += rays.length * rays.refractive_index.real
             #optical_path = optical_path[rays.parent_idx] + (rays.length * rays.refractive_index.real)
         return phases
-    
-    #@cached_property
-    def _get_neighbour_list(self):
-        try:
-            return list(self.iter_neighbours())
-        except:
-            traceback.print_exc()
-            return []
-    
-    def iter_neighbours(self):
-        neighbours = self.neighbours
-        yield neighbours
-        last_rays = self.TracedRays[0]
-        for rays in self.TracedRays[1:]:
-            labels = numpy.arange(len(rays))
-            children = numpy.full((len(last_rays)+1,2), -1)
-            parent_idx = rays.parent_idx
-            ray_type_id = rays.ray_type_id
-            transmitted = ray_type_id==0
-            reflected = ray_type_id==1
-            t_parents = parent_idx[transmitted]
-            r_parents = parent_idx[reflected]
-            children[t_parents,0] = labels[transmitted]
-            children[r_parents,1] = labels[reflected]
-            #children gives the indices in the child ray array for each parent
-            
-            new_neighbours = numpy.full((len(rays),6), -1)
-            ch2 = children[neighbours,:] #Should have shape Nx6x2
-            t_parents = t_parents[t_parents < len(rays)]
-            r_parents = r_parents[r_parents < len(rays)]
-            new_neighbours[t_parents,:] = ch2[t_parents,:,0]
-            new_neighbours[r_parents,:] = ch2[r_parents,:,1]
-            yield new_neighbours
-            last_rays = rays
-            neighbours = new_neighbours
         
     def _mesh_source_default(self):
         source = tvtk.ProgrammableSource()
@@ -953,7 +914,7 @@ class RayFieldSource(SingleRaySource):
             output = source.poly_data_output
             rays = self.InputRays
             points = rays.origin
-            neighbours = self.neighbours
+            neighbours = rays.neighbours
             fz = frozenset
             tris = set()
             for i in range(points.shape[0]):
@@ -1070,7 +1031,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         backmap = numpy.full(vi.shape[0]+1, -1, 'i')
         backmap[:-1][select] = numpy.arange(len(xi))
         selnb = backmap[neighbours]
-        self.neighbours = selnb[select,:]
+        neighbours = selnb[select,:]
         
         offsets = xi[:,None]*d1 + yj[:,None]*d2
         offsets *= spacing
@@ -1089,6 +1050,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
         rays = RayCollection.from_array(ray_data)
+        rays.neighbours = neighbours
         return rays
     
     
@@ -1178,7 +1140,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
             backmap = numpy.full(vi.shape[0]+1, -1, 'i')
             backmap[:-1][select] = numpy.arange(len(xi))
             selnb = backmap[neighbours]
-            self.neighbours = selnb[select,:]
+            neighbours = selnb[select,:]
             
             offsets = xi[:,None]*d1 + yj[:,None]*d2
             offsets *= spacing
@@ -1209,7 +1171,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
             ray_data['normal'] = [[0,1,0]]
             ray_data['phase'] = phase
             rays = RayCollection.from_array(ray_data)
-            rays.neighbours = self.neighbours
+            rays.neighbours = neighbours
         except:
             traceback.print_exc()
             return RayCollection(0)
