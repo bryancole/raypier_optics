@@ -230,8 +230,8 @@ class EFieldPlane(Probe):
         wavelengths = numpy.asarray(ray_src.wavelength_list)
         all_rays = [r.copy_as_array() for r in traced_rays]
         
-        for ray, phase in zip(all_rays, ray_src.cumulative_phases):
-            ray['phase'] = phase
+#         for ray, phase in zip(all_rays, ray_src.cumulative_phases):
+#             ray['phase'] = phase
         
         #intersections = [self.intersect_plane(rays) for rays in all_rays]
         idx = self.gen_idx

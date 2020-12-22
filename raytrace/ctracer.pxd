@@ -37,7 +37,7 @@ cdef packed struct ray_t:
     #complex attribs
     complex_t refractive_index, E1_amp, E2_amp
     #simple attribs
-    double length, phase
+    double length, phase, accumulated_path
     #reference ids to related objects
     unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
     

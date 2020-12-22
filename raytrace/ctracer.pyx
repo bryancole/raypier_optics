@@ -39,6 +39,7 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('E2_amp', np.complex128),
                         ('length', np.double),
                         ('phase', np.double),
+                        ('accumulated_path', np.double),
                         ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
                         ('end_face_idx', np.uint32),
@@ -63,18 +64,18 @@ cdef struct complex_t:
     double imag
 
     
-cdef packed struct ray_t:
-    #vectors
-    vector_t origin, direction, normals, E_vector
-    #complex attribs
-    complex_t refractive_index, E1_amp, E2_amp
-    #simple attribs
-    double length
-    #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
-    
-    ##objects
-    #object face, end_face, child_refl, child_trans
+# cdef packed struct ray_t:
+#     #vectors
+#     vector_t origin, direction, normals, E_vector
+#     #complex attribs
+#     complex_t refractive_index, E1_amp, E2_amp
+#     #simple attribs
+#     double length
+#     #reference ids to related objects
+#     unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
+#     
+#     ##objects
+#     #object face, end_face, child_refl, child_trans
     
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
@@ -391,6 +392,14 @@ cdef class Ray:
         
         def __set__(self, double v):
             self.ray.phase = v
+            
+    property accumulated_path:
+        """The total *optical* path up to the start-point of this ray."""
+        def __get__(self):
+            return self.ray.accumulated_path
+        
+        def __set__(self, double v):
+            self.ray.accumulated_path = v
             
     property wavelength_idx:
         """The wavelength of the ray in vacuum, in microns"""
@@ -741,7 +750,6 @@ cdef class RayCollection:
             self._neighbours = nb
             self._mtime = time.monotonic()
             
-    
     property origin:
         def __get__(self):
             cdef:
@@ -859,6 +867,15 @@ cdef class RayCollection:
             for i in xrange(self.n_rays):
                 v = self.rays[i].phase
                 out[i] = v
+            return out
+        
+    property accumulated_path:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,), dtype='d' )
+                size_t i
+            for i in xrange(self.n_rays):
+                out[i] = self.rays[i].accumulated_path
             return out
         
     property wavelength_idx:

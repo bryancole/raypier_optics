@@ -232,8 +232,10 @@ cdef class TransparentMaterial(InterfaceMaterial):
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         sp_ray.origin = point
         sp_ray.normal = normal
+        sp_ray.length = INF
         sp_ray.parent_idx = idx
         sp_ray.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray)
@@ -265,9 +267,11 @@ cdef class PECMaterial(InterfaceMaterial):
         cosTheta = dotprod_(normal, in_ray.direction)
         cosThetaNormal = multvs_(normal, cosTheta)
         reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.direction = reflected
+        sp_ray.length = INF
         sp_ray.E1_amp.real = -sp_ray.E1_amp.real
         sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag
         #sp_ray.E2_amp.real = -sp_ray.E2_amp.real
@@ -305,6 +309,9 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray = sp_ray2 = convert_to_sp(in_ray[0], normal)
         cosTheta = dotprod_(normal, in_direction)            
         cosThetaNormal = multvs_(normal, cosTheta)
+        
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        sp_ray2.accumulated_path = sp_ray.accumulated_path
         
         #Reflect the S-polarisation
         reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
@@ -403,7 +410,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         ###The "P" output of convert_to_sp with be aligned with the fast_axis
         ###The "S" output will thus be orthogonal to the fast axis
         out_ray = convert_to_sp(in_ray[0], self.fast_axis_)
-        
+        out_ray.accumulated_path += out_ray.length * out_ray.refractive_index.real
         out_ray.origin = point
         out_ray.normal = normal
         out_ray.direction = in_direction
@@ -468,6 +475,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
         
@@ -589,6 +597,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
@@ -721,6 +730,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
@@ -907,6 +917,8 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
@@ -1118,6 +1130,8 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         reflected = addvv_(reflected, multvs_(normal, k_z))
                 
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.direction = reflected
@@ -1182,6 +1196,8 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.parent_idx = idx

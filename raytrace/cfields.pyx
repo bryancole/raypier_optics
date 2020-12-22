@@ -85,7 +85,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             B.imag /= k
             C.imag /= k
             detG0 = (A*C) - (B*B)
-            phase = ray.phase
+            phase = ray.phase + (ray.accumulated_path*k)
             
             for ipt in prange(Npt):
                 pt.x = points[ipt,0]
