@@ -38,14 +38,12 @@ def find_ray_gen(probe_centre, traced_rays):
     ### unfinished ###
 
 
-def project_to_sphere(rays, wavelengths, centre=(0,0,0), radius=10.0):
+def project_to_sphere(rays, centre=(0,0,0), radius=10.0):
     """project the given set of rays back to their intercept 
     with a sphere at the given centre and radius.
     
     rays - an array of ray_t dtype
-    wavelengths - an array of wavelengths taken from the source
     """
-    all_wavelengths = numpy.asarray(wavelengths)
     centre = numpy.asarray(centre).reshape(1,3)
     origin = rays['origin'] - centre
     direction = rays['direction'] #assume this is already normalised
@@ -65,8 +63,7 @@ def project_to_sphere(rays, wavelengths, centre=(0,0,0), radius=10.0):
     rays = rays[selector]
     rays['origin'] += alpha[:,None]*direction[selector]
     
-    wl = all_wavelengths[rays['wavelength_idx']]
-    rays['phase'] += (2000.0*numpy.pi)*alpha*rays['refractive_index'].real / wl
+    rays['accumulated_path'] += alpha*rays['refractive_index'].real
     return rays 
     
 
@@ -228,18 +225,13 @@ class EFieldPlane(Probe):
         if not traced_rays:
             return
         wavelengths = numpy.asarray(ray_src.wavelength_list)
-        all_rays = [r.copy_as_array() for r in traced_rays]
         
-#         for ray, phase in zip(all_rays, ray_src.cumulative_phases):
-#             ray['phase'] = phase
-        
-        #intersections = [self.intersect_plane(rays) for rays in all_rays]
         idx = self.gen_idx
-        rays = all_rays[idx]
+        rays = traced_rays[idx].copy_as_array() 
         centre = self.centre
         radius = self.exit_pupil_offset
         
-        projected = project_to_sphere(rays, wavelengths, centre, radius)
+        projected = project_to_sphere(rays, centre, radius)
         #projected = rays
         
         neighbours_idx = traced_rays[idx].neighbours

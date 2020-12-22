@@ -880,10 +880,6 @@ class AdHocSource(BaseRaySource):
     
     
 class RayFieldSource(SingleRaySource):    
-    ### These are the phases at the origin of each ray, relative to the source origin
-    cumulative_phases = Property(List(Array),
-                                 depends_on="TracedRays")
-    
     show_mesh = Bool(True)
     mesh_source = Instance(tvtk.ProgrammableSource, transient=True)
     mesh_mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
@@ -892,19 +888,6 @@ class RayFieldSource(SingleRaySource):
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor, self.mesh_actor]
         return actors
-    
-    @cached_property
-    def _get_cumulative_phases(self):
-        all_wavelengths = numpy.asarray(self.wavelength_list)
-        phases = []
-        optical_path = numpy.zeros(len(self.TracedRays[0]))
-        for rays in self.TracedRays:
-            k = (1000.0*2*numpy.pi)/all_wavelengths[rays.wavelength_idx]
-            optical_path = optical_path[rays.parent_idx]
-            phases.append(rays.phase + optical_path*k)
-            optical_path += rays.length * rays.refractive_index.real
-            #optical_path = optical_path[rays.parent_idx] + (rays.length * rays.refractive_index.real)
-        return phases
         
     def _mesh_source_default(self):
         source = tvtk.ProgrammableSource()
