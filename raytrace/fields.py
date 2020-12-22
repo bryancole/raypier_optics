@@ -14,7 +14,7 @@ from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection, BaseRaySource
 from raytrace.cfields import sum_gaussian_modes
 from raytrace.find_focus import find_ray_focus
-from raytrace.utils import normaliseVector
+from raytrace.utils import normaliseVector, dotprod
 
 import numpy
 
@@ -32,9 +32,29 @@ def find_ray_gen(probe_centre, traced_rays):
     dist = [ ((wpt-probe)**2).sum() for wpt in waypoints ]
     
     imin = numpy.argmin(dist)
+    if imin + 1 >= len(waypoints):
+        return -1
     
-    dir1 = waypoints[imin] - waypoints[imin-1]
+    closest = waypoints[imin]
+    
+    dir1 = closest - waypoints[imin-1]
     dir1 = normaliseVector(dir1)
+    
+    dir2 = waypoints[imin+1] - closest
+    dir2 = normaliseVector(dir2)
+    
+    normal = normaliseVector(dir1 + dir2)
+    if dotprod(probe-closest, normal) > 0:
+        idx = imin
+    else:
+        idx = imin-1
+    if idx < 0:
+        idx = 0
+    if idx > len(waypoints)-2:
+        idx = -1
+    return idx
+    
+    
     ### unfinished ###
 
 
@@ -226,9 +246,13 @@ class EFieldPlane(Probe):
             return
         wavelengths = numpy.asarray(ray_src.wavelength_list)
         
-        idx = self.gen_idx
-        rays = traced_rays[idx].copy_as_array() 
         centre = self.centre
+        idx = self.gen_idx
+        
+        ### Reliably finding the gen-idx is tricky ###
+        #idx = find_ray_gen(centre, traced_rays)
+        
+        rays = traced_rays[idx].copy_as_array() 
         radius = self.exit_pupil_offset
         
         projected = project_to_sphere(rays, centre, radius)
