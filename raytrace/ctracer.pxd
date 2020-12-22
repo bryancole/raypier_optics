@@ -87,7 +87,7 @@ cdef class RayCollection:
     cdef: 
         ray_t *rays
         readonly unsigned long n_rays, max_size
-        public RayCollection parent
+        RayCollection _parent
         
         int[:,:] _neighbours
         double _mtime        

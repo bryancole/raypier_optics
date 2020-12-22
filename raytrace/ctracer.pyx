@@ -690,12 +690,12 @@ cdef class RayCollection:
         cdef:
             double pmtime
             
-        if self.parent is None:
+        if self._parent is None:
             return self._mtime
         if guard == id(self):
             return self._mtime
         
-        pmtime = self.parent.get_mtime(guard)
+        pmtime = self._parent.get_mtime(guard)
         if pmtime > self._mtime:
             self._neighbours = None
             return pmtime
@@ -706,7 +706,7 @@ cdef class RayCollection:
         cdef:
             int i, j, pidx, rtype, child_nb
             int[:,:] rmap
-            unsigned int nparent=self.parent.n_rays
+            unsigned int nparent=self._parent.n_rays
             
         if pnb is None:
             return
@@ -732,23 +732,31 @@ cdef class RayCollection:
         
     property neighbours:
         def __get__(self):
-            if self.parent is None:
+            if self._parent is None:
                 if self._neighbours is None:
                     return None
                 else:
                     return np.asarray(self._neighbours)
             else:
-                pmtime = self.parent.get_mtime(id(self))
+                pmtime = self._parent.get_mtime(id(self))
                 if self._mtime >= pmtime:
                     if self._neighbours is not None:
                         return np.asarray(self._neighbours)
-                self._eval_neighbours(self.parent.neighbours)
+                self._eval_neighbours(self._parent.neighbours)
                 self._mtime = time.monotonic()
                 return np.asarray(self._neighbours)
                 
         def __set__(self, int[:,:] nb):
             self._neighbours = nb
             self._mtime = time.monotonic()
+            
+    property parent:
+        def __get__(self):
+            return self._parent
+        
+        def __set__(self, RayCollection rc):
+            self._parent = rc
+            self._neighbours = None
             
     property origin:
         def __get__(self):
