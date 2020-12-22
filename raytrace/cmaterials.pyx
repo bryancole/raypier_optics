@@ -1159,6 +1159,7 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         public double outer_radius
         public double radius
         public double edge_width
+        public int invert
         vector_t origin_
         
     def __cinit__(self, **kwds):
@@ -1166,6 +1167,7 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         self.radius = kwds.get("radius", 15.0)
         self.edge_width = kwds.get("edge_width", 1.0)
         self.origin = kwds.get("origin", (0.0,0.0,0.0))
+        self.invert = kwds.get("invert", 0)
         
     property origin: 
         def __get__(self):
@@ -1193,6 +1195,8 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         if (r > self.outer_radius):
             return
         atten = 0.5 + 0.5*erf((self.radius - r)/width)
+        if self.invert:
+            atten = 1 - atten
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)

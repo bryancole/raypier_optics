@@ -4,7 +4,7 @@ from .cmaterials import CircularApertureMaterial
 from .cfaces import CircularFace
 from .ctracer import FaceList
 
-from traits.api import Float, on_trait_change, Instance, Property, Str
+from traits.api import Float, on_trait_change, Instance, Property, Str, Bool
 from traitsui.api import View, Item, VGroup
 from tvtk.api import tvtk
 
@@ -35,6 +35,7 @@ class CircularAperture(BaseAperture):
     inner_diameter = Float(15.0)
     hole_diameter = Float(10.0)
     edge_width = Float(2.0)
+    invert = Bool(False)
     
     diameter = Property()
     offset = Float(0.0)
@@ -61,6 +62,7 @@ class CircularAperture(BaseAperture):
                        Item('inner_diameter', editor=NumEditor),
                        Item('hole_diameter', editor=NumEditor),
                        Item('edge_width', editor=NumEditor),
+                       Item('invert'),
                         ),
                    )
     
@@ -80,7 +82,8 @@ class CircularAperture(BaseAperture):
         m = CircularApertureMaterial(origin=self.centre,
                                     radius = self.hole_diameter/2,
                                      outer_radius = self.inner_diameter/2,
-                                    edge_width = self.edge_width)
+                                    edge_width = self.edge_width,
+                                    invert=self.invert)
         return m
     
     def make_faces(self):
@@ -88,7 +91,7 @@ class CircularAperture(BaseAperture):
                                 material = self.material)]
         return fl
     
-    @on_trait_change("inner_diameter, hole_diameter, edge_width, centre")
+    @on_trait_change("inner_diameter, hole_diameter, edge_width, centre, invert")
     def on_material_params_changed(self):
         self.material = self.make_material()
         self.faces.faces = self.make_faces()
@@ -133,6 +136,8 @@ class CircularAperture(BaseAperture):
             alpha = 0.5 - 0.5*(erf(2*(r-r0)/width))
             alpha[r>=(0.99*self.inner_diameter/2)] = -0.01
             out = sc.get_output_data_object(0)
+            if self.invert:
+                alpha = 1 - alpha
             out.point_data.scalars=alpha
             
         sc.set_execute_method(update)

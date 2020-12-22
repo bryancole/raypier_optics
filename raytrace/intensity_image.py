@@ -75,6 +75,7 @@ class IntensityImageView(Result):
     field_probe = Instance(EFieldPlane)
     
     display = Enum("Intensity", "E_x", "E_y", "E_z")
+    use_log = Bool(False)
     
     intensity_data = Array()
     
@@ -92,7 +93,8 @@ class IntensityImageView(Result):
     height = Float(1.0)
     
     traits_view = View(VGroup(
-            HGroup(Item("display", style="simple", show_label=False)),
+            HGroup(Item("display", style="simple", show_label=False),
+                   Item("use_log", show_label=True)),
             Item("hbox", editor=ComponentEditor(), show_label=False)
                 ))
     
@@ -105,9 +107,14 @@ class IntensityImageView(Result):
         else:
             idx = {"E_x":0, "E_y":1, "E_z":2}[mode]
             U = E[:,:,idx]
+            
+        if self.use_log:
+            U = numpy.log10(U)
+            
         self.intensity_data = U
         return U
     
+    @on_trait_change("use_log")
     def _display_changed(self):
         self.on_field_changed(self.field_probe.E_field)
     
