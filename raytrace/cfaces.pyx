@@ -1247,16 +1247,15 @@ cdef class AsphericFace(Face):
         r2 = p.x*p.x + p.y*p.y
         r = sqrt(r2)
         root = sqrt(1-(beta*(r2)/(R*R)))
-        df = 10*self.A10*(r2**5) + 8*self.A8*(r2**4) + 6*self.A6*(r2**3) + 4*self.A4*(r2**2)
-        df += 16*self.A16*(r2**8) + 14*self.A14*(r2**7) + 12*self.A12*(r2**6) 
-        df /= r
-        df += (2*r)/(R*(1+root))
-        df += beta*(r2**2)/(r*(R**3)*root*((1+root)**2))
+        df = 10*self.A10*(r2**4) + 8*self.A8*(r2**3) + 6*self.A6*(r2**2) + 4*self.A4*r2
+        df += 16*self.A16*(r2**7) + 14*self.A14*(r2**6) + 12*self.A12*(r2**5) 
+        df += 2/(R*(1+root))
+        df += beta*(r2)/((R**3)*root*((1+root)**2))
             
         g.z = 1.0
-        g.x = - df*p.x/r 
-        g.y = - df*p.y/r
-             
+        g.x = - df*p.x
+        g.y = - df*p.y
+        
         g.z *= sign
         g.y *= sign
         g.x *= sign

@@ -22,6 +22,7 @@ cdef struct vector_t:
 cdef struct orientation_t:
     vector_t normal, tangent
 
+
 IF UNAME_SYSNAME == "Windows":
     ctypedef double complex complex_t
 ELSE:
@@ -29,15 +30,17 @@ ELSE:
         double real
         double imag
 
+
 cdef packed struct ray_t:
     #vectors
     vector_t origin, direction, normal, E_vector
     #complex attribs
     complex_t refractive_index, E1_amp, E2_amp
     #simple attribs
-    double length, phase
+    double length, phase, accumulated_path
     #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx
+    unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
+    
     ##objects
     #object face, end_face, child_refl, child_trans
 
@@ -52,22 +55,22 @@ cdef struct ray_pair_t:
 ### Vector maths functions ###
 ##############################
 
-cdef  vector_t transform_c(transform_t t, vector_t p)
-cdef  vector_t rotate_c(transform_t t, vector_t p)
+cdef  vector_t transform_c(transform_t t, vector_t p) nogil
+cdef  vector_t rotate_c(transform_t t, vector_t p) nogil
 cdef  vector_t set_v(object O)
-cdef  double sep_(vector_t p1, vector_t p2)
-cdef  vector_t multvv_(vector_t a, vector_t b)
-cdef  vector_t multvs_(vector_t a, double b)
-cdef  vector_t addvv_(vector_t a, vector_t b)
-cdef  vector_t addvs_(vector_t a, double b)
-cdef  vector_t subvv_(vector_t a, vector_t b)
-cdef  vector_t subvs_(vector_t a, double b)
-cdef  double dotprod_(vector_t a, vector_t b)
-cdef  vector_t cross_(vector_t a, vector_t b)
-cdef  vector_t norm_(vector_t a)
-cdef  double mag_(vector_t a)
-cdef  double mag_sq_(vector_t a)
-cdef  vector_t invert_(vector_t v)
+cdef  double sep_(vector_t p1, vector_t p2) nogil
+cdef  vector_t multvv_(vector_t a, vector_t b) nogil
+cdef  vector_t multvs_(vector_t a, double b) nogil
+cdef  vector_t addvv_(vector_t a, vector_t b) nogil
+cdef  vector_t addvs_(vector_t a, double b) nogil
+cdef  vector_t subvv_(vector_t a, vector_t b) nogil
+cdef  vector_t subvs_(vector_t a, double b) nogil
+cdef  double dotprod_(vector_t a, vector_t b) nogil
+cdef  vector_t cross_(vector_t a, vector_t b) nogil
+cdef  vector_t norm_(vector_t a) nogil
+cdef  double mag_(vector_t a) nogil
+cdef  double mag_sq_(vector_t a) nogil
+cdef  vector_t invert_(vector_t v) nogil
 
 
 ##################################
@@ -81,11 +84,20 @@ cdef class Ray:
     cdef ray_t ray
 
 cdef class RayCollection:
-    cdef ray_t *rays
-    cdef readonly unsigned long n_rays, max_size
-    cdef public RayCollection parent
+    cdef: 
+        ray_t *rays
+        readonly unsigned long n_rays, max_size
+        public RayCollection parent
+        
+        int[:,:] _neighbours
+        double _mtime        
 
     cdef add_ray_c(self, ray_t r)
+    
+    cdef double get_mtime(self, unsigned long guard)
+    
+    cdef void _eval_neighbours(self, int[:,:] pnb)
+    
 
 cdef class RayCollectionIterator:
     cdef:
@@ -99,7 +111,7 @@ cdef class InterfaceMaterial(object):
     """
     cdef double[:] _wavelengths
 
-    cdef eval_child_ray_c(self, ray_t *old_ray,
+    cdef void eval_child_ray_c(self, ray_t *old_ray,
                             unsigned int ray_idx,
                             vector_t point,
                             orientation_t orient,

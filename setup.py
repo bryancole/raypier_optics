@@ -56,6 +56,10 @@ ext_modules = cythonize("raytrace/*.pyx",
                         language="c++" if Win64 else None,
                         include_path=[numpy.get_include()])
 
+for module in ext_modules:
+    module.extra_compile_args.append('-fopenmp')
+    module.extra_link_args.append('-fopenmp')
+
 setup(
     name="raytrace",
     version="0.1dev",
@@ -78,7 +82,7 @@ setup(
     package_data = {}, #none, yet
 
     author = "Bryan Cole",
-    author_email = "bryan.cole@teraview.com",
+    author_email = "bryancole.cam@gmail.com",
     description = "A optical ray-tracing package, for design, optimisation and \
 visualisation of mirror/lens systems. Good support for off-axis aspheric \
 surfaces is a priority",

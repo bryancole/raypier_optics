@@ -6,6 +6,7 @@ cdef extern from "math.h":
     double sin(double arg)
     double cos(double arg)
     double atan2(double y, double x)
+    double erf(double arg)
     double M_PI
     
 cdef extern from "float.h":
@@ -25,7 +26,11 @@ ELSE:
         double complex cexp (double complex)
         double complex I
     
-cdef double INF=(DBL_MAX+DBL_MAX)
+cdef:
+    double INF=(DBL_MAX+DBL_MAX)
+    unsigned int TRANS_RAY=0
+    unsigned int REFL_RAY=1
+    double SP_TOL=1.0e-10
 
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
@@ -53,7 +58,7 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     normal = norm_(normal)
         
     S_vector = cross_(ray.direction, normal)
-    if S_vector.x==0 and S_vector.y==0 and S_vector.z==0:
+    if fabs(S_vector.x)<SP_TOL and fabs(S_vector.y)<SP_TOL and fabs(S_vector.z)<SP_TOL:
         return ray
     S_vector = norm_(S_vector)
         
@@ -200,7 +205,7 @@ cdef class BaseDispersionCurve(object):
 cdef class OpaqueMaterial(InterfaceMaterial):
     """A perfect absorber i.e. it generates no rays
     """
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -215,30 +220,31 @@ cdef class TransparentMaterial(InterfaceMaterial):
     to the incoming ray. It does project the polarisation
     vectors to it's S- and P-directions, however.
     """
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
                             RayCollection new_rays):
         cdef:
-            vector_t cosThetaNormal, reflected, normal
+            vector_t normal
             ray_t sp_ray
-            complex_t cpx
-            double cosTheta
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         sp_ray.origin = point
         sp_ray.normal = normal
+        sp_ray.length = INF
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray)
 
 
 cdef class PECMaterial(InterfaceMaterial):
     """Simulates a Perfect Electrical Conductor
     """
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -261,14 +267,17 @@ cdef class PECMaterial(InterfaceMaterial):
         cosTheta = dotprod_(normal, in_ray.direction)
         cosThetaNormal = multvs_(normal, cosTheta)
         reflected = subvv_(in_ray.direction, multvs_(cosThetaNormal, 2))
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.direction = reflected
+        sp_ray.length = INF
         sp_ray.E1_amp.real = -sp_ray.E1_amp.real
         sp_ray.E1_amp.imag = -sp_ray.E1_amp.imag
         #sp_ray.E2_amp.real = -sp_ray.E2_amp.real
         #sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = REFL_RAY
         new_rays.add_ray_c(sp_ray)
         
         
@@ -276,7 +285,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
     """Simulates a perfect polarising beam splitter. P-polarisation
     is 100% transmitted while S- is reflected"""
     
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -301,6 +310,9 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         cosTheta = dotprod_(normal, in_direction)            
         cosThetaNormal = multvs_(normal, cosTheta)
         
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        sp_ray2.accumulated_path = sp_ray.accumulated_path
+        
         #Reflect the S-polarisation
         reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
         sp_ray.origin = point
@@ -311,6 +323,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = 0.0
         sp_ray.E2_amp.imag = 0.0
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = REFL_RAY
         new_rays.add_ray_c(sp_ray)
             
         #Transmit the P-polarisation
@@ -322,6 +335,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray2.E1_amp.real = 0.0
         sp_ray2.E1_amp.imag = 0.0
         sp_ray2.parent_idx = idx
+        sp_ray2.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray2)
         
         
@@ -374,7 +388,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         return out
             
     
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -396,13 +410,13 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         ###The "P" output of convert_to_sp with be aligned with the fast_axis
         ###The "S" output will thus be orthogonal to the fast axis
         out_ray = convert_to_sp(in_ray[0], self.fast_axis_)
-        
+        out_ray.accumulated_path += out_ray.length * out_ray.refractive_index.real
         out_ray.origin = point
         out_ray.normal = normal
         out_ray.direction = in_direction
         out_ray.length = INF
         out_ray.parent_idx = idx
-        
+        out_ray.ray_type_id = TRANS_RAY
         out_ray = self.apply_retardance_c(out_ray)
         
         new_rays.add_ray_c(out_ray)
@@ -436,7 +450,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             self.n_outside_.real = v.real
             self.n_outside_.imag = v.imag
             
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -461,6 +475,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
         
@@ -500,6 +515,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= -1
             sp_ray.E2_amp.imag *= -1
             sp_ray.parent_idx = idx
+            sp_ray.ray_type_id = REFL_RAY
         else:
             #normal transmission            
             tangent = subvv_(in_direction, cosThetaNormal)
@@ -526,6 +542,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.real *= T_p
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
+            sp_ray.ray_type_id = TRANS_RAY
         new_rays.add_ray_c(sp_ray)
         
 
@@ -554,7 +571,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
     
     @cython.cdivision(True)
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -580,6 +597,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
@@ -642,6 +660,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id = REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -674,13 +693,14 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
+            sp_ray.ray_type_id = TRANS_RAY
             new_rays.add_ray_c(sp_ray)
             
             
 cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             
     @cython.cdivision(True)
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -710,6 +730,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
@@ -806,6 +827,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id = REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -833,6 +855,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
+            sp_ray.ray_type_id = TRANS_RAY
             new_rays.add_ray_c(sp_ray)
     
 vacuum = BaseDispersionCurve(0,np.array([1.0,]))
@@ -863,7 +886,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         self.n_coating = self.dispersion_coating.c_evaluate_n(wavelengths)
     
     @cython.cdivision(True)
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -894,6 +917,8 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
@@ -995,6 +1020,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id = REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
         #normal transmission            
@@ -1022,6 +1048,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.parent_idx = idx
             sp_ray.refractive_index.real = n3.real
             sp_ray.refractive_index.imag = n3.imag
+            sp_ray.ray_type_id = TRANS_RAY
             new_rays.add_ray_c(sp_ray)
             
 
@@ -1049,7 +1076,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
             self.origin_.y = o[1]
             self.origin_.z = o[2]
     
-    cdef eval_child_ray_c(self,
+    cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
                             unsigned int idx, 
                             vector_t point,
@@ -1103,6 +1130,8 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         reflected = addvv_(reflected, multvs_(normal, k_z))
                 
         sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        
         sp_ray.origin = point
         sp_ray.normal = normal
         sp_ray.direction = reflected
@@ -1111,9 +1140,72 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real = sp_ray.E2_amp.real * self.efficiency
         sp_ray.E2_amp.imag = sp_ray.E2_amp.imag * self.efficiency
         sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = REFL_RAY
         
         ### This is the mysterious Grating Phase
         #Need to convert origin offset to microns since line-spacing is in microns
         sp_ray.phase += 1000.0*dotprod_(subvv_(self.origin_, point), tangent)*self.order*2*M_PI/line_spacing
+        
+        new_rays.add_ray_c(sp_ray)
+        
+        
+cdef class CircularApertureMaterial(InterfaceMaterial):
+    """Similar to the TransparentMaterial i.e. it generates an
+    outgoing ray with identical direction, polarisation etc.
+    to the incoming ray. The material attenuates the E_field amplitudes
+    according to the radial distance from the surface origin. 
+    """
+    cdef:
+        public double outer_radius
+        public double radius
+        public double edge_width
+        vector_t origin_
+        
+    def __cinit__(self, **kwds):
+        self.outer_radius = kwds.get("outer_radius", 25.0)
+        self.radius = kwds.get("radius", 15.0)
+        self.edge_width = kwds.get("edge_width", 1.0)
+        self.origin = kwds.get("origin", (0.0,0.0,0.0))
+        
+    property origin: 
+        def __get__(self):
+            cdef vector_t o = self.origin_
+            return (o.x, o.y, o.z)
+        
+        def __set__(self, o):
+            self.origin_.x = o[0]
+            self.origin_.y = o[1]
+            self.origin_.z = o[2]
+        
+    cdef void eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        cdef:
+            vector_t normal
+            ray_t sp_ray
+            double atten, r
+            double width = self.edge_width
+            
+        r = sqrt(mag_sq_(subvv_(self.origin_, point)))
+        if (r > self.outer_radius):
+            return
+        atten = 0.5 + 0.5*erf((self.radius - r)/width)
+        
+        normal = norm_(orient.normal)
+        sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = TRANS_RAY
+        
+        sp_ray.E1_amp.real *= atten
+        sp_ray.E1_amp.imag *= atten
+        sp_ray.E2_amp.real *= atten
+        sp_ray.E2_amp.imag *= atten
         
         new_rays.add_ray_c(sp_ray)

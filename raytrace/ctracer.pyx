@@ -1,16 +1,17 @@
 #!/bin/env python
+from builtins import None
 
 #cython: boundscheck=False
 #cython: nonecheck=False
 #cython: cdivision=True
 
 cdef extern from "math.h":
-    double sqrt(double arg)
-    double fabs(double arg)
-    double atan2(double y, double x)
-    double atan(double arg)
-    double sin(double arg)
-    double cos(double arg)
+    double sqrt(double arg) nogil
+    double fabs(double arg) nogil
+    double atan2(double y, double x) nogil
+    double atan(double arg) nogil
+    double sin(double arg) nogil
+    double cos(double arg) nogil
     #double INFINITY
     
 cdef extern from "float.h":
@@ -25,6 +26,7 @@ from libc.stdlib cimport malloc, free, realloc
 cdef extern from "stdlib.h" nogil:
     void *memcpy(void *str1, void *str2, size_t n)
 
+import time
 import numpy as np
 cimport numpy as np_
 
@@ -37,9 +39,11 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('E2_amp', np.complex128),
                         ('length', np.double),
                         ('phase', np.double),
+                        ('accumulated_path', np.double),
                         ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
-                        ('end_face_idx', np.uint32)
+                        ('end_face_idx', np.uint32),
+                        ('ray_type_id', np.uint32) #No point using a smaller type here as it'll probably get padded by the compiler
                         ])
                         
 
@@ -60,17 +64,18 @@ cdef struct complex_t:
     double imag
 
     
-cdef packed struct ray_t:
-    #vectors
-    vector_t origin, direction, normals, E_vector
-    #complex attribs
-    complex_t refractive_index, E1_amp, E2_amp
-    #simple attribs
-    double length
-    #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx
-    ##objects
-    #object face, end_face, child_refl, child_trans
+# cdef packed struct ray_t:
+#     #vectors
+#     vector_t origin, direction, normals, E_vector
+#     #complex attribs
+#     complex_t refractive_index, E1_amp, E2_amp
+#     #simple attribs
+#     double length
+#     #reference ids to related objects
+#     unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
+#     
+#     ##objects
+#     #object face, end_face, child_refl, child_trans
     
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
@@ -81,14 +86,14 @@ cdef struct transform_t:
 ### Vector maths functions ###
 ##############################
 
-cdef inline vector_t transform_c(transform_t t, vector_t p):
+cdef inline vector_t transform_c(transform_t t, vector_t p) nogil:
     cdef vector_t out
     out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02 + t.tx
     out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12 + t.ty
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22 + t.tz
     return out
 
-cdef inline vector_t rotate_c(transform_t t, vector_t p):
+cdef inline vector_t rotate_c(transform_t t, vector_t p) nogil:
     cdef vector_t out
     out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02
     out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12
@@ -107,7 +112,7 @@ def py_set_v(O):
     v_ = set_v(O)
     return (v_.x, v_.y, v_.z)
 
-cdef inline double sep_(vector_t p1, vector_t p2):
+cdef inline double sep_(vector_t p1, vector_t p2) nogil:
     cdef double a,b
     a = (p2.x-p1.x)
     b = (p2.y-p1.y)
@@ -118,7 +123,7 @@ def sep(a, b):
     cdef vector_t a_ = set_v(a), b_ = set_v(b)
     return sep_(a_, b_)
 
-cdef inline vector_t invert_(vector_t v):
+cdef inline vector_t invert_(vector_t v) nogil:
     v.x = -v.x
     v.y = -v.y
     v.z = -v.z
@@ -129,7 +134,7 @@ def invert(v):
     v_ = invert_(v_)
     return (v_.x, v_.y, v_.z)
 
-cdef inline vector_t multvv_(vector_t a, vector_t b):
+cdef inline vector_t multvv_(vector_t a, vector_t b) nogil:
     cdef vector_t out
     out.x = a.x*b.x
     out.y = a.y*b.y
@@ -143,7 +148,7 @@ def multvv(a, b):
     c_ = multvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t multvs_(vector_t a, double b):
+cdef inline vector_t multvs_(vector_t a, double b) nogil:
     cdef vector_t out
     out.x = a.x*b
     out.y = a.y*b
@@ -156,7 +161,7 @@ def multvs(a, b):
     c_ = multvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t addvv_(vector_t a, vector_t b):
+cdef inline vector_t addvv_(vector_t a, vector_t b) nogil:
     cdef vector_t out
     out.x = a.x+b.x
     out.y = a.y+b.y
@@ -170,7 +175,7 @@ def addvv(a, b):
     c_ = addvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
     
-cdef inline vector_t addvs_(vector_t a, double b):
+cdef inline vector_t addvs_(vector_t a, double b) nogil:
     cdef vector_t out
     out.x = a.x+b
     out.y = a.y+b
@@ -183,7 +188,7 @@ def addvs(a, b):
     c_ = addvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t subvv_(vector_t a, vector_t b):
+cdef inline vector_t subvv_(vector_t a, vector_t b) nogil:
     cdef vector_t out
     out.x = a.x-b.x
     out.y = a.y-b.y
@@ -197,7 +202,7 @@ def subvv(a, b):
     c_ = subvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t subvs_(vector_t a, double b):
+cdef inline vector_t subvs_(vector_t a, double b) nogil:
     cdef vector_t out
     out.x = a.x-b
     out.y = a.y-b
@@ -210,7 +215,7 @@ def subvs(a, b):
     c_ = subvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline double mag_(vector_t a):
+cdef inline double mag_(vector_t a) nogil:
     return sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
 
 def mag(a):
@@ -218,7 +223,7 @@ def mag(a):
     a_ = set_v(a)
     return mag_(a_)
 
-cdef inline double mag_sq_(vector_t a):
+cdef inline double mag_sq_(vector_t a) nogil:
     return a.x*a.x + a.y*a.y + a.z*a.z
 
 def mag_sq(a):
@@ -226,7 +231,7 @@ def mag_sq(a):
     a_ = set_v(a)
     return mag_sq_(a_)
 
-cdef inline double dotprod_(vector_t a, vector_t b):
+cdef inline double dotprod_(vector_t a, vector_t b) nogil:
     return a.x*b.x + a.y*b.y + a.z*b.z
 
 def dotprod(a, b):
@@ -235,7 +240,7 @@ def dotprod(a, b):
     b_ = set_v(b)
     return dotprod_(a_,b_)
 
-cdef inline vector_t cross_(vector_t a, vector_t b):
+cdef inline vector_t cross_(vector_t a, vector_t b) nogil:
     cdef vector_t c
     c.x = a.y*b.z - a.z*b.y
     c.y = a.z*b.x - a.x*b.z
@@ -249,7 +254,7 @@ def cross(a, b):
     c_ = cross_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef vector_t norm_(vector_t a):
+cdef vector_t norm_(vector_t a) nogil:
     cdef double mag=sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
     a.x /= mag
     a.y /= mag
@@ -314,6 +319,12 @@ cdef class RayCollectionIterator:
 
 
 cdef class Ray:
+    """ Ray - a wrapper around the ray_t C-structure.
+    
+    The Ray extension class exists mainly as a convenience for manipulation of single or small numbers of rays 
+    from python. Large numbers of rays are more efficiently handled as either RayCollection objects, created in the
+    tracing process, or as numpy arrays with the 'ray_dtype' dtype.
+    """
     
     def __cinit__(self, **kwds):
         for k in kwds:
@@ -374,13 +385,21 @@ cdef class Ray:
             self.ray.length = v
             
     property phase:
-        """The length of the ray. This is infinite in 
-        unterminated rays"""
+        """An additional phase-factor for the ray. At present, this handles the 'grating phase' factor
+        generated by diffraction gratings. All other material surfaces leave this unchanged"""
         def __get__(self):
             return self.ray.phase
         
         def __set__(self, double v):
             self.ray.phase = v
+            
+    property accumulated_path:
+        """The total *optical* path up to the start-point of this ray."""
+        def __get__(self):
+            return self.ray.accumulated_path
+        
+        def __set__(self, double v):
+            self.ray.accumulated_path = v
             
     property wavelength_idx:
         """The wavelength of the ray in vacuum, in microns"""
@@ -440,7 +459,7 @@ cdef class Ray:
         def __get__(self):
             return self.ray.parent_idx
         
-        def __set__(self, int v):
+        def __set__(self, unsigned int v):
             self.ray.parent_idx = v
             
     property end_face_idx:
@@ -450,8 +469,17 @@ cdef class Ray:
         def __get__(self):
             return self.ray.end_face_idx
         
-        def __set__(self, int v):
+        def __set__(self, unsigned int v):
             self.ray.end_face_idx = v
+            
+    property ray_type_id:
+        """Used to distinguish rays created by reflection vs transmission or some other mechanism.
+        Transmission->0, Reflection->1"""
+        def __get__(self):
+            return self.ray.ray_type_id
+        
+        def __set__(self, unsigned int v):
+            self.ray.ray_type_id = v
             
     property power:
         """Optical power for the ray"""
@@ -564,11 +592,20 @@ cdef class Ray:
         
 
 cdef class RayCollection:
+    """A list-like collection of ray_t objects.
+    
+    The RayCollection is the primary data-structure used in the ray-tracing operation. 
+    
+    The RayCollection is of variable length, in that it can grow as individual rays are added to it.
+    Internally, the memory allocated to the array of ray_t structures is re-allocated to increase
+    its capacity.
+    """
     
     def __cinit__(self, size_t max_size):
         self.rays = <ray_t*>malloc(max_size*sizeof(ray_t))
         self.n_rays = 0
         self.max_size = max_size
+        self._mtime = 0.0
         
     def __dealloc__(self):
         free(self.rays)
@@ -589,7 +626,7 @@ cdef class RayCollection:
     def reset_length(self):
         """Sets the length of all rays in this RayCollection to Infinity
         """
-        cdef int i
+        cdef size_t i
         for i in xrange(self.n_rays):
             self.rays[i].length = INF
         
@@ -601,11 +638,11 @@ cdef class RayCollection:
     def add_ray_list(self, list rays):
         """Adds the given list of Rays to this collection
         """
-        cdef int i
-        for i in xrange(len(rays)):
+        cdef long int i
+        for i in range(len(rays)):
             if not isinstance(rays[i], Ray):
                 raise TypeError("ray list contains non-Ray instance at index %d"%i)
-        for i in xrange(len(rays)):
+        for i in range(len(rays)):
             self.add_ray_c((<Ray>rays[i]).ray)
         
     def clear_ray_list(self):
@@ -616,16 +653,16 @@ cdef class RayCollection:
     def get_ray_list(self):
         """Returns the contents of this RayCollection as a list of Rays
         """
-        cdef int i
+        cdef size_t i
         cdef list ray_list = []
         cdef Ray r
-        for i in xrange(self.n_rays):
+        for i in range(self.n_rays):
             r = Ray()
             r.ray = self.rays[i]
             ray_list.append(r)
         return ray_list
     
-    def __getitem__(self, int idx):
+    def __getitem__(self, size_t idx):
         cdef Ray r
         if idx >= self.n_rays:
             raise IndexError("Requested index %d from a size %d array"%(idx, self.n_rays))
@@ -633,7 +670,7 @@ cdef class RayCollection:
         r.ray = self.rays[idx]
         return r
     
-    def __setitem__(self, int idx, Ray r):
+    def __setitem__(self, size_t idx, Ray r):
         if idx >= self.n_rays:
             raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
         self.rays[idx] = r.ray
@@ -649,11 +686,75 @@ cdef class RayCollection:
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
     
+    cdef double get_mtime(self, unsigned long guard):
+        cdef:
+            double pmtime
+            
+        if self.parent is None:
+            return self._mtime
+        if guard == id(self):
+            return self._mtime
+        
+        pmtime = self.parent.get_mtime(guard)
+        if pmtime > self._mtime:
+            self._neighbours = None
+            return pmtime
+        else:
+            return self._mtime
+        
+    cdef void _eval_neighbours(self, int[:,:] pnb):
+        cdef:
+            int i, j, pidx, rtype, child_nb
+            int[:,:] rmap
+            unsigned int nparent=self.parent.n_rays
+            
+        if pnb is None:
+            return
+        
+        rmap = np.full( (nparent, 2), -1 ,dtype=np.int32)
+        nb = np.full( (self.n_rays, pnb.shape[1]), -1, dtype=np.int32)
+        
+        for i in range(self.n_rays):
+            rtype = self.rays[i].ray_type_id
+            pidx = self.rays[i].parent_idx
+            rmap[pidx, rtype] = i
+            
+        for i in range(self.n_rays):
+            rtype = self.rays[i].ray_type_id
+            pidx = self.rays[i].parent_idx
+            for j in range(pnb.shape[1]):
+                child_nb = pnb[pidx,j]
+                if child_nb >= 0:
+                    nb[i,j] = rmap[child_nb,rtype]
+                    
+        self._neighbours = nb
+        
+        
+    property neighbours:
+        def __get__(self):
+            if self.parent is None:
+                if self._neighbours is None:
+                    return None
+                else:
+                    return np.asarray(self._neighbours)
+            else:
+                pmtime = self.parent.get_mtime(id(self))
+                if self._mtime >= pmtime:
+                    if self._neighbours is not None:
+                        return np.asarray(self._neighbours)
+                self._eval_neighbours(self.parent.neighbours)
+                self._mtime = time.monotonic()
+                return np.asarray(self._neighbours)
+                
+        def __set__(self, int[:,:] nb):
+            self._neighbours = nb
+            self._mtime = time.monotonic()
+            
     property origin:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].origin
@@ -666,7 +767,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].direction
@@ -679,7 +780,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].normal
@@ -692,7 +793,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = self.rays[i].E_vector
@@ -706,7 +807,7 @@ cdef class RayCollection:
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
                 np_.ndarray rr,ii
-                int i
+                size_t i
                 complex_t n
             rr = out.real
             ii = out.imag
@@ -721,7 +822,7 @@ cdef class RayCollection:
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
                 np_.ndarray rr,ii
-                int i
+                size_t i
                 complex_t n
             rr = out.real
             ii = out.imag
@@ -736,7 +837,7 @@ cdef class RayCollection:
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.complex128)
                 np_.ndarray rr,ii
-                int i
+                size_t i
                 complex_t n
             rr = out.real
             ii = out.imag
@@ -750,7 +851,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype='d')
-                int i
+                size_t i
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].length
@@ -761,18 +862,27 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype='d')
-                int i
+                size_t i
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].phase
                 out[i] = v
             return out
         
+    property accumulated_path:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,), dtype='d' )
+                size_t i
+            for i in xrange(self.n_rays):
+                out[i] = self.rays[i].accumulated_path
+            return out
+        
     property wavelength_idx:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 double v
             for i in xrange(self.n_rays):
                 v = self.rays[i].wavelength_idx
@@ -783,7 +893,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 unsigned int v
             for i in xrange(self.n_rays):
                 v = self.rays[i].parent_idx
@@ -794,10 +904,21 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
-                int i
+                size_t i
                 unsigned int v
             for i in xrange(self.n_rays):
                 v = self.rays[i].end_face_idx
+                out[i] = v
+            return out
+        
+    property ray_type_id:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty(self.n_rays, dtype=np.uint32)
+                size_t i
+                unsigned int v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].ray_type_id
                 out[i] = v
             return out
         
@@ -805,7 +926,7 @@ cdef class RayCollection:
         def __get__(self):
             cdef:
                 np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
-                int i
+                size_t i
                 vector_t v
             for i in xrange(self.n_rays):
                 v = addvv_(self.rays[i].origin, 
@@ -838,7 +959,7 @@ cdef class InterfaceMaterial(object):
     def __cinit__(self):
         self.wavelengths = np.array([], dtype=np.double)
     
-    cdef eval_child_ray_c(self, ray_t *old_ray, 
+    cdef void eval_child_ray_c(self, ray_t *old_ray, 
                                 unsigned int ray_idx, 
                                 vector_t p, 
                                 orientation_t orient,
@@ -1064,16 +1185,18 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     float max_length):
     cdef:
         FaceList face_set #a FaceList
-        unsigned int size, i, j
+        size_t size
+        size_t i, j, n_sets=len(face_sets)
         vector_t P1, point
         orientation_t orient
-        int idx, nearest_set=-1, nearest_idx=-1, n_sets=len(face_sets)
+        int idx, nearest_set=-1, nearest_idx=-1
         ray_t new_ray
         ray_t *ray
         RayCollection new_rays
    
     #need to allocate the output rays here 
     new_rays = RayCollection(rays.n_rays)
+    new_rays.parent = rays
     
     for i in range(rays.n_rays):
         ray = rays.rays + i
@@ -1084,7 +1207,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                             multvs_(ray.direction, 
                                     max_length))
         #print "points", P1, P2
-        for j in xrange(n_sets):
+        for j in range(n_sets):
             face_set = face_sets[j]
             #intersect_c returns the face idx of the intersection, or -1 otherwise
             idx = (<FaceList>face_set).intersect_c(ray, point, max_length)

@@ -54,7 +54,7 @@ from raytrace.qt_future_call import FutureCall
 counter = count()
 
 from raytrace import mirrors, prisms, corner_cubes, ellipsoids, sources,\
-    results, beamstop, lenses, beamsplitters, waveplates
+    results, beamstop, lenses, beamsplitters, waveplates, apertures, fields
 
 optics_classes = sorted(Traceable.subclasses, key=lambda c: c.__name__)
 
@@ -289,21 +289,29 @@ class RayTraceModel(HasQueue):
         optics = self.optics
         #print "trace", 
         next(counter)
-        if optics is not None:
-            self.prepare_to_trace()
-            for o in optics:
-                o.intersections = []
-            for ray_source in self.sources:
-                self.trace_ray_source(ray_source, optics)
-            for o in optics:
-                o.update_complete()
-            for r in self.results:
-                try:
-                    r.calc_result(self)
-                except:
-                    traceback.print_exc()
-        self.render_vtk()
-        self._updating = False
+        try:
+            if optics is not None:
+                self.prepare_to_trace()
+                for o in optics:
+                    o.intersections = []
+                for ray_source in self.sources:
+                    self.trace_ray_source(ray_source, optics)
+                for probe in self.probes:
+                    try:
+                        probe.evaluate()
+                    except:
+                        traceback.print_exc()
+                for o in optics:
+                    o.update_complete()
+                for r in self.results:
+                    try:
+                        r.calc_result(self)
+                    except:
+                        traceback.print_exc()
+            self.render_vtk()
+            self._updating = False
+        except:
+            traceback.print_exc()
         
     def trace_detail(self, _async=False):
         optics = [o.clone_traits() for o in self.optics]

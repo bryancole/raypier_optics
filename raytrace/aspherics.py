@@ -114,7 +114,7 @@ class Thorlabs352440(AsphericLens):
     
     def _material_default(self):
         ### ECO-550 is not in the database :(
-        glass = NondispersiveCurve(1.594)
+        glass = NondispersiveCurve(1.594) #Value for 780nm
         cri = self.coating_refractive_index
         coating = NondispersiveCurve(refractive_index=cri)
         air = NondispersiveCurve(1.0)
