@@ -2,7 +2,6 @@
 from raytrace.tracer import RayTraceModel
 from raytrace.sources import HexagonalRayFieldSource, ConfocalRayFieldSource
 from raytrace.lenses import PlanoConvexLens
-from raytrace.apertures import CircularAperture
 from raytrace.fields import EFieldPlane
 from raytrace.constraints import BaseConstraint
 from raytrace.intensity_image import IntensityImageView
@@ -12,21 +11,25 @@ from traits.api import Range, on_trait_change
 from traitsui.api import View, Item
 
 
-aperture = CircularAperture(centre=(0,0,10), direction=(0,0,1),
-                            hole_diameter = 0.5, edge_width=0.001, invert=True)
+lens = PlanoConvexLens(centre=(0,0,20),
+                       direction=(0,0,-1),
+                       diameter=25.0,
+                       thickness=6.0,
+                       curvature=40.0,
+                       n_inside=1.5)
 
-src = HexagonalRayFieldSource(resolution=10.0, direction=(0,0,1),
-                              radius=2.0,
+src = ConfocalRayFieldSource(direction=(0,0,1),
+                              angle=5.0,
                               wavelength=1.0)
 
 src.InputRays
 
 probe = EFieldPlane(source=src,
-                    centre=(0,0,50),
+                    centre=(0,0,70),
                     direction=(0,1,0),
                     exit_pupil_offset=100.,
-                    width=2.0,
-                    height=100.0,
+                    width=0.1,
+                    height=0.5,
                     size=100)
 
 img = IntensityImageView(field_probe=probe)
@@ -48,7 +51,7 @@ class FocalPlane(BaseConstraint):
         
         
 
-model = RayTraceModel(sources=[src], optics=[aperture],
+model = RayTraceModel(sources=[src], optics=[lens],
                       probes=[probe], constraints=[FocalPlane()],
                       results=[img, surf])
 

@@ -255,7 +255,10 @@ class EFieldPlane(Probe):
         rays = traced_rays[idx].copy_as_array() 
         radius = self.exit_pupil_offset
         
-        projected = project_to_sphere(rays, centre, radius)
+        if radius:
+            projected = project_to_sphere(rays, centre, radius)
+        else:
+            projected = rays
         #projected = rays
         
         neighbours_idx = traced_rays[idx].neighbours

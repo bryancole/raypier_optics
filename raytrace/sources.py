@@ -941,10 +941,11 @@ class RayFieldSource(SingleRaySource):
 
 class HexagonalRayFieldSource(RayFieldSource):
     radius = Float(10.,editor=NumEditor)
-    spacing = Float(0.5, editor=NumEditor)
+    resolution = Float(10.0, editor=NumEditor)
+    gauss_width = Float(2.0, editor=NumEditor)
     
     InputRays = Property(Instance(RayCollection), 
-                         depends_on="origin, direction, spacing, radius, max_ray_len, E_vector")
+                         depends_on="origin, direction, resolution, wavelength, gauss_width, radius, max_ray_len, E_vector")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
                             show_border=True,
@@ -953,8 +954,9 @@ class HexagonalRayFieldSource(RayFieldSource):
                        Group(Item('direction', show_label=False, resizable=True),
                             show_border=True,
                             label="Direction"),
-                       Item('spacing'),
                        Item('radius'),
+                       Item('resolution'),
+                       Item('gauss_width'),
                        label="Geometry")
 
     @on_trait_change("direction, spacing, radius, max_ray_len")
@@ -967,8 +969,8 @@ class HexagonalRayFieldSource(RayFieldSource):
     def _get_InputRays(self):
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
-        spacing = self.spacing
         radius = self.radius
+        spacing = radius/self.resolution
         max_axis = numpy.abs(direction).argmax()
         if max_axis==0:
             v = numpy.array([0.,1.,0.])
@@ -1019,7 +1021,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         offsets = xi[:,None]*d1 + yj[:,None]*d2
         offsets *= spacing
         
-        gauss = numpy.exp(-(ri[select]*(spacing**2)/((0.5*radius)**2))) 
+        gauss = numpy.exp(-(ri[select]*(spacing**2)/((self.gauss_width)**2))) 
         
         ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
             
