@@ -41,6 +41,7 @@ from raytrace import ctracer, cmaterials
 Vector = Array(shape=(3,))
 
 NumEditor = TextEditor(auto_set=False, enter_set=True, evaluate=float)
+IntEditor = TextEditor(auto_set=False, enter_set=True, evaluate=int)
 ComplexEditor = TextEditor(auto_set=False, enter_set=True, 
                            evaluate=float)
 

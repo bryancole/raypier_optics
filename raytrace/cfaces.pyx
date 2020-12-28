@@ -130,6 +130,9 @@ cdef class RectangularFace(Face):
     
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
+        self.width = kwds.get("width", 2.0)
+        self.length = kwds.get("length", 5.0)
+        self.offset = kwds.get("offset", 0.0)
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
         """Intersects the given ray with this face.

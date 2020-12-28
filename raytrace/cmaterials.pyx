@@ -1,3 +1,4 @@
+from fontTools.cffLib import width
 cimport cython
 
 cdef extern from "math.h":
@@ -1195,6 +1196,83 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         if (r > self.outer_radius):
             return
         atten = 0.5 + 0.5*erf((self.radius - r)/width)
+        if self.invert:
+            atten = 1 - atten
+        
+        normal = norm_(orient.normal)
+        sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.parent_idx = idx
+        sp_ray.ray_type_id = TRANS_RAY
+        
+        sp_ray.E1_amp.real *= atten
+        sp_ray.E1_amp.imag *= atten
+        sp_ray.E2_amp.real *= atten
+        sp_ray.E2_amp.imag *= atten
+        
+        new_rays.add_ray_c(sp_ray)
+
+
+cdef class RectangularApertureMaterial(InterfaceMaterial):
+    cdef:
+        public double outer_width
+        public double outer_height
+        public double width
+        public double height
+        public double edge_width
+        public int invert
+        vector_t origin_
+        
+    def __cinit__(self, **kwds):
+        self.outer_width = kwds.get("outer_width", 15.0)
+        self.outer_height = kwds.get("outer_height", 20.0)
+        self.width = kwds.get("width", 5.0)
+        self.height = kwds.get("height", 10.0)
+        self.edge_width = kwds.get("edge_width", 1.0)
+        self.origin = kwds.get("origin", (0.0,0.0,0.0))
+        self.invert = kwds.get("invert", 0)
+        
+    property origin: 
+        def __get__(self):
+            cdef vector_t o = self.origin_
+            return (o.x, o.y, o.z)
+        
+        def __set__(self, o):
+            self.origin_.x = o[0]
+            self.origin_.y = o[1]
+            self.origin_.z = o[2]
+        
+    cdef void eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        cdef:
+            vector_t normal, p
+            ray_t sp_ray
+            double atten, px, py
+            double width = self.edge_width
+            double x = self.width/2.
+            double y = self.height/2.
+            
+        p = subvv_(point, self.origin_)
+        px = dotprod_(p,orient.tangent)
+        py = dotprod_(p,cross_(orient.normal,orient.tangent))
+            
+        if fabs(px) > self.outer_width/2.:
+            return 
+        if fabs(py) > self.outer_height/2.:
+            return 
+            
+        atten = 0.5 - 0.5*erf((px - x)/width)
+        atten *= 0.5 - 0.5*erf(-(px + x)/width)
+        atten *= 0.5 - 0.5*erf((py - y)/width)
+        atten *= 0.5 - 0.5*erf(-(py + y)/width)
+        
         if self.invert:
             atten = 1 - atten
         
