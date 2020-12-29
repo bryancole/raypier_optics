@@ -1291,3 +1291,34 @@ cdef class RectangularApertureMaterial(InterfaceMaterial):
         sp_ray.E2_amp.imag *= atten
         
         new_rays.add_ray_c(sp_ray)
+        
+        
+cdef class ResampleGaussletMaterial(InterfaceMaterial):
+    """
+    This is a special pseudo-material which generates new rays not by
+    the normal process of refraction or reflection of an incoming ray,
+    but by computing a new set of Gausslets by computing the E-field
+    at a set of grid points and launching new Gausslets from these points.
+    
+    The material needs the set of new launch-positions to be given up front (i.e. before tracing). 
+    
+    """
+    cdef:
+        public int capture_count
+        RayCollection captured_rays
+    
+    cdef void eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        """
+        Capture each incident ray in an internal RayCollection.
+        """
+        pass
+    
+    cdef void append_new_rays_c(self, RayCollection new_rays):
+        """
+        Here we compute the new rays and append them to the new_rays object.
+        """

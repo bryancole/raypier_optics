@@ -141,7 +141,75 @@ cdef double complex calc_mode_U(double complex A,
     U *= inv_root_area*rootI
     
     return U
+
+
+cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y, double[:] dx, double[:] dy, double blending, int size):
+    ### Brute force evaluation of the linear least squares fit to the x,y,dx,dy coefs
+    ### We solve A.T*A x = A.T b which (by magical means) gives the least squares fit to A x = b
+    ### A.T*A and A.T b have 3 rows i.e. we just need to solve 3 equations for 3 unknowns.
+    ### Even better, the matrices are symmetric. Solving in sympy gives the closed form of the solution
+    ### as fairly simple expressions 
+    cdef:
+        double a00=0, a01=0, a02=0, a11=0, a12=0, a22=0, b0=0, b1=0, b2=0
+        int i
+        double xi2, yi2
+    
+    ### Imag parts ###    
+    for i in range(size):
+        xi2 = x[i]*x[i]
+        yi2 = y[i]*y[i]
+        a00 += xi2*xi2
+        a01 += 2*xi2*x[i]*y[i]
+        a02 += xi2*yi2
+        a11 += 4*xi2*yi2
+        a12 += 2*x[i]*y[i]*yi2
+        a22 += yi2*yi2
+        b0 += xi2
+        b1 += 2*x[i]*y[i]
+        b2 += yi2
+    
+    out[0].imag = blending *(-b0*(a11*a22 - a12**2) + b1*(a01*a22 - a02*a12) - b2*(a01*a12 - a02*a11))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
+    out[1].imag = blending *(b0*(a01*a22 - a02*a12) - b1*(a00*a22 - a02**2) + b2*(a00*a12 - a01*a02))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
+    out[2].imag = blending *(-b0*(a01*a12 - a02*a11) + b1*(a00*a12 - a01*a02) - b2*(a00*a11 - a01**2))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
+    
+    ### Real parts ###
+    a00=0
+    a01=0
+    a02=0
+    a11=0
+    a12=0
+    a22=0
+    b0=0
+    b1=0
+    b2=0 
+    for i in range(size):
+        xi2 = x[i]*x[i]
+        yi2 = y[i]*y[i]
+        
+        a00 += xi2
+        a01 += x[i]*y[i]
+        a11 += xi2 + yi2
+        a22 += yi2
+        
+        b0 += dx[i]*x[i]
+        b1 += dx[i]*y[i] + dy[i]*x[i]
+        b2 += dy[i]*y[i]
+        
+    a12 = a01*a01 #reuse a12 as an optimisation
+
+    out[0].real = (-a12*b2 + a01*a22*b1 + b0*(a12 - a11*a22))/(a00*a12 - a00*a11*a22 + a12*a22)
+    out[1].real = (a00*a01*b2 - a00*a22*b1 + a01*a22*b0)/(a00*a12 - a00*a11*a22 + a12*a22)
+    out[2].real = (a00*a01*b1 - a12*b0 - b2*(a00*a11 - a12))/(a00*a12 - a00*a11*a22 + a12*a22)
     
     
+def evaluate_modes(double[:,:] x, double[:,:] y, double[:,:] dx, double[:,:] dy, double blending=1.0):
+    cdef:
+        int n_rays=x.shape[0], row_size=x.shape[1]
+        int i
+        np_.npy_complex128[:,:] out = np.zeros((n_rays,3), dtype=np.complex128)        
     
+    for i in range(n_rays):
+        evaluate_one_mode(out[i,:], x[i], y[i], dx[i], dy[i], blending, row_size)
+        
+    return out
     
