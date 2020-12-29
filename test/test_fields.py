@@ -4,8 +4,9 @@ import unittest
 from raytrace.sources import HexagonalRayFieldSource
 from raytrace.fields import evaluate_neighbours, project_to_sphere,\
         evaluate_modes
+from raytrace.cfields import evaluate_modes as evaluate_modes_c
         
-from raytrace.cfields import inv_area_of_ellipse
+#from raytrace.cfields import inv_area_of_ellipse
 
 import numpy
 
@@ -66,6 +67,22 @@ class TestEvalModes(unittest.TestCase):
         print(x.shape)
         Z = evaluate_modes(rays, x, y, dx, dy)
         print(Z.shape)
+        
+    def test_eval_modes_c(self):
+        angles = numpy.array([numpy.linspace(0,numpy.pi*2, 7)[:6]])
+        x = numpy.sin(angles)*2.0
+        y = numpy.cos(angles)
+        rot = 20.0*numpy.pi/180.0
+        x2 = numpy.cos(rot)*x -numpy.sin(rot)*y
+        y2 = numpy.cos(rot)*y + numpy.sin(rot)*x
+        dx = -x/10.0 + y/50.0
+        dy = y/10.0 + x/50.0
+        
+        ret1 = evaluate_modes(x2, y2, dx, dy)
+        print(ret1)
+        ret2 = evaluate_modes_c(x2,y2,dx,dy)
+        print(ret2)
+        self.assertTrue(numpy.allclose(ret1, ret2))
         
         
 class TestAreaOfEllipse(unittest.TestCase):

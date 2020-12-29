@@ -12,14 +12,14 @@ from tvtk.api import tvtk
 
 from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection, BaseRaySource
-from raytrace.cfields import sum_gaussian_modes
+from raytrace.cfields import sum_gaussian_modes, evaluate_modes as evaluate_modes_c
 from raytrace.find_focus import find_ray_focus
 from raytrace.utils import normaliseVector, dotprod
 
 import numpy
 
-from scipy.sparse.linalg import lsqr
-from scipy.sparse import block_diag
+scipy = None
+    
 import time
 import traceback
 
@@ -121,7 +121,7 @@ def evaluate_neighbours(rays, neighbours_idx):
     return (rays[mask], x,y,dx,dy)
     
     
-def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy, blending=1.0):
+def evaluate_modes(neighbour_x, neighbour_y, dx, dy, blending=1.0):
     """For each ray in rays, use its nearest neighbours
     to compute the best fit for the Astigmatic Gaussian Beam
     parameters.
@@ -130,6 +130,14 @@ def evaluate_modes(rays, neighbour_x, neighbour_y, dx, dy, blending=1.0):
     x,y,dx,dy - array of shape (N,6)
     
     For N rays, return a Nx3 complex array of coeffs"""
+    global scipy
+    if scipy is None:
+        global lsqr
+        global block_diag
+        import scipy
+        from scipy.sparse.linalg import lsqr
+        from scipy.sparse import block_diag
+    
     ### Do linear least squares on each ray and neighbours
     
     x = neighbour_x
@@ -264,7 +272,7 @@ class EFieldPlane(Probe):
         neighbours_idx = traced_rays[idx].neighbours
         rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
 
-        modes = evaluate_modes(rays, x, y, dx, dy, blending=self.blending)
+        modes = evaluate_modes_c(x, y, dx, dy, blending=self.blending)
         
         size = self.size
         side = self.width/2.

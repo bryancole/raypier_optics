@@ -143,7 +143,10 @@ cdef double complex calc_mode_U(double complex A,
     return U
 
 
-cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y, double[:] dx, double[:] dy, double blending, int size):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y, 
+                            double[:] dx, double[:] dy, double blending, int size) nogil:
     ### Brute force evaluation of the linear least squares fit to the x,y,dx,dy coefs
     ### We solve A.T*A x = A.T b which (by magical means) gives the least squares fit to A x = b
     ### A.T*A and A.T b have 3 rows i.e. we just need to solve 3 equations for 3 unknowns.
@@ -201,6 +204,8 @@ cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y,
     out[1].real = (a00*a01*b2 - a00*a22*b1 + a01*a22*b0)/(a00*a12 - a00*a11*a22 + a12*a22)
     out[2].real = (a00*a01*b1 - a12*b0 - b2*(a00*a11 - a12))/(a00*a12 - a00*a11*a22 + a12*a22)
     
+    return
+    
     
 def evaluate_modes(double[:,:] x, double[:,:] y, double[:,:] dx, double[:,:] dy, double blending=1.0):
     cdef:
@@ -208,8 +213,9 @@ def evaluate_modes(double[:,:] x, double[:,:] y, double[:,:] dx, double[:,:] dy,
         int i
         np_.npy_complex128[:,:] out = np.zeros((n_rays,3), dtype=np.complex128)        
     
-    for i in range(n_rays):
-        evaluate_one_mode(out[i,:], x[i], y[i], dx[i], dy[i], blending, row_size)
+    with nogil:
+        for i in prange(n_rays):
+            evaluate_one_mode(out[i,:], x[i], y[i], dx[i], dy[i], blending, row_size)
         
-    return out
+    return np.asarray(out)
     
