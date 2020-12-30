@@ -32,8 +32,8 @@ from tvtk.api import tvtk
 from raytrace.ctracer import RayCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
-from raytrace.bases import Renderable, RaytraceObject, NumEditor
-from traitsui.examples.demo.Advanced import Settable_cached_property
+from raytrace.bases import RaytraceObject, NumEditor
+from raytrace.gausslets import decompose_angle
 
 Vector = Array(shape=(3,))
 
@@ -1243,6 +1243,68 @@ class SingleGaussletSource(SingleRaySource):
             neighbours = numpy.full((7, 6), -1, 'i')
             neighbours[0,:] = [1,2,3,4,5,6]
             rays.neighbours = neighbours
+        except:
+            import traceback
+            traceback.print_exc()
+            return RayCollection(5)
+        return rays
+    
+    
+class TopHatGaussletSource(SingleRaySource):
+    beam_waist = Float(100.0) #diameter, in microns
+    sample_spacing = Float(10.0) #in microns
+    max_angle = Float(10.0)
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, beam_waist, wavelength, "
+                         "max_ray_len, E_vector, sample_spacing, max_angle")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item("wavelength"),
+                       Item("max_angle"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
+                       Item('sample_spacing', tooltip="Sample spacing for the field in the aperture"),
+                       label="Geometry")
+    
+    
+    @on_trait_change("direction, beam_waist, max_ray_len, sample_spacing, max_angle")
+    def on_update(self):
+        self.data_source.modified()
+        self.update=True
+    
+    @cached_property
+    def _get_InputRays(self):
+        try:
+            origin = numpy.array(self.origin)
+            direction = numpy.array(self.direction)
+            radius = self.beam_waist/2.0 #convert to mm
+            
+            max_axis = numpy.abs(direction).argmax()
+            if max_axis==0:
+                v = numpy.array([0.,1.,0.])
+            else:
+                v = numpy.array([1.,0.,0.])
+                
+            max_angle=self.max_angle
+            input_spacing = self.sample_spacing
+            wavelength = self.wavelength
+            oversample=4
+            
+            x = numpy.linspace(-radius,radius, int(radius/input_spacing)+1)
+            X,Y = numpy.meshgrid(x,x)
+            select = (X**2 + Y**2) < radius
+            E_field = numpy.zeros((2,len(x),len(x)), dtype=numpy.complex128)
+            E1 = E_field[0,:,:]
+            E1[select] = 1.0 
+                
+            rays = decompose_angle(origin, direction, v, E_field, input_spacing, max_angle, wavelength, oversample)
+                
         except:
             import traceback
             traceback.print_exc()
