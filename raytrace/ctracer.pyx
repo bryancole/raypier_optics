@@ -46,6 +46,9 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('ray_type_id', np.uint32) #No point using a smaller type here as it'll probably get padded by the compiler
                         ])
                         
+    
+GAUSSLET_ = GAUSSLET
+PARABASAL_ = PARABASAL
 
 ############################################
 ### C type declarations for internal use ###

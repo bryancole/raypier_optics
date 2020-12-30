@@ -31,9 +31,9 @@ ELSE:
         double imag
         
 cdef:
-    unsigned int REFL_RAY=1<<0
-    unsigned int GAUSSLET=1<<1
-    unsigned int PARABASAL=1<<2
+    public unsigned int REFL_RAY=1<<0
+    public unsigned int GAUSSLET=1<<1
+    public unsigned int PARABASAL=1<<2
 
 
 cdef packed struct ray_t:

@@ -29,7 +29,7 @@ from traitsui.api import View, Item, Tabbed, VGroup, Include, \
 
 from tvtk.api import tvtk
 
-from raytrace.ctracer import RayCollection, Ray, ray_dtype
+from raytrace.ctracer import RayCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
 from raytrace.bases import Renderable, RaytraceObject, NumEditor
@@ -645,7 +645,7 @@ class GaussianBeamRaySource(SingleRaySource):
     See Paul D Colbourne - Proc. SPIE 9293, International Optical Design Conference 2014, 92931S
     and refs theirin.
     """
-    beam_waist = Float() #in microns
+    beam_waist = Float(100.0) #in microns
     number = Range(2,64,16)
     working_distance = Float(0.0) #the distance from the beam waist to the source location
     
@@ -1164,3 +1164,87 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
         print("Made input rays.")
         return rays
     
+    
+class SingleGaussletSource(SingleRaySource):
+    beam_waist = Float(100.0) #in microns
+    working_distance = Float(0.0) #the distance from the beam waist to the source location
+    
+    InputRays = Property(Instance(RayCollection), 
+                         depends_on="origin, direction, beam_waist, wavelength, "
+                         "max_ray_len, E_vector, working_distance")
+    
+    geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                            show_border=True,
+                            label="Origin position",
+                            padding=0),
+                       Group(Item('direction', show_label=False, resizable=True),
+                            show_border=True,
+                            label="Direction"),
+                       Item("wavelength"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
+                       Item('working_distance', tooltip="The distance from the source to the beam waist"),
+                       label="Geometry")
+    
+    
+    @on_trait_change("direction, beam_waist, max_ray_len, working_distance")
+    def on_update(self):
+        self.data_source.modified()
+        self.update=True
+    
+    @cached_property
+    def _get_InputRays(self):
+        try:
+            origin = numpy.array(self.origin)
+            direction = numpy.array(self.direction)
+            radius = self.beam_waist/2000.0 #convert to mm
+            max_axis = numpy.abs(direction).argmax()
+            if max_axis==0:
+                v = numpy.array([0.,1.,0.])
+            else:
+                v = numpy.array([1.,0.,0.])
+            d1 = numpy.cross(direction, v)
+            d1 = normaliseVector(d1)
+            d2 = numpy.cross(direction, d1)
+            d2 = normaliseVector(d2)
+    
+            E_vector = numpy.cross(self.E_vector, direction)
+            E_vector = numpy.cross(E_vector, direction)
+    
+            count = 3
+            ray_data = numpy.zeros((2*count)+1, dtype=ray_dtype)
+            
+            theta0 = self.wavelength/(numpy.pi*radius*1000.0)
+            lr = numpy.array([1,-1])[:,None,None]
+            eye = numpy.array([1,1])[:,None,None]
+            alpha = (numpy.arange(count)*(2*numpy.pi/count))[None,:,None]
+            origins = eye*radius*(d1*numpy.sin(alpha) + d2*numpy.cos(alpha))
+            directions = theta0*lr*(d1*numpy.cos(alpha) - d2*numpy.sin(alpha))
+            
+            origins.shape = (-1,3)
+            directions.shape = (-1,3)
+            directions += direction
+            directions = normaliseVector(directions)
+            origins = origins - (self.working_distance*directions)
+                
+            ray_data['origin'] = origin
+            ray_data['origin'][1:] += origins + (self.working_distance*direction)
+            ray_data['direction'][1:] = directions
+            ray_data['direction'][0] = direction
+            ray_data['wavelength_idx'] = 0
+            ray_data['E_vector'] = [normaliseVector(E_vector)]
+            ray_data['E1_amp'] = self.E1_amp
+            ray_data['E2_amp'] = self.E2_amp
+            ray_data['refractive_index'] = 1.0+0.0j
+            ray_data['normal'] = [[0,1,0]]
+            ray_data['ray_type_id'] = GAUSSLET_
+            ray_data['ray_type_id'][1:] |= PARABASAL_ 
+            rays = RayCollection.from_array(ray_data)
+            
+            neighbours = numpy.full((7, 6), -1, 'i')
+            neighbours[0,:] = [1,2,3,4,5,6]
+            rays.neighbours = neighbours
+        except:
+            import traceback
+            traceback.print_exc()
+            return RayCollection(5)
+        return rays
