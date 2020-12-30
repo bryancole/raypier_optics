@@ -114,7 +114,7 @@ class IntensityImageView(Result):
         self.intensity_data = U
         return U
     
-    @on_trait_change("use_log")
+    @on_trait_change("use_log, display")
     def _display_changed(self):
         self.on_field_changed(self.field_probe.E_field)
     

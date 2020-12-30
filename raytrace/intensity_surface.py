@@ -1,6 +1,6 @@
 
 
-from traits.api import Float, Instance, Enum, Array
+from traits.api import Float, Instance, Enum, Array, on_trait_change
 
 from traitsui.api import View, Item, VGroup, HGroup
 
@@ -48,8 +48,10 @@ class IntensitySurface(Result):
             map.scalar_range = (sdata.min(), sdata.max())
         self.scene.render()
         
+    @on_trait_change("scale, intensity_data")
     def _scale_changed(self, value):
         w = self._warp
+        value = self.scale
         low = self.intensity_data.min()
         high = self.intensity_data.max()
         m=self._map
