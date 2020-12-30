@@ -940,6 +940,7 @@ class RayFieldSource(SingleRaySource):
     
 
 class HexagonalRayFieldSource(RayFieldSource):
+    abstract = False
     radius = Float(10.,editor=NumEditor)
     resolution = Float(10.0, editor=NumEditor)
     gauss_width = Float(2.0, editor=NumEditor)
@@ -1040,7 +1041,7 @@ class HexagonalRayFieldSource(RayFieldSource):
     
     
 class ConfocalRayFieldSource(HexagonalRayFieldSource):
-    
+    abstract = False
     angle = Float(10.0)
     
     ### Number of angle steps along the radius

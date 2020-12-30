@@ -389,7 +389,7 @@ cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
         long double R = (2.0*a1*a1*a1 - 9.0*a1*a2 + 27.0*a3)/54.0
         long double R2_Q3 = R*R - Q*Q*Q
         long double theta
-        poly_roots x
+        poly_roots x= ((0.0,0.0,0.0),0)
     if fabs(a) <= 0.0000000001:
         #^this, precision is less than ideal here
         if fabs(b) <= 0.0000000001:

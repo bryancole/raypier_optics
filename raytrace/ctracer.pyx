@@ -704,7 +704,8 @@ cdef class RayCollection:
         
     cdef void _eval_neighbours(self, int[:,:] pnb):
         cdef:
-            int i, j, pidx, rtype, child_nb
+            unsigned long i
+            int j, pidx, child_nb, rtype
             int[:,:] rmap
             unsigned int nparent=self._parent.n_rays
             
@@ -715,12 +716,12 @@ cdef class RayCollection:
         nb = np.full( (self.n_rays, pnb.shape[1]), -1, dtype=np.int32)
         
         for i in range(self.n_rays):
-            rtype = self.rays[i].ray_type_id
+            rtype = self.rays[i].ray_type_id & REFL_RAY
             pidx = self.rays[i].parent_idx
             rmap[pidx, rtype] = i
             
         for i in range(self.n_rays):
-            rtype = self.rays[i].ray_type_id
+            rtype = self.rays[i].ray_type_id & REFL_RAY
             pidx = self.rays[i].parent_idx
             for j in range(pnb.shape[1]):
                 child_nb = pnb[pidx,j]

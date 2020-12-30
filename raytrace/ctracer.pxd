@@ -29,6 +29,11 @@ ELSE:
     cdef struct complex_t:
         double real
         double imag
+        
+cdef:
+    unsigned int REFL_RAY=1<<0
+    unsigned int GAUSSLET=1<<1
+    unsigned int PARABASAL=1<<2
 
 
 cdef packed struct ray_t:
