@@ -357,6 +357,7 @@ cdef class GaussletCollectionIterator:
 
 cdef class ParabasalRay:
     def __cinit__(self, **kwds):
+        self.max_length = 1000.0
         for k in kwds:
             setattr(self, k, kwds[k])
             
@@ -403,6 +404,19 @@ cdef class ParabasalRay:
         def __set__(self, double v):
             self.ray.length = v
     
+    property termination:
+        """the end-point of the ray (read only)
+        """
+        def __get__(self):
+            cdef vector_t end
+            cdef float length
+            if self.ray.length > self.max_length:
+                length = self.max_length
+            else:
+                length = self.ray.length
+            end = addvv_(self.ray.origin, multvs_(self.ray.direction, 
+                                    length))
+            return (end.x, end.y, end.z)
 
 
 cdef class Ray:
@@ -414,6 +428,7 @@ cdef class Ray:
     """
     
     def __cinit__(self, **kwds):
+        self.max_length = 1000.0
         for k in kwds:
             setattr(self, k, kwds[k])
             
@@ -502,8 +517,8 @@ cdef class Ray:
         def __get__(self):
             cdef vector_t end
             cdef float length
-            if self.ray.length > 1000.0:
-                length = 1000.0
+            if self.ray.length > self.max_length:
+                length = self.max_length
             else:
                 length = self.ray.length
             end = addvv_(self.ray.origin, multvs_(self.ray.direction, 
@@ -684,8 +699,8 @@ cdef class Gausslet:
             setattr(self, k, kwds[k])
             
     def __repr__(self):
-        return "Gausslet(o=%s, d=%s)"%(str(self.origin),
-                                            str(self.direction))
+        return "Gausslet(o=%s, d=%s)"%(str(self.base_ray.origin),
+                                            str(self.base_ray.direction))
         
     property base_ray:
         def __get__(self):
@@ -1137,6 +1152,20 @@ cdef class GaussletCollection:
                 raise TypeError("ray list contains non-Gausslet instance at index %d"%i)
         for i in range(len(rays)):
             self.add_ray_c((<Gausslet>rays[i]).gausslet)
+            
+    cdef void reset_length_c(self, double max_length):
+        cdef:
+            size_t i, j
+        for i in range(self.n_rays):
+            self.rays[i].base_ray.length = max_length
+            for j in range(6):
+                self.rays[i].para[j].length = max_length
+        
+            
+    def reset_length(self, double max_length=INF):
+        """Sets the length of all rays in this RayCollection to Infinity
+        """
+        self.reset_length_c(max_length)
         
     def clear_ray_list(self):
         """Empties this RayCollection (by setting the count to zero)
@@ -1178,6 +1207,138 @@ cdef class GaussletCollection:
         cdef np_.ndarray out = np.empty(self.n_rays, dtype=gausslet_dtype)
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(gausslet_t))
         return out
+    
+    @classmethod
+    def from_array(cls, np_.ndarray data):
+        """Creates a new RayCollection from the given numpy array. The array
+        dtype should be a ctracer.ray_dtype. The data is copied into the 
+        RayCollection
+        """
+        cdef: 
+            int size=data.shape[0]
+            GaussletCollection rc = GaussletCollection(size)
+        assert data.dtype is gausslet_dtype
+        memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(gausslet_t))
+        rc.n_rays = size
+        return rc
+    
+    property origin:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                size_t i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].base_ray.origin
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property para_origin:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,6,3), dtype='d')
+                size_t i, j
+                vector_t v
+            for i in xrange(self.n_rays):
+                for j in xrange(6):
+                    v = self.rays[i].para[j].origin
+                    out[i,j,0] = v.x
+                    out[i,j,1] = v.y
+                    out[i,j,2] = v.z
+            return out
+        
+    property direction:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                size_t i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].base_ray.direction
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property para_direction:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,6,3), dtype='d')
+                size_t i, j
+                vector_t v
+            for i in xrange(self.n_rays):
+                for j in range(6):
+                    v = self.rays[i].para[j].direction
+                    out[i,j,0] = v.x
+                    out[i,j,1] = v.y
+                    out[i,j,2] = v.z
+            return out
+    
+    property normal:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,3), dtype='d')
+                size_t i
+                vector_t v
+            for i in xrange(self.n_rays):
+                v = self.rays[i].base_ray.normal
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return out
+        
+    property para_normal:
+        def __get__(self):
+            cdef:
+                np_.ndarray out = np.empty((self.n_rays,6,3), dtype='d')
+                size_t i, j
+                vector_t v
+            for i in xrange(self.n_rays):
+                for j in range(6):
+                    v = self.rays[i].para[j].normal
+                    out[i,j,0] = v.x
+                    out[i,j,1] = v.y
+                    out[i,j,2] = v.z
+            return out
+        
+    property termination:
+        def __get__(self):
+            cdef:
+                np_.ndarray aout = np.empty((self.n_rays,3), dtype='d')
+                double [:,:] out = aout
+                size_t i
+                vector_t v
+                ray_t *r
+            for i in xrange(self.n_rays):
+                r = &self.rays[i].base_ray
+                v = addvv_(r.origin, 
+                           multvs_(r.direction, 
+                                    r.length))
+                out[i,0] = v.x
+                out[i,1] = v.y
+                out[i,2] = v.z
+            return aout
+        
+    property para_termination:
+        def __get__(self):
+            cdef:
+                np_.ndarray aout = np.empty((self.n_rays,6,3), dtype='d')
+                double [:,:,:] out = aout
+                size_t i,j
+                vector_t v
+                para_t *p
+            for i in xrange(self.n_rays):
+                for j in range(1,7):
+                    p = self.rays[i].para + j
+                    v = addvv_(p.origin, 
+                           multvs_(p.direction, 
+                                    p.length))
+                    out[i,j,0] = v.x
+                    out[i,j,1] = v.y
+                    out[i,j,2] = v.z
+            return aout
         
     
 cdef class InterfaceMaterial(object):
@@ -1337,7 +1498,7 @@ cdef class FaceList(object):
         self.inverse_transform = Transform()
         self.owner = owner
         
-    def sync_transforms(self):
+    cpdef void sync_transforms(self):
         """sets the transforms from the owner's VTKTransform
         """
         try:
@@ -1523,8 +1684,16 @@ def trace_segment(RayCollection rays,
         fs.sync_transforms()
     return trace_segment_c(rays, face_sets, all_faces, max_length)
 
+def trace_gausslet(GaussletCollection rays, 
+                    list face_sets, 
+                    list all_faces,
+                    max_length=100):
+    for fs in face_sets:
+        (<FaceList>fs).sync_transforms()
+    return trace_gausslet_c(rays, face_sets, all_faces, max_length)
 
-cdef GaussletCollection trace_gausslets_c(GaussletCollection gausslets, 
+
+cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
                                     list face_sets, 
                                     list all_faces,
                                     double max_length):
@@ -1548,7 +1717,6 @@ cdef GaussletCollection trace_gausslets_c(GaussletCollection gausslets,
     for i in range(gausslets.n_rays):
         gausslet = gausslets.rays + i
         ray = &gausslet.base_ray
-        ray.length = max_length
         ray.end_face_idx = -1
         nearest_idx=-1
         point = addvv_(ray.origin, 
@@ -1578,7 +1746,9 @@ cdef GaussletCollection trace_gausslets_c(GaussletCollection gausslets,
                                                     orient,
                                                     child_rays
                                                     )
-            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length )
+            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length)
+            
+    new_gausslets.reset_length_c(max_length)
     return new_gausslets
 
 
@@ -1597,11 +1767,11 @@ cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face f
         
         for j in range(6):
             para_ray = g_in.para + j
-            para_ray.length = max_length
             ray_end = addvv_(para_ray.origin, 
                             multvs_(para_ray.direction, 
                                     max_length))
             if face_set.intersect_para_c(para_ray, ray_end, face):
+                print("miss")
                 break
             
             point = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))

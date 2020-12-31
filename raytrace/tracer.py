@@ -41,7 +41,7 @@ import yaml
 from contextlib import contextmanager
 from itertools import chain, islice, count
 from raytrace.sources import BaseRaySource
-from raytrace.ctracer import Face
+from raytrace.ctracer import Face, RayCollection
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
 from raytrace.bases import Traceable, Probe, Result
@@ -54,7 +54,7 @@ from raytrace.qt_future_call import FutureCall
 counter = count()
 
 from raytrace import mirrors, prisms, corner_cubes, ellipsoids, sources,\
-    results, beamstop, lenses, beamsplitters, waveplates, apertures, fields
+    results, beamstop, lenses, beamsplitters, waveplates, apertures, fields, gausslet_sources
 
 optics_classes = sorted(Traceable.subclasses, key=lambda c: c.__name__)
 
@@ -375,8 +375,10 @@ class RayTraceModel(HasQueue):
         """trace a ray source asequentially, using the ctracer framework"""
         max_length = ray_source.max_ray_len
         rays = ray_source.InputRays #FIXME
-        rays.reset_length()
+        rays.reset_length(max_length)
         traced_rays = []
+        trace_func = ctracer.trace_segment if isinstance(rays, RayCollection) else ctracer.trace_gausslet
+        
         limit = self.recursion_limit
         count = 0
         face_sets = list(self.face_sets)
@@ -389,7 +391,7 @@ class RayTraceModel(HasQueue):
             while rays.n_rays>0 and count<limit:
                 #print "count", count
                 traced_rays.append(rays)
-                rays = ctracer.trace_segment(rays, face_sets, all_faces, 
+                rays = trace_func(rays, face_sets, all_faces, 
                                              max_length=max_length)
                 count += 1
             ray_source.TracedRays = traced_rays

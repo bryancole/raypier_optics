@@ -19,6 +19,7 @@
 import numpy
 import itertools
 import traceback
+from abc import ABCMeta
 
 from traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
@@ -29,7 +30,7 @@ from traitsui.api import View, Item, Tabbed, VGroup, Include, \
 
 from tvtk.api import tvtk
 
-from raytrace.ctracer import RayCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
+from raytrace.ctracer import RayCollection, GaussletCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
 from raytrace.bases import RaytraceObject, NumEditor
@@ -40,6 +41,12 @@ Vector = Array(shape=(3,))
 
 class BaseBase(HasTraits, RaytraceObject):
     pass
+
+
+class BaseRayCollection(metaclass=ABCMeta):
+    pass
+BaseRayCollection.register(RayCollection)
+BaseRayCollection.register(GaussletCollection)
 
 
 class BaseRaySource(BaseBase):
@@ -58,11 +65,11 @@ class BaseRaySource(BaseBase):
     
     wavelength_list = List() #List of wavelengths (floats) given in microns
     
-    InputRays = Property(Instance(RayCollection), depends_on="max_ray_len")
-    TracedRays = List(RayCollection, transient=True)
+    InputRays = Property(Instance(BaseRayCollection), depends_on="max_ray_len")
+    TracedRays = List(BaseRayCollection, transient=True)
     
-    InputDetailRays = Property(Instance(RayCollection), depends_on="InputRays")
-    TracedDetailRays = List(RayCollection, transient=True)
+    InputDetailRays = Property(Instance(BaseRayCollection), depends_on="InputRays")
+    TracedDetailRays = List(BaseRayCollection, transient=True)
 
     detail_resolution = Int(32)
 
@@ -282,8 +289,8 @@ class BaseRaySource(BaseBase):
                 vis = mask.get(rays, [])
                 if len(vis) != len(rays):
                     vis = itertools.repeat(True)
-                start_pos = [r.origin for r,v in zip(rays, vis) if v]
-                end_pos = [r.termination for r,v in zip(rays, vis) if v]
+                start_pos = [r.base_ray.origin for r,v in zip(rays, vis) if v]
+                end_pos = [r.base_ray.termination for r,v in zip(rays, vis) if v]
                 #print "start", start_pos
                 #print "end", end_pos
                 interleaved = numpy.array([start_pos, end_pos]).swapaxes(0,1).reshape(-1,3)

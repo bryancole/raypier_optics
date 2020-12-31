@@ -103,11 +103,15 @@ cdef class Transform:
     
 
 cdef class Ray:
-    cdef ray_t ray
+    cdef:
+        ray_t ray
+        double max_length
     
 
 cdef class ParabasalRay:
-    cdef para_t ray
+    cdef:
+        para_t ray
+        double max_length
     
     
 cdef class Gausslet:
@@ -137,6 +141,7 @@ cdef class GaussletCollection:
         GaussletCollection _parent     
 
     cdef add_gausslet_c(self, gausslet_t r)
+    cdef void reset_length_c(self, double max_length)
     
     
 
@@ -197,6 +202,7 @@ cdef class FaceList(object):
     cdef public list faces
     cdef public object owner
 
+    cpdef void sync_transforms(self)
     cdef int intersect_c(self, ray_t *ray, vector_t end_point)
     cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point)
@@ -211,7 +217,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list all_faces,
                                     float max_length)
 
-cdef GaussletCollection trace_gausslets_c(GaussletCollection gausslets, 
+cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
                                     list face_sets, 
                                     list all_faces,
                                     double max_length)
