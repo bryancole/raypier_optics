@@ -1,5 +1,4 @@
 #!/bin/env python
-from builtins import None
 
 #cython: boundscheck=False
 #cython: nonecheck=False
@@ -20,6 +19,9 @@ cdef extern from "float.h":
 cdef:
     INF=(DBL_MAX+DBL_MAX)
     double root2 = sqrt(2.0)
+    public unsigned int REFL_RAY=1<<0
+    public unsigned int GAUSSLET=1<<1
+    public unsigned int PARABASAL=1<<2
     
 from libc.stdlib cimport malloc, free, realloc
 
@@ -29,6 +31,8 @@ cdef extern from "stdlib.h" nogil:
 import time
 import numpy as np
 cimport numpy as np_
+
+cdef int NPARA = 6
 
 ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('direction', np.double, (3,)),
@@ -49,6 +53,19 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
     
 GAUSSLET_ = GAUSSLET
 PARABASAL_ = PARABASAL
+
+para_dtype = np.dtype([('origin', np.double, (3,)),
+                        ('direction', np.double, (3,)),
+                        ('normal', np.double, (3,)),
+                        ('length', np.double),
+                        ])
+
+
+gausslet_dtype = np.dtype([
+                    ('base_ray', ray_dtype),
+                    ('para_rays', para_dtype, (NPARA,))
+                    ])
+
 
 ############################################
 ### C type declarations for internal use ###
@@ -319,6 +336,73 @@ cdef class RayCollectionIterator:
         ray.ray = self.rays.rays[self.counter]
         self.counter += 1
         return ray
+    
+    
+cdef class GaussletCollectionIterator:        
+    def __cinit__(self, GaussletCollection rays):
+        self.rays = rays
+        self.counter = 0
+        
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        cdef Gausslet ray=Gausslet.__new__(Gausslet)
+        if self.counter >= self.rays.n_rays:
+            raise StopIteration
+        ray.gausslet = self.rays.rays[self.counter]
+        self.counter += 1
+        return ray
+
+
+cdef class ParabasalRay:
+    def __cinit__(self, **kwds):
+        for k in kwds:
+            setattr(self, k, kwds[k])
+            
+    def __repr__(self):
+        return "Parabasal Ray(o=%s, d=%s)"%(str(self.origin),
+                                            str(self.direction))
+        
+    property origin:
+        """Origin coordinates of the ray"""
+        def __get__(self):
+            return (self.ray.origin.x,self.ray.origin.y,self.ray.origin.z)
+        
+        def __set__(self, v):
+            self.ray.origin.x = v[0]
+            self.ray.origin.y = v[1]
+            self.ray.origin.z = v[2]
+            
+    property direction:
+        """direction of the ray, normalised to a unit vector"""
+        def __get__(self):
+            return (self.ray.direction.x,self.ray.direction.y,self.ray.direction.z)
+        
+        def __set__(self, v):
+            self.ray.direction.x = v[0]
+            self.ray.direction.y = v[1]
+            self.ray.direction.z = v[2]
+            
+    property normal:
+        """normal vector for the face which created this ray"""
+        def __get__(self):
+            return (self.ray.normal.x,self.ray.normal.y,self.ray.normal.z)
+        
+        def __set__(self, v):
+            self.ray.normal.x = v[0]
+            self.ray.normal.y = v[1]
+            self.ray.normal.z = v[2]
+            
+    property length:
+        """The length of the ray. This is infinite in 
+        unterminated rays"""
+        def __get__(self):
+            return self.ray.length
+        
+        def __set__(self, double v):
+            self.ray.length = v
+    
 
 
 cdef class Ray:
@@ -357,7 +441,7 @@ cdef class Ray:
             self.ray.direction.y = v[1]
             self.ray.direction.z = v[2]
             
-    property normals:
+    property normal:
         """normal vector for the face which created this ray"""
         def __get__(self):
             return (self.ray.normal.x,self.ray.normal.y,self.ray.normal.z)
@@ -592,6 +676,44 @@ cdef class Ray:
         self.ray.E2_amp.imag = E2.imag*A + E1.imag*B
         
         self.ray.E_vector = E_vector2
+        
+        
+cdef class Gausslet:
+    def __cinit__(self, **kwds):
+        for k in kwds:
+            setattr(self, k, kwds[k])
+            
+    def __repr__(self):
+        return "Gausslet(o=%s, d=%s)"%(str(self.origin),
+                                            str(self.direction))
+        
+    property base_ray:
+        def __get__(self):
+            cdef:
+                Ray out = Ray()
+                
+            out.ray = self.gausslet.base_ray
+            return out
+        
+        def __set__(self, Ray r):
+            self.gausslet.base_ray = r
+            
+    property parabasal_rays:
+        def __get__(self):
+            cdef:
+                ParabasalRay p
+                int i
+                tuple out
+                
+            out = tuple(ParabasalRay() for i in range(6))
+            for i in range(6):
+                p = out[i]
+                p.ray = self.gausslet.para[i]
+            return out
+        
+        def __set__(self, tuple paras):
+            for i in range(6):
+                self.gausslet.para[i] = paras[i].ray
         
 
 cdef class RayCollection:
@@ -961,6 +1083,101 @@ cdef class RayCollection:
         memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(ray_t))
         rc.n_rays = size
         return rc
+    
+    
+cdef class GaussletCollection:
+    """A list-like collection of ray_t objects.
+    
+    The RayCollection is the primary data-structure used in the ray-tracing operation. 
+    
+    The RayCollection is of variable length, in that it can grow as individual rays are added to it.
+    Internally, the memory allocated to the array of ray_t structures is re-allocated to increase
+    its capacity.
+    """
+    
+    def __cinit__(self, size_t max_size):
+        self.rays = <gausslet_t*>malloc(max_size*sizeof(gausslet_t))
+        self.n_rays = 0
+        self.max_size = max_size
+        
+    def __dealloc__(self):
+        free(self.rays)
+        
+    def __len__(self):
+        return self.n_rays
+    
+    property parent:
+        def __get__(self):
+            return self._parent
+        
+        def __set__(self, GaussletCollection gc):
+            self._parent = gc
+        
+    cdef add_gausslet_c(self, gausslet_t r):
+        if self.n_rays == self.max_size:
+            if self.max_size == 0:
+                self.max_size = 1
+            else:
+                self.max_size *= 2
+            self.rays = <gausslet_t*>realloc(self.rays, self.max_size*sizeof(gausslet_t))
+        self.rays[self.n_rays] = r
+        self.n_rays += 1
+        
+    def add_gausslet(self, Gausslet r):
+        """Adds the given Ray instance to this collection
+        """
+        self.add_gausslet_c(r.gausslet)
+        
+    def add_gausslet_list(self, list rays):
+        """Adds the given list of Rays to this collection
+        """
+        cdef long int i
+        for i in range(len(rays)):
+            if not isinstance(rays[i], Gausslet):
+                raise TypeError("ray list contains non-Gausslet instance at index %d"%i)
+        for i in range(len(rays)):
+            self.add_ray_c((<Gausslet>rays[i]).gausslet)
+        
+    def clear_ray_list(self):
+        """Empties this RayCollection (by setting the count to zero)
+        """
+        self.n_rays = 0
+        
+    def get_gausslet_list(self):
+        """Returns the contents of this RayCollection as a list of Rays
+        """
+        cdef size_t i
+        cdef list ray_list = []
+        cdef Gausslet r
+        for i in range(self.n_rays):
+            r = Gausslet()
+            r.gausslet = self.rays[i]
+            ray_list.append(r)
+        return ray_list
+    
+    def __getitem__(self, size_t idx):
+        cdef Gausslet r
+        if idx >= self.n_rays:
+            raise IndexError("Requested index %d from a size %d array"%(idx, self.n_rays))
+        r = Gausslet()
+        r.gausslet = self.rays[idx]
+        return r
+    
+    def __setitem__(self, size_t idx, Gausslet r):
+        if idx >= self.n_rays:
+            raise IndexError("Attempting to set index %d from a size %d array"%(idx, self.n_rays))
+        self.rays[idx] = r.gausslet
+        
+    def __iter__(self):
+        return GaussletCollectionIterator(self)
+    
+    def copy_as_array(self):
+        """Returns the contents of this RayCollection as a numpy array
+        (the data is always copied).
+        """
+        cdef np_.ndarray out = np.empty(self.n_rays, dtype=gausslet_dtype)
+        memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(gausslet_t))
+        return out
         
     
 cdef class InterfaceMaterial(object):
@@ -978,6 +1195,30 @@ cdef class InterfaceMaterial(object):
                                 RayCollection new_rays):
         pass
     
+    cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray, 
+                                     vector_t direction, #incoming ray direction
+                                   vector_t point, #position of intercept
+                                   orientation_t orient,
+                                   unsigned int ray_type_id, #bool, if True, it's a reflected ray
+                                   ):
+        cdef:
+            vector_t cosThetaNormal, reflected, normal
+            para_t para_out
+            double cosTheta
+        
+        normal = norm_(orient.normal)
+        if ray_type_id & REFL_RAY:
+            cosTheta = dotprod_(normal, direction)
+            cosThetaNormal = multvs_(normal, cosTheta)
+            reflected = subvv_(direction, multvs_(cosThetaNormal, 2))
+            para_out.direction = reflected
+        else:
+            para_out.direction = direction
+        para_out.origin = point
+        para_out.normal = normal
+        para_out.length = INF
+        return para_out
+    
     def eval_child_ray(self, Ray old_ray, ray_idx, point, 
                         normal, tangent, RayCollection new_rays):
         cdef:
@@ -991,6 +1232,19 @@ cdef class InterfaceMaterial(object):
         n.tangent = set_v(tangent)
         self.eval_child_ray_c(&old_ray.ray, ray_idx, 
                                         p, n, new_rays)
+        
+    def eval_parabasal_ray(self, Ray base_ray, direction, point, normal, tangent, reflect=False):
+        cdef:
+            vector_t d=set_v(direction), p = set_v(point)
+            orientation_t n
+            ParabasalRay out = ParabasalRay()
+            unsigned int ray_type=1 if reflect else 0
+            
+        n.normal = set_v(normal)
+        n.tangent = set_v(tangent)
+        out.ray = self.eval_parabasal_ray_c(&base_ray.ray, d, p, n, ray_type)
+        return out
+            
         
     property wavelengths:
         def __set__(self, double[:] wavelengths):
@@ -1124,7 +1378,7 @@ cdef class FaceList(object):
         return self.faces[intidx]
         
      
-    cdef int intersect_c(self, ray_t *ray, vector_t ray_end, double max_length):
+    cdef int intersect_c(self, ray_t *ray, vector_t ray_end):
         """Finds the face with the nearest intersection
         point, for the ray defined by the two input points,
         P1 and P2 (in global coords).
@@ -1147,12 +1401,33 @@ cdef class FaceList(object):
                 ray.end_face_idx = all_idx
         return all_idx
     
-    def intersect(self, Ray r, double max_length):
+    def intersect(self, Ray r):
         cdef vector_t P1_
         cdef int idx
         
         P1_ = addvv_(r.ray.origin, multvs_(r.ray.direction, r.ray.length))
-        idx = self.intersect_c(&r.ray, P1_, max_length)
+        idx = self.intersect_c(&r.ray, P1_)
+        return idx
+    
+    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face):
+        cdef:
+            vector_t p1 = transform_c(self.inv_trans, ray.origin)
+            vector_t p2 = transform_c(self.inv_trans, ray_end)
+            unsigned int i
+            double dist
+        
+        dist = face.intersect_c(p1, p2)
+        if face.tolerance < dist < ray.length:
+            ray.length = dist
+            return 0
+        return -1
+    
+    def intersect_para(self, ParabasalRay r, Face face):
+        cdef vector_t P1_
+        cdef int idx
+        
+        P1_ = addvv_(r.ray.origin, multvs_(r.ray.direction, r.ray.length))
+        idx = self.intersect_para_c(&r.ray, P1_, face)
         return idx
     
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point):
@@ -1197,12 +1472,10 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     float max_length):
     cdef:
         FaceList face_set #a FaceList
-        size_t size
         size_t i, j, n_sets=len(face_sets)
-        vector_t P1, point
+        vector_t point
         orientation_t orient
         int idx, nearest_set=-1, nearest_idx=-1
-        ray_t new_ray
         ray_t *ray
         RayCollection new_rays
    
@@ -1222,7 +1495,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         for j in range(n_sets):
             face_set = face_sets[j]
             #intersect_c returns the face idx of the intersection, or -1 otherwise
-            idx = (<FaceList>face_set).intersect_c(ray, point, max_length)
+            idx = (<FaceList>face_set).intersect_c(ray, point)
             if idx >= 0:
                 nearest_set = j
                 nearest_idx = idx
@@ -1249,6 +1522,101 @@ def trace_segment(RayCollection rays,
     for fs in face_sets:
         fs.sync_transforms()
     return trace_segment_c(rays, face_sets, all_faces, max_length)
+
+
+cdef GaussletCollection trace_gausslets_c(GaussletCollection gausslets, 
+                                    list face_sets, 
+                                    list all_faces,
+                                    double max_length):
+    cdef:
+        FaceList face_set #a FaceList
+        size_t i, j, n_sets=len(face_sets)
+        vector_t point
+        orientation_t orient
+        int idx, nearest_set=-1, nearest_idx=-1
+        gausslet_t *gausslet
+        ray_t *ray
+        GaussletCollection new_gausslets
+        RayCollection child_rays
+   
+    #need to allocate the output rays here 
+    new_gausslets = GaussletCollection(gausslets.n_rays)
+    new_gausslets.parent = gausslets
+    
+    child_rays = RayCollection(2)
+    
+    for i in range(gausslets.n_rays):
+        gausslet = gausslets.rays + i
+        ray = &gausslet.base_ray
+        ray.length = max_length
+        ray.end_face_idx = -1
+        nearest_idx=-1
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    max_length))
+        #print "points", P1, P2
+        for j in range(n_sets):
+            face_set = face_sets[j]
+            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            idx = (<FaceList>face_set).intersect_c(ray, point)
+            if idx >= 0:
+                nearest_set = j
+                nearest_idx = idx
+        if nearest_idx >= 0:
+            #print "GET FACE", nearest.face_idx, len(all_faces)
+            face = all_faces[nearest_idx]
+            face.count += 1
+            #print "ray length", ray.length
+            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+            face_set = (<FaceList>(face_sets[nearest_set])) 
+            orient = face_set.compute_orientation_c(face, point)
+            #print "s normal", normal
+            ### Clear the child_rays structure
+            child_rays.n_rays = 0
+            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                    point,
+                                                    orient,
+                                                    child_rays
+                                                    )
+            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length )
+    return new_gausslets
+
+
+cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face face, FaceList face_set, 
+                          GaussletCollection new_gausslets, double max_length):
+    cdef:
+        unsigned int i,j
+        para_t *para_ray
+        gausslet_t gausslet
+        vector_t ray_end, point
+        orientation_t orient
+        InterfaceMaterial material = (<InterfaceMaterial>(face.material))
+        
+    for i in range(base_rays.n_rays):
+        gausslet.base_ray = base_rays.rays[i]
+        
+        for j in range(6):
+            para_ray = g_in.para + j
+            para_ray.length = max_length
+            ray_end = addvv_(para_ray.origin, 
+                            multvs_(para_ray.direction, 
+                                    max_length))
+            if face_set.intersect_para_c(para_ray, ray_end, face):
+                break
+            
+            point = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))
+            orient = face_set.compute_orientation_c(face, point)
+            
+            gausslet.para[j] = material.eval_parabasal_ray_c(base_rays.rays + i,
+                                                            para_ray.direction, #incoming ray direction
+                                                            point, #position of intercept
+                                                            orient,
+                                                            gausslet.base_ray.ray_type_id, #indicates if it's a transmitted or reflected ray 
+                                                            )
+        if j>=5:
+            new_gausslets.add_gausslet_c(gausslet)
+            
+            
 
 
 def transform(Transform t, p):

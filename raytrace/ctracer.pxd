@@ -7,7 +7,9 @@ cdef extern from "float.h":
     #double INFINITY
     double DBL_MAX
 
-cdef double INF
+cdef:
+    double INF
+    int NPARA=6
 
 
 from libc.stdlib cimport malloc, free
@@ -48,6 +50,20 @@ cdef packed struct ray_t:
     
     ##objects
     #object face, end_face, child_refl, child_trans
+    
+### Structure for parabasal rays. These only carry geometric information.
+cdef packed struct para_t:
+    #vectors
+    vector_t origin, direction, normal
+    #simple attribs
+    double length
+
+    
+### A Gausslet combines a base-ray with 6 parabasal rays
+cdef packed struct gausslet_t:
+    ray_t base_ray
+    para_t para[6]
+    
 
 cdef struct transform_t:
     double m00, m01, m02, m10, m11, m12, m20, m21, m22
@@ -84,9 +100,19 @@ cdef  vector_t invert_(vector_t v) nogil
 
 cdef class Transform:
     cdef transform_t trans
+    
 
 cdef class Ray:
     cdef ray_t ray
+    
+
+cdef class ParabasalRay:
+    cdef para_t ray
+    
+    
+cdef class Gausslet:
+    cdef gausslet_t gausslet
+    
 
 cdef class RayCollection:
     cdef: 
@@ -103,10 +129,26 @@ cdef class RayCollection:
     
     cdef void _eval_neighbours(self, int[:,:] pnb)
     
+    
+cdef class GaussletCollection:
+    cdef: 
+        gausslet_t *rays
+        readonly unsigned long n_rays, max_size
+        GaussletCollection _parent     
+
+    cdef add_gausslet_c(self, gausslet_t r)
+    
+    
 
 cdef class RayCollectionIterator:
     cdef:
         RayCollection rays
+        unsigned int counter
+        
+        
+cdef class GaussletCollectionIterator:
+    cdef:
+        GaussletCollection rays
         unsigned int counter
 
 
@@ -121,6 +163,13 @@ cdef class InterfaceMaterial(object):
                             vector_t point,
                             orientation_t orient,
                             RayCollection new_rays)
+    
+    cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray,  
+                                     vector_t direction, #incoming ray direction
+                                   vector_t point, #position of intercept
+                                   orientation_t orient,
+                                   unsigned int ray_type_id, #indicates if it's a transmitted or reflected ray 
+                                   )
 
     cdef on_set_wavelengths(self)
 
@@ -148,7 +197,8 @@ cdef class FaceList(object):
     cdef public list faces
     cdef public object owner
 
-    cdef int intersect_c(self, ray_t *ray, vector_t end_point, double max_length)
+    cdef int intersect_c(self, ray_t *ray, vector_t end_point)
+    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point)
 
 
@@ -160,5 +210,10 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list face_sets,
                                     list all_faces,
                                     float max_length)
+
+cdef GaussletCollection trace_gausslets_c(GaussletCollection gausslets, 
+                                    list face_sets, 
+                                    list all_faces,
+                                    double max_length)
 
 cdef double ray_power_(ray_t ray)

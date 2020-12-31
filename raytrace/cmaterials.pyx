@@ -34,7 +34,8 @@ cdef:
 from ctracer cimport InterfaceMaterial, norm_, dotprod_, \
         multvs_, subvv_, vector_t, ray_t, RayCollection, \
         complex_t, mag_sq_, Ray, cross_, set_v, ray_power_, \
-        orientation_t, addvv_, REFL_RAY, PARABASAL
+        orientation_t, addvv_, REFL_RAY, PARABASAL, \
+        para_t, gausslet_t, GaussletCollection
 
 import numpy as np
 cimport numpy as np_
@@ -544,6 +545,50 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.ray_type_id &= ~REFL_RAY
         new_rays.add_ray_c(sp_ray)
         
+        
+    cdef para_t eval_parabasal_ray_c(self,
+                                     ray_t *base_ray, 
+                                     vector_t direction, #incoming ray direction
+                                   vector_t point, #position of intercept
+                                   orientation_t orient,
+                                   unsigned int ray_type_id, #bool, if True, it's a reflected ray
+                                   ):
+        cdef:
+            vector_t cosThetaNormal, normal, out_dir
+            para_t para_out
+            double cosTheta, n1, n2
+            int flip
+        
+        normal = norm_(orient.normal)
+        direction = norm_(direction)
+        cosTheta = dotprod_(normal, direction)
+        cosThetaNormal = multvs_(normal, cosTheta)
+        
+        if cosTheta < 0.0: 
+            #ray incident from outside going inwards
+            n1 = self.n_outside_.real
+            n2 = self.n_inside_.real
+            flip = 1
+        else:
+            n1 = self.n_inside_.real
+            n2 = self.n_outside_.real
+            flip = -1
+        
+        if ray_type_id & REFL_RAY:
+            out_dir = subvv_(direction, multvs_(cosThetaNormal, 2))
+        else:
+            tangent = subvv_(direction, cosThetaNormal)
+            tg2 = multvs_(tangent, n1/n2)
+            tan_mag_sq = mag_sq_(tg2)
+            c2 = sqrt(1-tan_mag_sq)
+            out_dir = subvv_(tg2, multvs_(normal, c2*flip))
+        
+        para_out.direction = out_dir 
+        para_out.origin = point
+        para_out.normal = normal
+        para_out.length = INF
+        return para_out
+        
 
 cdef class FullDielectricMaterial(DielectricMaterial):
     """Model for dielectric using full Fresnel equations 
@@ -1050,6 +1095,49 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.ray_type_id &= ~REFL_RAY
             new_rays.add_ray_c(sp_ray)
             
+    cdef para_t eval_parabasal_ray_c(self,
+                                     ray_t *base_ray, 
+                                     vector_t direction, #incoming ray direction
+                                   vector_t point, #position of intercept
+                                   orientation_t orient,
+                                   unsigned int ray_type_id, #bool, if True, it's a reflected ray
+                                   ):
+        cdef:
+            vector_t cosThetaNormal, normal, out_dir
+            para_t para_out
+            double cosTheta, n1, n2
+            int flip
+        
+        normal = norm_(orient.normal)
+        direction = norm_(direction)
+        cosTheta = dotprod_(normal, direction)
+        cosThetaNormal = multvs_(normal, cosTheta)
+        
+        if cosTheta < 0.0: 
+            #ray incident from outside going inwards
+            n1 = self.n_outside[base_ray.wavelength_idx].real#self.n_outside_.real
+            n2 = self.n_inside[base_ray.wavelength_idx].real
+            flip = 1
+        else:
+            n1 = self.n_inside[base_ray.wavelength_idx].real
+            n2 = self.n_outside[base_ray.wavelength_idx].real
+            flip = -1
+        
+        if ray_type_id & REFL_RAY:
+            out_dir = subvv_(direction, multvs_(cosThetaNormal, 2))
+        else:
+            tangent = subvv_(direction, cosThetaNormal)
+            tg2 = multvs_(tangent, n1/n2)
+            tan_mag_sq = mag_sq_(tg2)
+            c2 = sqrt(1-tan_mag_sq)
+            out_dir = subvv_(tg2, multvs_(normal, c2*flip))
+        
+        para_out.direction = out_dir 
+        para_out.origin = point
+        para_out.normal = normal
+        para_out.length = INF
+        return para_out
+            
 
 cdef class DiffractionGratingMaterial(InterfaceMaterial):
     ###A perfect reflection diffraction grating
@@ -1146,6 +1234,63 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         sp_ray.phase += 1000.0*dotprod_(subvv_(self.origin_, point), tangent)*self.order*2*M_PI/line_spacing
         
         new_rays.add_ray_c(sp_ray)
+        
+    cdef para_t eval_parabasal_ray_c(self,
+                                     ray_t *base_ray, 
+                                     vector_t direction, #incoming ray direction
+                                   vector_t point, #position of intercept
+                                   orientation_t orient,
+                                   unsigned int ray_type_id, #bool, if True, it's a reflected ray
+                                   ):        
+        cdef:
+            para_t para_out
+            vector_t reflected, normal, tangent, tangent2
+            ray_t sp_ray
+            complex_t n_ray
+            double k_x, k_y, k_z
+            double wavelen, line_spacing
+            int sign
+        
+        #Create surface unit axes
+        normal = norm_(orient.normal)
+        tangent = norm_(orient.tangent) #this is the grating wavevector direction
+        tangent2 = cross_(normal, tangent) #parallel to grating lines
+        
+        wavelen = self._wavelengths[base_ray.wavelength_idx]
+        line_spacing = 1000.0 / self.lines_per_mm #in microns
+        
+        reflected = norm_(direction) #ensure unit vector
+        #Break incoming direction vector into components along surface unit axes
+        k_z = dotprod_(normal, reflected)
+        k_y = dotprod_(tangent2, reflected)
+        k_x = dotprod_(tangent, reflected)
+        
+        if k_z<0.0:#invert for a reflecting grating
+            sign = 1
+        else:
+            sign = -1
+        
+        n_ray = base_ray.refractive_index #Should this be the parent refractive index?
+        k_x = k_x - self.order*wavelen/(line_spacing*n_ray.real)
+        #y-component (parallel to grating lines) doesn't change
+        
+        k_z = 1 - (k_x*k_x) - (k_y*k_y) #Apply Pythagoras to get z-component
+        if k_z < 0: #diffracted ray is evanescent
+            print("Error. Parabasal reflection is imaginary!")
+            #return #Then we're in trouble!
+        k_z = sign * sqrt(k_z) 
+        
+        #Add the x- , y- and z-components together
+        reflected = multvs_(tangent, k_x)
+        reflected = addvv_(reflected, multvs_(tangent2, k_y))
+        reflected = addvv_(reflected, multvs_(normal, k_z))
+                
+        para_out.direction = reflected
+        para_out.origin = point
+        para_out.normal = normal
+        para_out.length=INF        
+        
+        return para_out 
         
         
 cdef class CircularApertureMaterial(InterfaceMaterial):
