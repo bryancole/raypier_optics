@@ -129,6 +129,7 @@ cdef class RayCollection:
         double _mtime        
 
     cdef add_ray_c(self, ray_t r)
+    cdef void reset_length_c(self, double max_length)
     
     cdef double get_mtime(self, unsigned long guard)
     

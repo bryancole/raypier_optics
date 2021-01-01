@@ -763,12 +763,16 @@ cdef class RayCollection:
         self.rays[self.n_rays] = r
         self.n_rays += 1
         
-    def reset_length(self):
+    cdef void reset_length_c(self, double max_length):
+        cdef:
+            size_t i
+        for i in range(self.n_rays):
+            self.rays[i].length = max_length
+            
+    def reset_length(self, double max_length=INF):
         """Sets the length of all rays in this RayCollection to Infinity
         """
-        cdef size_t i
-        for i in xrange(self.n_rays):
-            self.rays[i].length = INF
+        self.reset_length_c(max_length)
         
     def add_ray(self, Ray r):
         """Adds the given Ray instance to this collection

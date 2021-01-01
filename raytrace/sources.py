@@ -285,12 +285,17 @@ class BaseRaySource(BaseBase):
             output = source.poly_data_output
             pointArrayList = []
             mask = self.ray_mask
+            gausslet = isinstance(self.InputRays, GaussletCollection)
             for rays in self.TracedRays:
                 vis = mask.get(rays, [])
                 if len(vis) != len(rays):
                     vis = itertools.repeat(True)
-                start_pos = [r.base_ray.origin for r,v in zip(rays, vis) if v]
-                end_pos = [r.base_ray.termination for r,v in zip(rays, vis) if v]
+                if gausslet:
+                    start_pos = [r.base_ray.origin for r,v in zip(rays, vis) if v]
+                    end_pos = [r.base_ray.termination for r,v in zip(rays, vis) if v]
+                else:
+                    start_pos = [r.origin for r,v in zip(rays, vis) if v]
+                    end_pos = [r.termination for r,v in zip(rays, vis) if v]
                 #print "start", start_pos
                 #print "end", end_pos
                 interleaved = numpy.array([start_pos, end_pos]).swapaxes(0,1).reshape(-1,3)

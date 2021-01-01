@@ -15,7 +15,8 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from traits.api import Float, Instance, on_trait_change, Array
+from traits.api import Float, Instance, on_trait_change, Array, Property,\
+        cached_property
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup
@@ -23,12 +24,13 @@ from traitsui.api import View, Item, ListEditor, VSplit,\
 from tvtk.api import tvtk
      
 from raytrace.bases import Optic, normaliseVector, NumEditor,\
-    ComplexEditor, Traceable, transformPoints, transformNormals
+    ComplexEditor, Traceable, transformPoints, transformNormals,\
+    ShapedOptic
     
 from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
-
+from raytrace.shapes import CircleShape, BaseShape
 from raytrace.custom_sources import EmptyGridSource
 
 import math, numpy
@@ -45,9 +47,7 @@ class PlanoConvexLens(BaseLens):
     CT = Float(5.0, desc="centre thickness")
     diameter = Float(15.0)
     offset = Float(0.0)
-    curvature = Float(11.7, desc="radius of curvature for spherical face")
-    
-    #vtkproperty = tvtk.Property(representation="wireframe")
+    curvature = Float(11.7, desc="radius of curvature for spherical face")    
     
     vtk_grid = Instance(EmptyGridSource, ())
     vtk_cylinder = Instance(tvtk.Cylinder, ())
@@ -63,7 +63,6 @@ class PlanoConvexLens(BaseLens):
                        Item('curvature', editor=NumEditor)
                        )
                     )
-                    
     
     def _faces_default(self):
         fl = FaceList(owner=self)
@@ -145,6 +144,68 @@ class PlanoConvexLens(BaseLens):
         self.config_pipeline()
         grid.modified()
         return transF
+    
+    
+class ShapedPlanoSphericLens(ShapedOptic):
+    abstract = False
+    name = "Plano-Convex Lens"
+    
+    CT = Float(5.0, desc="centre thickness")
+    diameter = Float(15.0)
+    offset = Float(0.0)
+    curvature = Float(11.7, desc="radius of curvature for spherical face")
+    
+    shape = Instance(BaseShape, ())
+    
+    grid_extent = Property(depends_on="CT, diameter")
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('n_inside'),
+                       Item('CT', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       Item('curvature', editor=NumEditor)
+                       )
+                    )
+    
+    def _shape_default(self):
+        s1 = CircleShape(radius=self.diameter/2.)
+        return s1
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces = [CircularFace(owner=self, diameter=self.diameter,
+                                material = self.material), 
+                SphericalFace(owner=self, diameter=self.diameter,
+                                material=self.material,
+                                z_height=self.CT, curvature=self.curvature)]
+        return fl
+    
+    @cached_property
+    def _get_grid_extent(self):
+        r = self.diameter/2
+        return (-r,r,-r,r,0,self.CT)
+    
+    def _CT_changed(self, new_ct):
+        self.faces.faces[1].z_height = new_ct
+        self.update = True
+        
+    def _curvature_changed(self, new_curve):
+        self.faces.faces[1].curvature = new_curve
+        self.grid_in.modified()
+        self.update = True
+        
+    def _diameter_changed(self, dnew):
+        self.shape.radius = dnew/2.
+        self.grid_in.modified()
+        
+    def eval_sag_top(self, points):
+        centre = numpy.array([0,0,-(self.curvature-self.CT)])
+        func = ((points - centre)**2).sum(axis=1) - (self.curvature**2)
+        return func
+    
+    def eval_sag_bottom(self, points):
+        return None
     
     
 class SurfaceOfRotationLens(BaseLens):

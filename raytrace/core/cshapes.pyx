@@ -14,8 +14,22 @@ from .ctracer cimport Shape, sep_, \
         vector_t, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, cross_
             
+
+cdef class LogicalOpShape(Shape):
+    def __and__(self, Shape other):
+        return BooleanAND(self, other)
+    
+    def __or__(self, Shape other):
+        return BooleanOR(self, other)
+    
+    def __xor__(self, Shape other):
+        return BooleanXOR(self, other)
+    
+    def __invert__(self):
+        return InvertShape(self)
             
-cdef class InvertShape(Shape):
+            
+cdef class InvertShape(LogicalOpShape):
     cdef:
         public Shape shape
         
@@ -26,7 +40,7 @@ cdef class InvertShape(Shape):
         return 1 & (~self.shape.point_inside_c(x,y))
             
             
-cdef class BooleanShape(Shape):
+cdef class BooleanShape(LogicalOpShape):
     cdef:
         public Shape shape1
         public Shape shape2
@@ -51,13 +65,16 @@ cdef class BooleanXOR(BooleanShape):
         return self.shape1.point_inside_c(x,y) ^ self.shape2.point_inside_c(x,y)
     
     
-cdef class BasicShape(Shape):
+cdef class BasicShape(LogicalOpShape):
     cdef:
         double centre_x, centre_y
         
     def __cinit__(self, **kwds):
-        self.centre_x = kwds.get("centre_x", 0.0)
-        self.centre_y = kwds.get("centre_y", 0.0)
+        if "centre" in kwds:
+            self.centre = kwds["centre"]
+        else:
+            self.centre_x = kwds.get("centre_x", 0.0)
+            self.centre_y = kwds.get("centre_y", 0.0)
         
     property centre:
         def __get__(self):
@@ -85,7 +102,7 @@ cdef class CircleShape(BasicShape):
         public double radius
         
     def __cinit__(self, **kwds):
-        self.centre_x = kwds.get("radius", 1.0)
+        self.radius = kwds.get("radius", 1.0)
         
     cdef bint point_inside_c(self, double x, double y):
         cdef:

@@ -37,6 +37,8 @@ from raytrace.has_queue import HasQueue, on_trait_change
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
 from raytrace import ctracer, cmaterials
+from .shapes import BaseShape
+from .custom_sources import EmptyGridSource
 
 Vector = Array(shape=(3,))
 
@@ -140,6 +142,7 @@ class Renderable(HasQueue, RaytraceObject, metaclass=RaytraceObjectMetaclass):
 
 
 class ModelObject(Renderable):
+    abstract=True
     name = Str("A traceable component")
     
     update = Event() #request re-tracing
@@ -373,17 +376,107 @@ Traceable.uigroup = VGroup(
                           ),
                     )
 
+
+class ShapedTraceable(Traceable):
+    shape = Instance(BaseShape)
+    
+    grid_extent = Tuple(-50.,50.,-50.,50.0,-5.,5.)
+    grid_resolution = Tuple(50,50,30)
+    grid_in = Instance(EmptyGridSource, ())    
+    
+    def eval_sag_top(self, points):
+        return None
+    
+    def eval_sag_bottom(self, points):
+        return None
+    
+    @on_trait_change("grid_extent", "grid_resolution")
+    def _update_grid(self):
+        grid = self.grid_in
+        e = self.grid_extent
+        d = self.grid_resolution
+        grid.dimensions = d
+        grid.spacing = (e[1]-e[0])/(d[0]-1), (e[3]-e[2])/(d[1]-1), (e[5]-e[4])/(d[2]-1)
+        grid.origin = (e[0],e[2],e[4])
+        grid.modified()
+        self.update=True
+    
+    def _pipeline_default(self):
+        grid = self.grid_in
+        self._update_grid()
+        
+        shape = self.shape
+        func = shape.impl_func
+        clip = tvtk.ClipVolume(input_connection=grid.output_port,
+                               clip_function=func,
+                               inside_out=1)
+        
+        attrb = tvtk.ProgrammableAttributeDataFilter(input_connection=clip.output_port)
+        def update( *args ):
+            in_data = attrb.get_input_data_object(0,0)
+            points = in_data.points.to_array()
+            top = self.eval_sag_top(points)
+            bottom = self.eval_sag_bottom(points)
+            if top is None:
+                top = bottom
+            if bottom is None:
+                bottom = top
+            if top is not bottom:
+                result = numpy.minimum(top, bottom) #Or maybe I need maximum
+            else:
+                result = top
+            out = attrb.get_output_data_object(0)
+            out.point_data.scalars=result
+        attrb.set_execute_method(update)
+        
+        clip2 = tvtk.ClipDataSet(input_connection=attrb.output_port,
+                                 value=0.0,
+                                 inside_out=1)
+        
+        #topoly = tvtk.GeometryFilter(input_connection=clip2.output_port)
+        topoly = tvtk.DataSetSurfaceFilter(input_connection=clip2.output_port)
+        norms = tvtk.PolyDataNormals(input_connection=topoly.output_port)
+        
+        transF = tvtk.TransformFilter(input_connection=norms.output_port, 
+                                      transform=self.transform)
+        return transF
+    
     
 class Optic(Traceable):
-    abstract=True
     n_inside = Complex(1.0+0.0j) #refractive
     n_outside = Complex(1.0+0.0j)
     
     all_rays = Bool(False, desc="trace all reflected rays")
     
-    vtkproperty = tvtk.Property(opacity = 0.4,
-                             color = (0.8,0.8,1.0))
+    vtkproperty = Instance(tvtk.Property, (), {'opacity': 0.4, 'color': (0.8,0.8,1.0)})
                              
+    def _material_default(self):
+        m = cmaterials.FullDielectricMaterial(n_inside = self.n_inside,
+                                    n_outside = self.n_outside)
+        return m
+    
+    def calc_refractive_index(self, wavelengths):
+        """
+        Evaluates an array of (complex) refractive indices.
+        @param wavelengths: a shape=(N,1) array of wavelengths
+        @returns: a 2-tuple representing the inside and outside
+        refractive indices respectively. The items in the tuple can be
+        either 1) an arrays with the same shape as wavelengths and with
+                    dtype=numpy.complex128
+            or 2) a complex scalar
+        """
+        return self.n_inside, self.n_outside
+    
+    @on_trait_change("n_inside, n_outside")
+    def n_changed(self):
+        self.material.n_inside = self.n_inside
+        self.material.n_outside = self.n_outside
+        self.update = True
+        
+        
+class ShapedOptic(ShapedTraceable, Optic):
+    vtkproperty = Instance(tvtk.Property, (), {'opacity': 0.4, 'color': (0.8,0.8,1.0)})
+    
     def _material_default(self):
         m = cmaterials.FullDielectricMaterial(n_inside = self.n_inside,
                                     n_outside = self.n_outside)
