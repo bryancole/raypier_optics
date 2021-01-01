@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from _operator import invert
 
 cdef extern from "math.h":
     double sqrt(double arg)
@@ -177,17 +178,24 @@ cdef class InterfaceMaterial(object):
                                    )
 
     cdef on_set_wavelengths(self)
+    
+    
+cdef class Shape:
+    cdef bint point_inside_c(self, double x, double y)
 
 
 cdef class Face(object):
-    cdef public object owner
-    cdef public char *name
-    cdef public double tolerance
-    cdef public int idx #index in the global face list
-    cdef public double max_length
-    cdef public InterfaceMaterial material
-    cdef public short int invert_normal
-    cdef public unsigned int count
+    cdef:
+        public object owner
+        public char *name
+        public double tolerance
+        public int idx #index in the global face list
+        public double max_length
+        public InterfaceMaterial material
+        public short int invert_normal
+        public unsigned int count
+        public Shape shape 
+    
 
     cdef double intersect_c(self, vector_t p1, vector_t p2)
 

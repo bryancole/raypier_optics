@@ -5,7 +5,10 @@ syntax: glob
 *~
 *.so
 *.dll
-
+raytrace/*.h
+raytrace/*.c
+raytrace/*.html
+notebooks/.ipynb_checkpoints/*
 
 syntax: regexp
 ^build$

@@ -1419,6 +1419,14 @@ cdef class InterfaceMaterial(object):
         pass
     
     
+cdef class Shape:        
+    cdef bint point_inside_c(self, double x, double y):
+        return 1
+    
+    def point_inside(self, double x, double y):
+        return self.point_inside_c(x,y) 
+    
+    
 cdef class Face(object):
     
     params = []
