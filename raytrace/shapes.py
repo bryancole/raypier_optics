@@ -93,11 +93,10 @@ class BasicShape(BaseShape):
     
 class CircleShape(BasicShape):
     radius = Float(1.0)
-    cshape = Property(depends_on="centre, radius")
+    cshape = Instance(cshapes.CircleShape)
     impl_func = Instance(tvtk.ImplicitFunction)
     
-    @cached_property
-    def _get_cshape(self):
+    def _cshape_default(self):
         return cshapes.CircleShape(centre=self.centre, radius=self.radius)
     
     def _impl_func_default(self):
@@ -112,6 +111,8 @@ class CircleShape(BasicShape):
         func = self.impl_func
         func.radius = self.radius
         func.center = (x,y,0)
+        self.cshape.radius = self.radius
+        self.cshape.centre = (x,y)
         
         
 

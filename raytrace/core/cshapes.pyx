@@ -52,17 +52,17 @@ cdef class BooleanShape(LogicalOpShape):
         
 cdef class BooleanAND(BooleanShape):
     cdef bint point_inside_c(self, double x, double y):
-        return self.shape1.point_inside_c(x,y) & self.shape2.point_inside_c(x,y)
+        return (<Shape>self.shape1).point_inside_c(x,y) & (<Shape>self.shape2).point_inside_c(x,y)
     
     
 cdef class BooleanOR(BooleanShape):
     cdef bint point_inside_c(self, double x, double y):
-        return self.shape1.point_inside_c(x,y) | self.shape2.point_inside_c(x,y)
+        return (<Shape>self.shape1).point_inside_c(x,y) | (<Shape>self.shape2).point_inside_c(x,y)
     
     
 cdef class BooleanXOR(BooleanShape):
     cdef bint point_inside_c(self, double x, double y):
-        return self.shape1.point_inside_c(x,y) ^ self.shape2.point_inside_c(x,y)
+        return (<Shape>self.shape1).point_inside_c(x,y) ^ (<Shape>self.shape2).point_inside_c(x,y)
     
     
 cdef class BasicShape(LogicalOpShape):

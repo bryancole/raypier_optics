@@ -29,13 +29,21 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c
+                rotate_c, Shape
 
 import numpy as np
 cimport numpy as np_
 
 cdef struct flatvector_t:
     double x,y
+    
+    
+cdef class ShapedFace(Face):
+    cdef:
+        public Shape shape
+        
+    def __cinit__(self, **kwds):
+        self.shape = kwds.get("shape", Shape())
 
 
 cdef class CircularFace(Face):
@@ -74,6 +82,49 @@ cdef class CircularFace(Face):
             return 0
         return h * max_length
 
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef vector_t normal
+        normal.x=0
+        normal.y=0
+        normal.z=-1
+        return normal
+    
+    
+cdef class ShapedPlanarFace(ShapedFace):
+    cdef:
+        double z_plane
+        
+    def __cinit__(self, **kwds):
+        self.z_plane = kwds.get('z_plane', 0.0)
+    
+    cdef double intersect_c(self, vector_t p1, vector_t p2):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double max_length = sep_(p1, p2)
+            double h = (self.z_plane-p1.z)/(p2.z-p1.z)
+            double X, Y
+                    
+        if (h<self.tolerance) or (h>1.0):
+            return -1
+        
+        X = p1.x + h*(p2.x-p1.x)
+        Y = p1.y + h*(p2.y-p1.y)
+        if (<Shape>self.shape).point_inside_c(X,Y):
+            return h*max_length
+        return -1
+        
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
@@ -243,6 +294,93 @@ cdef class SphericalFace(Face):
         if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
             a1 = INF
         if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
+            a2 = INF
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
+            return 0
+        return a1 * sep_(r, p2)
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        
+        p.z -= (self.z_height - self.curvature)
+        if self.curvature < 0:
+            p.z = -p.z
+            p.y = -p.y
+            p.x = -p.x
+        return norm_(p)
+    
+    
+cdef class ShapedSphericalFace(ShapedFace):
+    cdef:
+        public double curvature, z_height
+    
+    #Don't want curvature in this list in case the owner defines the 
+    #curvature in a different way
+    params = [] 
+    
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.curvature = kwds.get("curvature", 100.0)
+    
+    cdef double intersect_c(self, vector_t r, vector_t p2):
+        """Intersects the given ray with this face.
+        
+        params:
+          r - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          ray - pointer to the input ray
+          
+        returns:
+          idx - -1 if no intersection is found *or* the distance to the 
+                intersection is larger than the existing ray.length. OTherwise,
+                this is set to the intersecting face idx
+        """
+        cdef:
+            double A,B,C,D, cz, a1, a2
+            vector_t s, d, pt1, pt2
+            
+        s = subvv_(p2, r)
+        cz = self.z_height - self.curvature
+        d = r
+        d.z -= cz
+        
+        A = mag_sq_(s)
+        B = 2*dotprod_(s,d)
+        C = mag_sq_(d) - self.curvature**2
+        D = B*B - 4*A*C
+        
+        if D < 0: #no intersection with sphere
+            return 0
+        
+        D = sqrt(D)
+        
+        #1st root
+        a1 = (-B+D)/(2*A) 
+        pt1 = addvv_(r, multvs_(s, a1))
+        #2nd root
+        a2 = (-B-D)/(2*A)
+        pt2 = addvv_(r, multvs_(s, a2))
+        
+        if self.curvature >= 0:
+            if pt1.z < cz:
+                a1 = INF
+            if pt2.z < cz:
+                a2 = INF
+        else:
+            if pt1.z > cz:
+                a1 = INF
+            if pt2.z > cz:
+                a2 = INF
+           
+        if not (<Shape>self.shape).point_inside_c( pt1.x, pt1.y ):
+            a1 = INF
+        if not (<Shape>self.shape).point_inside_c( pt2.x, pt2.y ):
             a2 = INF
         
         if a2 < a1:

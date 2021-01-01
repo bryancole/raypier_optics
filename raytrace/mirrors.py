@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from traits.api import Float, Instance, on_trait_change
+from traits.api import Float, Instance, on_trait_change, Property, cached_property
 
 from traitsui.api import View, Item, VGroup
 
@@ -23,15 +23,16 @@ from tvtk.api import tvtk
 
 
 from raytrace.bases import Traceable, normaliseVector, NumEditor,\
-     ComplexEditor, VectorEditor, Optic
+     ComplexEditor, VectorEditor, Optic, ShapedTraceable
      
 from raytrace.utils import transformPoints, dotprod
 from raytrace.sources import RayCollection
-from raytrace.cfaces import CircularFace, RectangularFace
+from raytrace.cfaces import CircularFace, RectangularFace, ShapedSphericalFace
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial, \
         CoatedDispersiveMaterial, PECMaterial
 from raytrace.dispersion import BaseDispersionCurve, NondispersiveCurve
+from raytrace.shapes import CircleShape
 
 import math, numpy
 
@@ -107,6 +108,70 @@ class PECMirror(BaseMirror):
                                        transform=self.transform)
         self.config_pipeline()
         return transF2
+    
+    
+class SphericalMirrorWithHole(ShapedTraceable):
+    name = "Spherical Mirror + Hole"
+    abstract = False
+    
+    diameter = Float(25.4)
+    hole_diameter = Float(5.0)
+    hole_offset = Float(0.0)
+    
+    curvature = Float(100.0)
+    
+    thickness = Float(5.0, desc="centre thickness, purely for visualisation purposes")
+    
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('diameter', editor=NumEditor),
+                       Item('hole_diameter', editor=NumEditor),
+                       Item('thickness', editor=NumEditor),
+                       Item('curvature', editor=NumEditor),
+                       Item('hole_offset', editor=NumEditor)
+                        ),
+                   )
+        
+    
+    def _material_default(self):
+        return PECMaterial()
+    
+    def _shape_default(self):
+        return CircleShape(radius=self.diameter/2.) ^ CircleShape(radius=self.hole_diameter/2.,
+                                                                  centre=(self.hole_offset,0))
+    
+    def _faces_default(self):
+        m = self.material
+        fl = FaceList(owner=self)
+        fl.faces = [ShapedSphericalFace(owner=self, material=m, shape=self.shape.cshape)]
+        return fl
+    
+    @on_trait_change("diameter, hole_diameter, thickness, curvature, hole_offset")
+    def config_params(self):
+        self.grid_extent = self.eval_grid_extent()
+        self.shape.shape1.radius = self.diameter/2.
+        self.shape.shape2.radius = self.hole_diameter/2.
+        self.shape.shape2.centre = (self.hole_offset,0)
+        face = self.faces.faces[0]
+        face.z_height = self.thickness
+        face.curvature = -self.curvature
+        self.update = True
+        
+    def eval_grid_extent(self):
+        r = self.diameter/2
+        c = self.curvature
+        h = c - numpy.sqrt(c**2 - r**2)
+        return (-r,r,-r,r,0,self.thickness + h)
+    
+    def eval_sag_top(self, points):
+        centre = numpy.array([0,0,(self.curvature+self.thickness)])
+        func = ((points - centre)**2).sum(axis=1) - (self.curvature**2)
+        return -func
+    
+    def eval_sag_bottom(self, points):
+        return None
+    
     
 
 class PlanarWindow(PECMirror, Optic):
