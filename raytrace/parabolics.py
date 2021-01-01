@@ -8,7 +8,7 @@ from raytrace.mirrors import BaseMirror
 from raytrace.cfaces import OffAxisParabolicFace
 from raytrace.ctracer import FaceList
 
-from raytrace.custom_sources import EmptyGridSource
+from raytrace.vtk_algorithms import EmptyGridSource
 
 
 class OffAxisParabloid(BaseMirror):

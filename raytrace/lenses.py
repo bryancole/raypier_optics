@@ -31,7 +31,7 @@ from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, As
 from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 from raytrace.shapes import CircleShape, BaseShape
-from raytrace.custom_sources import EmptyGridSource
+from raytrace.vtk_algorithms import EmptyGridSource
 
 import math, numpy
 

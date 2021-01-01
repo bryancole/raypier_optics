@@ -38,7 +38,7 @@ from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
 from raytrace import ctracer, cmaterials
 from .shapes import BaseShape
-from .custom_sources import EmptyGridSource
+from raytrace.vtk_algorithms import EmptyGridSource
 
 Vector = Array(shape=(3,))
 

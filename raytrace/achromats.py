@@ -15,7 +15,7 @@ from raytrace.dispersion import BaseDispersionCurve, NamedDispersionCurve, \
 from raytrace.cmaterials import CoatedDispersiveMaterial
 from raytrace.cfaces import SphericalFace
 from raytrace.ctracer import FaceList
-from raytrace.custom_sources import EmptyGridSource
+from raytrace.vtk_algorithms import EmptyGridSource
 
 from tvtk.api import tvtk
 from numpy import sqrt

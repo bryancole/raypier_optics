@@ -10,7 +10,7 @@ from tvtk.pyface.scene_editor import SceneEditor
 
 from raytrace.results import Result
 from raytrace.fields import EFieldPlane
-from raytrace.custom_sources import NumpyImageSource
+from raytrace.vtk_algorithms import NumpyImageSource
 
 
 class IntensitySurface(Result):
