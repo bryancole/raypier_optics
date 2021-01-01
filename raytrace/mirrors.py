@@ -32,7 +32,7 @@ from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial, \
         CoatedDispersiveMaterial, PECMaterial
 from raytrace.dispersion import BaseDispersionCurve, NondispersiveCurve
-from raytrace.shapes import CircleShape
+from raytrace.shapes import CircleShape, RectangleShape
 
 import math, numpy
 

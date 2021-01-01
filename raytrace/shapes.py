@@ -88,13 +88,12 @@ class LogicalXOR(BooleanShape):
         
 class BasicShape(BaseShape):
     centre = Tuple(Float(0.0),Float(0.0))
-    cshape = Property(depends_on="centre")
+    cshape = Instance(Shape)
+    impl_func = Instance(tvtk.ImplicitFunction)
     
     
 class CircleShape(BasicShape):
     radius = Float(1.0)
-    cshape = Instance(cshapes.CircleShape)
-    impl_func = Instance(tvtk.ImplicitFunction)
     
     def _cshape_default(self):
         return cshapes.CircleShape(centre=self.centre, radius=self.radius)
@@ -115,5 +114,36 @@ class CircleShape(BasicShape):
         self.cshape.centre = (x,y)
         
         
+class RectangleShape(BasicShape):
+    width = Float(5.0)
+    height = Float(7.0)
+    
+    _zextent = Float(10000.)
 
+    def _cshape_default(self):
+        return cshapes.RectangleShape(centre=self.centre,
+                                      width=self.width,
+                                      height=self.height)
+        
+    def _impl_func_default(self):
+        x,y = self.centre
+        w=self.width/2.
+        h = self.height/2.
+        z = self._zextent
+        func = tvtk.Box(bounds=(x-w,x+w,y-h,y+y,-z,z))
+        return func
+    
+    @on_trait_change("width, height, centre")
+    def _update_imp_func(self):
+        func = self.impl_func
+        x,y = self.centre
+        w=self.width/2.
+        h = self.height/2.
+        z = self._zextent
+        func.bounds = (x-w,x+w,y-h,y+h,-z,z)
+        cshape = self.cshape
+        cshape.width = self.width
+        cshape.height = self.height
+        cshape.centre = (x,y)
+        
     

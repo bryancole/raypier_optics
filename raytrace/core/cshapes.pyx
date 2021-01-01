@@ -1,3 +1,4 @@
+from fontTools.cffLib import width
 
 cdef extern from "math.h":
     double M_PI
@@ -114,3 +115,21 @@ cdef class CircleShape(BasicShape):
             return 0
         
         
+cdef class RectangleShape(BasicShape):
+    cdef:
+        public double width
+        public double height
+        
+    def __cinit__(self, **kwds):
+        self.width = kwds.get("width", 5.0)
+        self.height = kwds.get("height", 7.0)
+        
+    cdef bint point_inside_c(self, double x, double y):
+        cdef:
+            double dx = x-self.centre_x
+            double dy = y-self.centre_y
+            
+        if (2*fabs(dx) < self.width) and (2*fabs(dy)) < self.height:
+            return 1
+        else:
+            return 0

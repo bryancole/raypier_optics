@@ -380,8 +380,8 @@ Traceable.uigroup = VGroup(
 class ShapedTraceable(Traceable):
     shape = Instance(BaseShape)
     
-    grid_extent = Tuple(-50.,50.,-50.,50.0,-5.,5.)
-    grid_resolution = Tuple(50,50,30)
+    grid_extent = Tuple((-50.,50.,-50.,50.0,-5.,5.))
+    grid_resolution = Tuple((50,50,30))
     grid_in = Instance(EmptyGridSource, ())    
     
     def eval_sag_top(self, points):
@@ -389,6 +389,9 @@ class ShapedTraceable(Traceable):
     
     def eval_sag_bottom(self, points):
         return None
+    
+    def eval_grid_extent(self):
+        return (-50.,50.,-50.,50.0,-5.,5.)
     
     @on_trait_change("grid_extent", "grid_resolution")
     def _update_grid(self):
@@ -400,6 +403,9 @@ class ShapedTraceable(Traceable):
         grid.origin = (e[0],e[2],e[4])
         grid.modified()
         self.update=True
+        
+    def _grid_extent_default(self):
+        return self.eval_grid_extent()
     
     def _pipeline_default(self):
         grid = self.grid_in
@@ -439,6 +445,7 @@ class ShapedTraceable(Traceable):
         
         transF = tvtk.TransformFilter(input_connection=norms.output_port, 
                                       transform=self.transform)
+        #self.grid_extent = extent
         return transF
     
     
