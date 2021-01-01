@@ -8,6 +8,9 @@ syntax: glob
 raytrace/*.h
 raytrace/*.c
 raytrace/*.html
+raytrace/core/*.c
+raytrace/core/*.h
+raytrace/core/*.html
 notebooks/.ipynb_checkpoints/*
 
 syntax: regexp

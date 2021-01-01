@@ -17,3 +17,10 @@
 
 from traits.etsconfig.api import ETSConfig
 ETSConfig.toolkit = 'qt4' #was 'wx'
+
+import sys
+
+from .core import ctracer, cfaces, cmaterials, cshapes, cfields
+__all__ = [ctracer, cfaces, cmaterials, cshapes, cfields]
+for md in __all__:
+    sys.modules[f"raytrace.{md.__name__.split('.')[-1]}"] = md
