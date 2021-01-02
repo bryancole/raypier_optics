@@ -151,10 +151,10 @@ cdef class CircularFace(Face):
     
 cdef class ShapedPlanarFace(ShapedFace):
     cdef:
-        double z_plane
+        double z_height
         
     def __cinit__(self, **kwds):
-        self.z_plane = kwds.get('z_plane', 0.0)
+        self.z_plane = kwds.get('z_height', 0.0)
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
         """Intersects the given ray with this face.
@@ -192,10 +192,10 @@ cdef class ShapedPlanarFace(ShapedFace):
         return normal
     
     cdef double eval_z_c(self, double x, double y) nogil:
-        return self.z_plane
+        return self.z_height
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
-        return (z - self.z_plane)
+        return (z - self.z_height)
     
     
 cdef class ElipticalPlaneFace(Face):

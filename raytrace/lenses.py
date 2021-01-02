@@ -16,10 +16,10 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.api import Float, Instance, on_trait_change, Array, Property,\
-        cached_property
+        cached_property, List
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
-            RangeEditor, ScrubberEditor, HSplit, VGroup
+            RangeEditor, ScrubberEditor, HSplit, VGroup, Group, ListEditor
 
 from tvtk.api import tvtk
      
@@ -32,8 +32,11 @@ from raytrace.ctracer import FaceList
 from raytrace.cmaterials import DielectricMaterial
 from raytrace.shapes import CircleShape, BaseShape
 from raytrace.vtk_algorithms import EmptyGridSource
+from . import faces
+from .materials import OpticalMaterial
 
 import math, numpy
+from pyface.tasks.task_layout import Tabbed
 
 
 class BaseLens(Optic):
@@ -486,6 +489,49 @@ class AsphericLens(SurfaceOfRotationLens):
         
         profile.extend(profile2[-1::-1])
         self.profile = profile
+    
+    
+alist_editor = ListEditor(use_notebook=True,
+                           deletable=False,
+                           selected='selected',
+                           export='DockWindowShell',
+                           page_name='.name')
+    
+    
+class GeneralLens(ShapedOptic):
+    shape = Instance(BaseShape)
+    
+    surfaces = List(faces.PlanarFace)
+    
+    materials = List(OpticalMaterial)
+    
+    coating_material = Instance(OpticalMaterial, ())
+    coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
+    
+    traits_view = View(Group(
+                Traceable.uigroup,
+                Group(
+                    Item("shape", show_label=False, style="custom"),
+                    label="Outline", dock="tab"
+                    ),
+                Group(
+                    Item("surfaces", style="custom",
+                         editor=alist_editor, 
+                         show_label=False),
+                    label="Faces", dock="tab"
+                    ),
+                Group(
+                    VGroup(
+                    Item("materials", style="custom", editor=alist_editor, show_label=False),
+                    ),
+                    Item("coating_material", style="custom"),
+                    Item("coating_thickness", editor=NumEditor),
+                    label="Materials", dock="tab"
+                    ),
+                layout="tabbed"
+            )
+        )
+    
     
 
         

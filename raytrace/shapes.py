@@ -1,25 +1,28 @@
 
 
 from traits.api import Instance, HasTraits, Property, on_trait_change, cached_property,\
-        Tuple, Float, Enum
+        Tuple, Float, Enum, observe
+        
+from traitsui.api import View, Item, VGroup, Label, Group
 
 from tvtk.api import tvtk
 
 from .core import cshapes
 from .core.ctracer import Shape
+from .editors import NumEditor
 
 
 class BaseShape(HasTraits):
     cshape = Instance(Shape)
     
     def __and__(self, other):
-        return LogicalAND(self, other)
+        return BooleanShape(self, other, operation="intersection")
     
     def __or__(self, other):
-        return LogicalOR(self, other)
+        return BooleanShape(self, other, operation="union")
     
     def __xor__(self, other):
-        return LogicalXOR(self, other)
+        return BooleanShape(self, other, operation="difference")
     
     def __invert__(self):
         return InvertedShape(self)
@@ -44,13 +47,34 @@ class BooleanShape(BaseShape):
     shape1 = Instance(BaseShape)
     shape2 = Instance(BaseShape)
     
-    cshape = Property(depends_on="shape1, shape2")
+    cshape = Property(depends_on="shape1, shape2, cshape_type")
     impl_func = Property(depends_on="shape1, shape2, operation_type")
     
-    operation_type = Enum("union", "difference", "intersection", "union_of_magnitudes")
+    operation_type = Enum("difference", "union", "intersection", "union_of_magnitudes")
     cshape_type = Enum(cshapes.BooleanAND, cshapes.BooleanOR, cshapes.BooleanXOR, cshapes.InvertShape)
     
-    def __init__(self, shape1, shape2):
+    traits_view = View(VGroup(
+        Group(Item("shape1", style="custom", show_label=False, padding=-5),
+              show_border=True,
+              label="Shape 1")
+              ,
+        Item("operation_type", style="simple", show_label=False),
+        Group(Item("shape2", style="custom", show_label=False, padding=-5),
+              show_border=True,
+              label="Shape 2"),
+        padding = 0,
+        show_border=True,
+        label="Boolean Combination"
+        ),
+    )
+    
+    cshape_map = {"union": cshapes.BooleanOR, 
+                      "difference": cshapes.BooleanXOR,
+                      "union_of_magnitudes": cshapes.BooleanOR, 
+                      "intersection": cshapes.BooleanAND}
+    
+    def __init__(self, shape1, shape2, operation="difference"):
+        self.operation_type = operation
         self.shape1=shape1
         self.shape2=shape2
         
@@ -59,6 +83,10 @@ class BooleanShape(BaseShape):
         return self.cshape_type(self.shape1.cshape,
                                   self.shape2.cshape)
         
+    @observe("operation_type")
+    def on_operation_changed(self, evt):
+        self.cshape_type = self.cshape_map[evt.new]
+        
     @cached_property
     def _get_impl_func(self):
         func = tvtk.ImplicitBoolean()
@@ -66,24 +94,6 @@ class BooleanShape(BaseShape):
         func.add_function(self.shape2.impl_func)
         func.operation_type = self.operation_type
         return func
-
-
-class LogicalAND(BooleanShape):
-    """Meaning inside A AND inside B"""
-    operation_type = "intersection"
-    cshape_type = cshapes.BooleanAND
-        
-        
-class LogicalOR(BooleanShape):
-    """Inside A OR inside B"""
-    operation_type = "union"
-    cshape_type = cshapes.BooleanOR
-        
-        
-class LogicalXOR(BooleanShape):
-    """(Inside A and outside B) or (Inside B and outside A)"""
-    operation_type = "difference"
-    cshape_type = cshapes.BooleanXOR
         
         
 class BasicShape(BaseShape):
@@ -91,9 +101,15 @@ class BasicShape(BaseShape):
     cshape = Instance(Shape)
     impl_func = Instance(tvtk.ImplicitFunction)
     
+    traits_view = View(Item("centre"))
+    
     
 class CircleShape(BasicShape):
     radius = Float(1.0)
+    
+    traits_view = View(
+            Item("centre"),
+            Item("radius", editor=NumEditor))
     
     def _cshape_default(self):
         return cshapes.CircleShape(centre=self.centre, radius=self.radius)
@@ -119,6 +135,10 @@ class RectangleShape(BasicShape):
     height = Float(7.0)
     
     _zextent = Float(10000.)
+    
+    traits_view = View(VGroup(Item("centre"),
+                            Item("width", editor=NumEditor),
+                              Item("height", editor=NumEditor)))
 
     def _cshape_default(self):
         return cshapes.RectangleShape(centre=self.centre,
