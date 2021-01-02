@@ -13,7 +13,7 @@ Cython module for Face definitions
 
 cdef extern from "math.h":
     double M_PI
-    double sqrt(double)
+    double sqrt(double) nogil
     double atan2 (double y, double x )
     double pow(double x, double y)
     double fabs(double)
@@ -33,6 +33,8 @@ from .ctracer cimport Face, sep_, \
 
 import numpy as np
 cimport numpy as np_
+cimport cython
+from cython.parallel import prange
 
 cdef struct flatvector_t:
     double x,y
@@ -44,7 +46,61 @@ cdef class ShapedFace(Face):
         
     def __cinit__(self, **kwds):
         self.shape = kwds.get("shape", Shape())
-
+        
+    cdef double eval_z_c(self, double x, double y) nogil:
+        return 0.0
+    
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return 0.0
+    
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def eval_z_extent(self, double[:] x, double[:] y):
+        """Samples the face surface z-values over the 2d grid given by the x- and y-
+           arrays. Returns the max and min values of z"""
+        cdef:
+            size_t i,j,ni=x.shape[0], nj=y.shape[0]
+            double maxv, minv, v
+        maxv = self.eval_z_c(x[0],y[0])
+        minv = maxv
+        with nogil:
+            for i in prange(ni):
+                for j in range(nj):
+                    v = self.eval_z_c(x[i],y[j])
+                    if v < minv:
+                        minv = v
+                    if v > maxv:
+                        maxv = v
+        return (minv, maxv)
+    
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def eval_implicit_grid(self, double[:] x, double[:] y, double[:] z):
+        cdef:
+            size_t i,j,k, ni=x.shape[0], nj=y.shape[0], nk=z.shape[0]
+            np_.ndarray aout = np.empty((ni,nj,nk), dtype='d')
+            double[:,:,:] out = aout
+            
+        with nogil:
+            for i in prange(ni):
+                for j in range(nj):
+                    for k in range(nk):
+                        out[i,j,k] = self.eval_implicit_c(x[i], y[j], z[k])
+        return aout
+    
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def eval_implicit_points(self, double[:,:] points):
+        cdef:
+            size_t i, ni=points.shape[0]
+            np_.ndarray aout = np.empty((ni,), dtype='d')
+            double[:] out = aout
+            
+        with nogil:
+            for i in prange(ni):
+                out[i] = self.eval_implicit_c(points[i,0],points[i,1],points[i,2])
+        return aout
+    
 
 cdef class CircularFace(Face):
     cdef public double diameter, offset, z_plane
@@ -134,6 +190,12 @@ cdef class ShapedPlanarFace(ShapedFace):
         normal.y=0
         normal.z=-1
         return normal
+    
+    cdef double eval_z_c(self, double x, double y) nogil:
+        return self.z_plane
+    
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return (z - self.z_plane)
     
     
 cdef class ElipticalPlaneFace(Face):
@@ -401,6 +463,26 @@ cdef class ShapedSphericalFace(ShapedFace):
             p.y = -p.y
             p.x = -p.x
         return norm_(p)
+    
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef:
+            double r2 = x*x + y*y
+            double c = self.curvature
+        if c >= 0:
+            return self.z_height + sqrt(c*c - r2) - c
+        else:
+            return self.z_height - sqrt(c*c - r2) - c
+    
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        cdef:
+            double cz, c=self.curvature
+
+        cz = z - self.z_height + c
+        
+        if c >= 0:
+            return ((x*x + y*y + cz*cz) - (c*c))
+        else:
+            return -((x*x + y*y + cz*cz) - (c*c))
     
     
 cdef class ExtrudedPlanarFace(Face):
@@ -1097,7 +1179,7 @@ cdef class EllipsoidalFace(Face):
         rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
         dt = [m.get_element(i,3) for i in xrange(3)]
         self.inverse_transform = Transform(rotation=rot, translation=dt)
-        
+    
         
 cdef double intersect_conic(vector_t a, vector_t d, double curvature, double conic_const):
     cdef:
@@ -1154,23 +1236,22 @@ cdef double intersect_conic(vector_t a, vector_t d, double curvature, double con
         return (-B-D)/(2*A)
      
     
-cdef class ConicRevolutionFace(Face):
+cdef class ConicRevolutionFace(ShapedFace):
     """This is surface of revolution formed from a conic section. Spherical and ellipsoidal faces
     are a special case of this.
     
     curvature = radius of curvature
     """
     cdef:
-        public double diameter, curvature, z_height, conic_const
+        public double curvature, z_height, conic_const
         public int invert_normals
     
-    params = ['diameter',] 
+    params = [] 
     
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 10.0)
-        self.diameter = kwds.get('diameter', 5.0)
         self.invert_normals = int(kwds.get('invert_normals', 0))
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
@@ -1196,9 +1277,8 @@ cdef class ConicRevolutionFace(Face):
         
         pt1 = addvv_(a, multvs_(d, a1))
             
-        D = self.diameter*self.diameter/4.
-        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
-            a1 = INF
+        if not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+            return INF
             
         if a1>1.0 or a1<self.tolerance:
             return -1
@@ -1229,6 +1309,17 @@ cdef class ConicRevolutionFace(Face):
         g.x *= sign
         
         return norm_(g)
+    
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef:
+            double r2 = (x*x) + (y*y)
+            double R = self.curvature
+            double R2 = R*R
+        
+        return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+    
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return z - self.eval_z_c(x,y)
     
     
 cdef struct aspheric_t:
@@ -1276,14 +1367,13 @@ cdef double eval_aspheric_grad(aspheric_t A, double alpha):
     return out
 
     
-    
-cdef class AsphericFace(Face):
+cdef class AsphericFace(ShapedFace):
     """This is the general aspheric lens surface formula.
     
     curvature = radius of curvature
     """
     cdef:
-        public double diameter, curvature, z_height, conic_const, A4, A6, A8, A10, A12, A14, A16
+        public double curvature, z_height, conic_const, A4, A6, A8, A10, A12, A14, A16
         public double atol
         public int invert_normals
     
@@ -1293,7 +1383,6 @@ cdef class AsphericFace(Face):
         self.z_height = kwds.get('z_height', 0.0)
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 25.0)
-        self.diameter = kwds.get('diameter', 15.0)
         self.invert_normals = int(kwds.get('invert_normals', 0))
         self.A4 = kwds.get('A4',0.0)
         self.A6 = kwds.get('A6',0.0)
@@ -1361,10 +1450,9 @@ cdef class AsphericFace(Face):
         #print("Converged:", dz, a1, i)
         
         pt1 = addvv_(a, multvs_(d, a1))
-        #print("a1:", a1_init, a1, pt1.z, i)
-        D = self.diameter*self.diameter/4.
-        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
-            a1 = INF
+
+        if not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+            return INF
             
         if a1>1.0 or a1<self.tolerance:
             return -1
@@ -1402,3 +1490,20 @@ cdef class AsphericFace(Face):
         g.x *= sign
         
         return norm_(g)
+
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef: 
+            double out
+            double r2 = (x*x) + (y*y)
+            double R = self.curvature
+    
+        out = r2
+        out /= (R + sqrt(R*R - (1+self.conic_const)*r2) )
+        out += self.A4*(r2**2) + self.A6*(r2**3) + self.A8*(r2**4) + self.A10*(r2**5) + self.A12*(r2**6) + self.A14*(r2**7) + self.A16*(r2**8)
+        out += self.z_height
+        return out
+    
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return z - self.eval_z_c(x,y)
+    
+    
