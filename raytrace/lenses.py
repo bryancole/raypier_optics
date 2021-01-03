@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.api import Float, Instance, on_trait_change, Array, Property,\
-        cached_property, List
+        cached_property, List, observe
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Group, ListEditor
@@ -532,7 +532,57 @@ class GeneralLens(ShapedOptic):
             )
         )
     
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces = [f.cface for f in self.surfaces]
+        return fl
+        
+    @observe("surfaces.items.updated")
+    def on_surfaces_changed(self, evt):
+        if evt.object is self:
+            for item in evt.new:
+                item.cface.shape = self.shape.cshape
+        else:
+            evt.object.cface.shape = self.shape.cshape
+        self.on_bounds_change(None)
+
+    @observe("shape.impl_func, surfaces")
+    def on_impl_func_change(self, evt):
+        self.clip.clip_function = self.shape.impl_func
+        self.render=True
+            
+    @observe("shape.cshape")
+    def on_shape_updated(self, evt):
+        self.updated=True
     
+    @observe("shape.bounds, surfaces")
+    def on_bounds_change(self, evt):
+        xmin, xmax, ymin, ymax = self.shape.bounds
+        zmin, zmax = self.eval_z_extent(xmin, xmax, ymin, ymax)
+        self.grid_extent = (xmin, xmax, ymin, ymax, zmin, zmax)
+    
+    def eval_z_extent(self, xmin, xmax, ymin, ymax):
+        nx, ny, nz = self.grid_resolution
+        try:
+            top_face = self.surfaces[0]
+            bottom_face = self.surfaces[-1]
+        except IndexError:
+            return 0,0
+        x = numpy.linspace(xmin, xmax, nx)
+        y = numpy.linspace(ymin, ymax, ny)
+        tzmin, tzmax = top_face.cface.eval_z_extent(x,y)
+        bzmin, bzmax = bottom_face.cface.eval_z_extent(x,y)
+        return ( min(tzmin,bzmin), max(tzmax, bzmax) )
+    
+    def eval_sag_top(self, points):
+        top_face = self.surfaces[0]
+        z_top = top_face.cface.eval_implicit_points(points.astype('d'))
+        return z_top 
+    
+    def eval_sag_bottom(self, points):
+        bottom_face = self.surfaces[-1]
+        z_bottom = bottom_face.cface.eval_implicit_points(points.astype('d'))
+        return z_bottom 
 
         
 if __name__=="__main__":

@@ -43,9 +43,11 @@ cdef struct flatvector_t:
 cdef class ShapedFace(Face):
     cdef:
         public Shape shape
+        public int invert_normals
         
     def __cinit__(self, **kwds):
         self.shape = kwds.get("shape", Shape())
+        self.invert_normals = int(kwds.get('invert_normals', 0))
         
     cdef double eval_z_c(self, double x, double y) nogil:
         return 0.0
@@ -64,7 +66,7 @@ cdef class ShapedFace(Face):
         maxv = self.eval_z_c(x[0],y[0])
         minv = maxv
         with nogil:
-            for i in prange(ni):
+            for i in range(ni):
                 for j in range(nj):
                     v = self.eval_z_c(x[i],y[j])
                     if v < minv:
@@ -80,12 +82,18 @@ cdef class ShapedFace(Face):
             size_t i,j,k, ni=x.shape[0], nj=y.shape[0], nk=z.shape[0]
             np_.ndarray aout = np.empty((ni,nj,nk), dtype='d')
             double[:,:,:] out = aout
+            int sign
+            
+        if self.invert_normals:
+            sign = -1
+        else:
+            sign = 1
             
         with nogil:
             for i in prange(ni):
                 for j in range(nj):
                     for k in range(nk):
-                        out[i,j,k] = self.eval_implicit_c(x[i], y[j], z[k])
+                        out[i,j,k] = sign*self.eval_implicit_c(x[i], y[j], z[k])
         return aout
     
     @cython.boundscheck(False)  # Deactivate bounds checking
@@ -95,10 +103,15 @@ cdef class ShapedFace(Face):
             size_t i, ni=points.shape[0]
             np_.ndarray aout = np.empty((ni,), dtype='d')
             double[:] out = aout
+            int sign
+        if self.invert_normals:
+            sign = -1
+        else:
+            sign = 1
             
         with nogil:
             for i in prange(ni):
-                out[i] = self.eval_implicit_c(points[i,0],points[i,1],points[i,2])
+                out[i] = sign*self.eval_implicit_c(points[i,0],points[i,1],points[i,2])
         return aout
     
 
@@ -1244,7 +1257,6 @@ cdef class ConicRevolutionFace(ShapedFace):
     """
     cdef:
         public double curvature, z_height, conic_const
-        public int invert_normals
     
     params = [] 
     
@@ -1252,7 +1264,6 @@ cdef class ConicRevolutionFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 10.0)
-        self.invert_normals = int(kwds.get('invert_normals', 0))
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
         """Intersects the given ray with this face.
@@ -1375,15 +1386,13 @@ cdef class AsphericFace(ShapedFace):
     cdef:
         public double curvature, z_height, conic_const, A4, A6, A8, A10, A12, A14, A16
         public double atol
-        public int invert_normals
     
-    params = ['diameter',] 
+    params = [] 
     
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 25.0)
-        self.invert_normals = int(kwds.get('invert_normals', 0))
         self.A4 = kwds.get('A4',0.0)
         self.A6 = kwds.get('A6',0.0)
         self.A8 = kwds.get('A8',0.0)

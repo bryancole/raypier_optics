@@ -377,6 +377,8 @@ class ShapedTraceable(Traceable):
     grid_resolution = Tuple((50,50,30))
     grid_in = Instance(EmptyGridSource, ())    
     
+    clip = Instance(tvtk.ClipVolume, ())
+    
     def eval_sag_top(self, points):
         return None
     
@@ -406,9 +408,10 @@ class ShapedTraceable(Traceable):
         
         shape = self.shape
         func = shape.impl_func
-        clip = tvtk.ClipVolume(input_connection=grid.output_port,
-                               clip_function=func,
-                               inside_out=1)
+        clip = self.clip 
+        clip.input_connection=grid.output_port
+        clip.clip_function=func
+        clip.inside_out=1
         
         attrb = tvtk.ProgrammableAttributeDataFilter(input_connection=clip.output_port)
         def update( *args ):
@@ -421,7 +424,7 @@ class ShapedTraceable(Traceable):
             if bottom is None:
                 bottom = top
             if top is not bottom:
-                result = numpy.minimum(top, bottom) #Or maybe I need maximum
+                result = numpy.maximum(top, bottom) #Or maybe I need maximum
             else:
                 result = top
             out = attrb.get_output_data_object(0)

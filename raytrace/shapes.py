@@ -1,7 +1,7 @@
 
 
-from traits.api import Instance, HasTraits, Property, on_trait_change, cached_property,\
-        Tuple, Float, Enum, observe
+from traits.api import Instance, HasStrictTraits, Property, cached_property,\
+        Tuple, Float, Enum, Event, Str, observe
         
 from traitsui.api import View, Item, VGroup, Label, Group
 
@@ -12,9 +12,7 @@ from .core.ctracer import Shape
 from .editors import NumEditor
 
 
-class BaseShape(HasTraits):
-    cshape = Instance(Shape)
-    
+class BaseShape(HasStrictTraits):    
     def __and__(self, other):
         return BooleanShape(self, other, operation="intersection")
     
@@ -26,6 +24,8 @@ class BaseShape(HasTraits):
     
     def __invert__(self):
         return InvertedShape(self)
+    
+    
     
     
 class InvertedShape(BaseShape):
@@ -44,13 +44,15 @@ class InvertedShape(BaseShape):
     
 
 class BooleanShape(BaseShape):
+    ###Inputs
     shape1 = Instance(BaseShape)
     shape2 = Instance(BaseShape)
-    
-    cshape = Property(depends_on="shape1, shape2, cshape_type")
-    impl_func = Property(depends_on="shape1, shape2, operation_type")
-    
     operation_type = Enum("difference", "union", "intersection", "union_of_magnitudes")
+    
+    ###Outputs
+    bounds = Property(depends_on="shape1.bounds, shape2.bounds")
+    cshape = Property(depends_on="shape1, shape2, operation_type")
+    impl_func = Property(depends_on="shape1, shape2, operation_type")
     cshape_type = Enum(cshapes.BooleanAND, cshapes.BooleanOR, cshapes.BooleanXOR, cshapes.InvertShape)
     
     traits_view = View(VGroup(
@@ -73,19 +75,23 @@ class BooleanShape(BaseShape):
                       "union_of_magnitudes": cshapes.BooleanOR, 
                       "intersection": cshapes.BooleanAND}
     
-    def __init__(self, shape1, shape2, operation="difference"):
+    def __init__(self, shape1, shape2, **kwds):
+        operation = kwds.pop("operation", "difference")
+        super().__init__(**kwds)
         self.operation_type = operation
         self.shape1=shape1
         self.shape2=shape2
         
     @cached_property
+    def _get_bounds(self):
+        b1 = self.shape1.bounds
+        b2 = self.shape2.bounds
+        return ( min(b1[0],b2[0]), max(b1[1],b2[1]), min(b1[2],b2[2]), max(b1[3],b2[3]) )
+        
+    @cached_property
     def _get_cshape(self):
         return self.cshape_type(self.shape1.cshape,
                                   self.shape2.cshape)
-        
-    @observe("operation_type")
-    def on_operation_changed(self, evt):
-        self.cshape_type = self.cshape_map[evt.new]
         
     @cached_property
     def _get_impl_func(self):
@@ -101,15 +107,25 @@ class BasicShape(BaseShape):
     cshape = Instance(Shape)
     impl_func = Instance(tvtk.ImplicitFunction)
     
+    bounds = Property()
+    
     traits_view = View(Item("centre"))
     
     
 class CircleShape(BasicShape):
     radius = Float(1.0)
     
+    bounds = Property(depends_on="radius, centre")
+    
     traits_view = View(
             Item("centre"),
             Item("radius", editor=NumEditor))
+    
+    @cached_property
+    def _get_bounds(self):
+        x,y = self.centre
+        r = self.radius
+        return (x-r,x+r,y-r,y+r)
     
     def _cshape_default(self):
         return cshapes.CircleShape(centre=self.centre, radius=self.radius)
@@ -120,8 +136,8 @@ class CircleShape(BasicShape):
                              radius=self.radius)
         return func
     
-    @on_trait_change("radius, centre")
-    def _update_imp_func(self):
+    @observe("radius, centre")
+    def _update_imp_func(self, evt):
         x,y = self.centre
         func = self.impl_func
         func.radius = self.radius
@@ -134,11 +150,20 @@ class RectangleShape(BasicShape):
     width = Float(5.0)
     height = Float(7.0)
     
+    bounds = Property(depends_on="width, height, centre")
+    
     _zextent = Float(10000.)
     
     traits_view = View(VGroup(Item("centre"),
                             Item("width", editor=NumEditor),
                               Item("height", editor=NumEditor)))
+    
+    @cached_property
+    def _get_bounds(self):
+        x,y = self.centre
+        w=self.width/2.
+        h = self.height/2.
+        return (x-w,x+w,y-h,y+h)
 
     def _cshape_default(self):
         return cshapes.RectangleShape(centre=self.centre,
@@ -153,8 +178,8 @@ class RectangleShape(BasicShape):
         func = tvtk.Box(bounds=(x-w,x+w,y-h,y+y,-z,z))
         return func
     
-    @on_trait_change("width, height, centre")
-    def _update_imp_func(self):
+    @observe("width, height, centre")
+    def _update_imp_func(self, evt):
         func = self.impl_func
         x,y = self.centre
         w=self.width/2.
@@ -165,5 +190,4 @@ class RectangleShape(BasicShape):
         cshape.width = self.width
         cshape.height = self.height
         cshape.centre = (x,y)
-        
     

@@ -8,19 +8,26 @@ from .core.cfaces import ShapedPlanarFace, ShapedSphericalFace, ConicRevolutionF
 from .shapes import BaseShape
 from .editors import NumEditor
 
-from traits.api import HasStrictTraits, Instance, Float, Bool, observe
+from traits.api import HasStrictTraits, Instance, Float, Bool, observe, Event
 from traitsui.api import View, VGroup, Item, VGrid
 
 
 class PlanarFace(HasStrictTraits):
     z_height = Float(0.0)
+    invert = Bool(False)
+    updated = Event()
      
     cface = Instance(ShapedPlanarFace, (), )
     
     traits_view = View(VGroup(Item("z_height", editor=NumEditor, tooltip="surface height in mm")))
     
     def _z_height_changed(self, znew):
-        self.cface.z_plane = znew
+        self.cface.z_height = znew
+        self.updated=True
+        
+    def _invert_changed(self, vnew):
+        self.cface.invert_normals = int(vnew)
+        self.updated=True
         
         
 class SphericalFace(PlanarFace):
@@ -35,11 +42,11 @@ class SphericalFace(PlanarFace):
     
     def _curvature_changed(self, cnew):
         self.cface.curvature = cnew
+        self.updated=True
         
         
 class ConicFace(SphericalFace):
     conic_const = Float(0.0)
-    invert = Bool(False)
     
     cface = Instance(ConicRevolutionFace, ())
     
@@ -52,9 +59,7 @@ class ConicFace(SphericalFace):
     
     def _conic_const_changed(self, knew):
         self.cface.conic_const = knew
-    
-    def _invert_changed(self, vnew):
-        self.cface.invert_normals = int(vnew)
+        self.updated=True
     
     
 class AsphericFace(ConicFace):
@@ -85,5 +90,6 @@ class AsphericFace(ConicFace):
     @observe("A4, A6, A8, A10, A12, A14, A16")
     def on_coef_change(self, evt):
         setattr(self.cface, evt.name, evt.new)
+        self.updated = True
         
     
