@@ -402,6 +402,9 @@ class ShapedTraceable(Traceable):
     def _grid_extent_default(self):
         return self.eval_grid_extent()
     
+    def build_pipeline(self, input_node):
+        return input_node
+    
     def _pipeline_default(self):
         grid = self.grid_in
         self._update_grid()
@@ -439,7 +442,9 @@ class ShapedTraceable(Traceable):
         topoly = tvtk.DataSetSurfaceFilter(input_connection=clip2.output_port)
         norms = tvtk.PolyDataNormals(input_connection=topoly.output_port)
         
-        transF = tvtk.TransformFilter(input_connection=norms.output_port, 
+        node = self.build_pipeline(norms)
+        
+        transF = tvtk.TransformFilter(input_connection=node.output_port, 
                                       transform=self.transform)
         #self.grid_extent = extent
         return transF

@@ -63,8 +63,8 @@ cdef class ShapedFace(Face):
         cdef:
             size_t i,j,ni=x.shape[0], nj=y.shape[0]
             double maxv, minv, v
-        maxv = self.eval_z_c(x[0],y[0])
-        minv = maxv
+        maxv = self.eval_z_c(x[0],y[0])+0.1
+        minv = maxv-0.2
         with nogil:
             for i in range(ni):
                 for j in range(nj):
@@ -74,6 +74,19 @@ cdef class ShapedFace(Face):
                     if v > maxv:
                         maxv = v
         return (minv, maxv)
+    
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def eval_z_points(self, double[:,:] points):
+        cdef:
+            size_t i, ni=points.shape[0]
+            np_.ndarray aout = np.empty((ni,), dtype='d')
+            double[:] out = aout
+            
+        with nogil:
+            for i in prange(ni):
+                out[i] = self.eval_z_c(points[i,0],points[i,1])
+        return aout
     
     @cython.boundscheck(False)  # Deactivate bounds checking
     @cython.wraparound(False)   # Deactivate negative indexing.
@@ -164,10 +177,10 @@ cdef class CircularFace(Face):
     
 cdef class ShapedPlanarFace(ShapedFace):
     cdef:
-        double z_height
+        public double z_height
         
     def __cinit__(self, **kwds):
-        self.z_plane = kwds.get('z_height', 0.0)
+        self.z_height = kwds.get('z_height', 0.0)
     
     cdef double intersect_c(self, vector_t p1, vector_t p2):
         """Intersects the given ray with this face.
@@ -182,7 +195,7 @@ cdef class ShapedPlanarFace(ShapedFace):
         """
         cdef:
             double max_length = sep_(p1, p2)
-            double h = (self.z_plane-p1.z)/(p2.z-p1.z)
+            double h = (self.z_height-p1.z)/(p2.z-p1.z)
             double X, Y
                     
         if (h<self.tolerance) or (h>1.0):

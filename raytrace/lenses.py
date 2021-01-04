@@ -505,6 +505,8 @@ class GeneralLens(ShapedOptic):
     
     materials = List(OpticalMaterial)
     
+    _grids = List()
+    
     coating_material = Instance(OpticalMaterial, ())
     coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
     
@@ -532,6 +534,45 @@ class GeneralLens(ShapedOptic):
             )
         )
     
+    
+    def build_pipeline(self, source):
+        nx,ny,nz = self.grid_resolution
+        xmin,xmax,ymin,ymax,zmin,zmax = self.grid_extent
+        grids=[]
+        
+        shape = self.shape
+        func = shape.impl_func
+        
+        append = tvtk.AppendPolyData()
+        append.add_input_connection(source.output_port)
+        
+        for face in self.surfaces[1:-1]:
+            grid = tvtk.PlaneSource(origin=(xmin,ymin,0),
+                                    point1=(xmin,ymax,0),
+                                    point2=(xmax,ymin,0),
+                                    x_resolution=nx,
+                                    y_resolution=ny)
+            
+            attrb = tvtk.ProgrammableAttributeDataFilter(input_connection=grid.output_port)
+            def execute( *args ):
+                in_data = attrb.get_input_data_object(0,0)
+                points = in_data.points.to_array()
+                z = face.cface.eval_z_points(points.astype('d'))
+                out = attrb.get_output_data_object(0)
+                out.point_data.scalars=z
+            attrb.set_execute_method(execute)
+            warp = tvtk.WarpScalar(input_connection=attrb.output_port,scale_factor=1.0)
+            warp.normal=(0,0,1)
+            warp.use_normal=True
+            clip = tvtk.ClipPolyData(input_connection=warp.output_port,
+                                     inside_out=1)
+            clip.clip_function = func
+            grids.append((grid, clip))
+            append.add_input_connection(clip.output_port)
+        self._grids = grids
+        return append
+            
+    
     def _faces_default(self):
         fl = FaceList(owner=self)
         fl.faces = [f.cface for f in self.surfaces]
@@ -549,6 +590,8 @@ class GeneralLens(ShapedOptic):
     @observe("shape.impl_func, surfaces")
     def on_impl_func_change(self, evt):
         self.clip.clip_function = self.shape.impl_func
+        for g in self._grids:
+            g[1].clip_function = self.shape.impl_func
         self.render=True
             
     @observe("shape.cshape")
@@ -557,9 +600,17 @@ class GeneralLens(ShapedOptic):
     
     @observe("shape.bounds, surfaces")
     def on_bounds_change(self, evt):
+        nx, ny, nz = self.grid_resolution
         xmin, xmax, ymin, ymax = self.shape.bounds
         zmin, zmax = self.eval_z_extent(xmin, xmax, ymin, ymax)
         self.grid_extent = (xmin, xmax, ymin, ymax, zmin, zmax)
+        for g,c in self._grids:
+            g.origin=(xmin,ymin,0)
+            g.point1=(xmin,ymax,0)
+            g.point2=(xmax,ymin,0)
+            g.x_resolution=nx
+            g.y_resolution=ny
+            g.modified()
     
     def eval_z_extent(self, xmin, xmax, ymin, ymax):
         nx, ny, nz = self.grid_resolution
