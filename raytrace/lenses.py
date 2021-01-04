@@ -29,14 +29,19 @@ from raytrace.bases import Optic, normaliseVector, NumEditor,\
     
 from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raytrace.ctracer import FaceList
-from raytrace.cmaterials import DielectricMaterial
+from raytrace.cmaterials import DielectricMaterial, CoatedDispersiveMaterial
 from raytrace.shapes import CircleShape, BaseShape
 from raytrace.vtk_algorithms import EmptyGridSource
 from . import faces
-from .materials import OpticalMaterial
+from .materials import OpticalMaterial, air
 
 import math, numpy
-from pyface.tasks.task_layout import Tabbed
+import itertools
+
+def pairwise(itr):
+    a1,a2 = itertools.tee(itr)
+    next(a2)
+    return zip(a1,a2)
 
 
 class BaseLens(Optic):
@@ -576,15 +581,36 @@ class GeneralLens(ShapedOptic):
     def _faces_default(self):
         fl = FaceList(owner=self)
         fl.faces = [f.cface for f in self.surfaces]
+        for face in fl.faces:
+            face.owner=self
         return fl
+    
+    @observe("materials.items.dispersion_curve")
+    def on_material_change(self, evt):
+        if evt.object is self:
+            if len(evt.new) + 1 != len(self.surfaces):
+                return
+            self.surfaces[0].cface.material.dispersion_outside = air
+            self.surfaces[1].cface.material.dispersion_inside = air
+            for (f1,f2),item in zip(pairwise(self.surfaces),evt.new):
+                f1.cface.material.dispersion_inside = item.dispersion_curve
+                f2.cface.material.dispersion_outside = item.dispersion_curve
+        else:
+            idx = self.materials.index(evt.object)
+            f1,f2 = self.surfaces[idx:idx+2]
+            f1.cface.material.dispersion_inside = evt.new
+            f2.cface.material.dispersion_outside = evt.new
         
     @observe("surfaces.items.updated")
     def on_surfaces_changed(self, evt):
         if evt.object is self:
             for item in evt.new:
                 item.cface.shape = self.shape.cshape
+                item.cface.material = CoatedDispersiveMaterial()
         else:
+            print(evt)
             evt.object.cface.shape = self.shape.cshape
+            evt.object.cface.material = CoatedDispersiveMaterial()
         self.on_bounds_change(None)
 
     @observe("shape.impl_func, surfaces")

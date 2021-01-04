@@ -15,6 +15,8 @@ from .editors import NumEditor
 
 GlassNames = sorted(NamedDispersionCurve.get_glass_names())
 
+air = NondispersiveCurve(1.0)
+
 
 class OpticalMaterial(HasStrictTraits):
     name = Str("Part A")

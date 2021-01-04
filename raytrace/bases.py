@@ -421,7 +421,7 @@ class ShapedTraceable(Traceable):
             in_data = attrb.get_input_data_object(0,0)
             points = in_data.points.to_array()
             top = self.eval_sag_top(points)
-            bottom = self.eval_sag_bottom(points)
+            bottom = -self.eval_sag_bottom(points)
             if top is None:
                 top = bottom
             if bottom is None:
