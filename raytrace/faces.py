@@ -21,6 +21,9 @@ class PlanarFace(HasStrictTraits):
     
     traits_view = View(VGroup(Item("z_height", editor=NumEditor, tooltip="surface height in mm")))
     
+    def __repr__(self):
+        return f"<Planar Face: z={self.z_height}>"
+    
     def _z_height_changed(self, znew):
         self.cface.z_height = znew
         self.updated=True
@@ -39,6 +42,9 @@ class SphericalFace(PlanarFace):
             Item("z_height", editor=NumEditor, tooltip="surface height at x=0,y=0 in mm"),
             Item("curvature", editor=NumEditor, tooltip="radius of curvature, in mm")
         ))
+    
+    def __repr__(self):
+        return f"<Spherical Face: z={self.z_height}, curvature={self.curvature}>"
     
     def _curvature_changed(self, cnew):
         self.cface.curvature = cnew

@@ -12,7 +12,9 @@ from .core.ctracer import Shape
 from .editors import NumEditor
 
 
-class BaseShape(HasStrictTraits):    
+class BaseShape(HasStrictTraits):
+    updated = Event()
+    
     def __and__(self, other):
         return BooleanShape(self, other, operation="intersection")
     
@@ -82,6 +84,10 @@ class BooleanShape(BaseShape):
         self.shape1=shape1
         self.shape2=shape2
         
+    @observe("shape1.updated, shape2.updated, operation_type")
+    def _on_changed(self, evt):
+        self.updated = True
+        
     @cached_property
     def _get_bounds(self):
         b1 = self.shape1.bounds
@@ -90,7 +96,7 @@ class BooleanShape(BaseShape):
         
     @cached_property
     def _get_cshape(self):
-        return self.cshape_type(self.shape1.cshape,
+        return self.cshape_map[self.operation_type](self.shape1.cshape,
                                   self.shape2.cshape)
         
     @cached_property
@@ -144,6 +150,7 @@ class CircleShape(BasicShape):
         func.center = (x,y,0)
         self.cshape.radius = self.radius
         self.cshape.centre = (x,y)
+        self.updated = True
         
         
 class RectangleShape(BasicShape):
@@ -190,4 +197,5 @@ class RectangleShape(BasicShape):
         cshape.width = self.width
         cshape.height = self.height
         cshape.centre = (x,y)
+        self.updated = True
     

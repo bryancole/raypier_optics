@@ -216,6 +216,21 @@ class EmptyGridSource(PythonAlgorithmBase):
         return 1
     
     
+# class PloyDataSkirt(PythonAlgorithmBase):
+#     input_type = Str("vtkPolyDatas")
+#     
+#     
+#     
+#     
+#     
+#     def RequestInformation(self, request, inInfo, outInfo):
+#         dims = self.dimensions
+#         info = outInfo.GetInformationObject(0)
+#         info.Set(vtk.vtkStreamingDemandDrivenPipeline.WHOLE_EXTENT(),
+#             (0, dims[0]-1, 0, dims[1]-1, 0, dims[2]-1), 6)
+#         return 1
+#     
+#     
 class NumpyImageSource(EmptyGridSource):
     number_of_input_ports = Int(0)
     output_type = Str("vtkImageData")

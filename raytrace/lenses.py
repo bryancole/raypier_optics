@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.api import Float, Instance, on_trait_change, Array, Property,\
-        cached_property, List, observe
+        cached_property, List, observe, Tuple
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Group, ListEditor
@@ -515,6 +515,8 @@ class GeneralLens(ShapedOptic):
     coating_material = Instance(OpticalMaterial, ())
     coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
     
+    grid_resolution = Tuple((200,200,30))
+    
     traits_view = View(Group(
                 Traceable.uigroup,
                 Group(
@@ -540,42 +542,52 @@ class GeneralLens(ShapedOptic):
         )
     
     
-    def build_pipeline(self, source):
+    def _pipeline_default(self):
         nx,ny,nz = self.grid_resolution
         xmin,xmax,ymin,ymax,zmin,zmax = self.grid_extent
-        grids=[]
         
         shape = self.shape
         func = shape.impl_func
         
-        append = tvtk.AppendPolyData()
-        append.add_input_connection(source.output_port)
+        _grids = []
         
-        for face in self.surfaces[1:-1]:
-            grid = tvtk.PlaneSource(origin=(xmin,ymin,0),
-                                    point1=(xmin,ymax,0),
-                                    point2=(xmax,ymin,0),
-                                    x_resolution=nx,
-                                    y_resolution=ny)
+        append = tvtk.AppendPolyData()
+        
+        grid = tvtk.PlaneSource(origin=(xmin,ymin,0),
+                                point1=(xmin,ymax,0),
+                                point2=(xmax,ymin,0),
+                                x_resolution=nx,
+                                y_resolution=ny)
+    
+        clip = tvtk.ClipPolyData(input_connection=grid.output_port,
+                                     inside_out=1)
+        clip.clip_function = func
+        
+        for face in self.surfaces:
+            attrb = tvtk.ProgrammableAttributeDataFilter(input_connection=clip.output_port)
             
-            attrb = tvtk.ProgrammableAttributeDataFilter(input_connection=grid.output_port)
-            def execute( *args ):
-                in_data = attrb.get_input_data_object(0,0)
+            ###Beware, references to outer scope change in the loop. Capture state using kwd-args.
+            def execute( *args , _face=face, _attrb=attrb):
+                in_data = _attrb.get_input_data_object(0,0)
                 points = in_data.points.to_array()
-                z = face.cface.eval_z_points(points.astype('d'))
-                out = attrb.get_output_data_object(0)
+                z = _face.cface.eval_z_points(points.astype('d'))
+                out = _attrb.get_output_data_object(0)
                 out.point_data.scalars=z
+
             attrb.set_execute_method(execute)
+            
             warp = tvtk.WarpScalar(input_connection=attrb.output_port,scale_factor=1.0)
             warp.normal=(0,0,1)
             warp.use_normal=True
-            clip = tvtk.ClipPolyData(input_connection=warp.output_port,
-                                     inside_out=1)
-            clip.clip_function = func
-            grids.append((grid, clip))
-            append.add_input_connection(clip.output_port)
-        self._grids = grids
-        return append
+            
+            append.add_input_connection(warp.output_port)
+        
+        _grids.append( (grid,clip) )
+        
+        transF = tvtk.TransformFilter(input_connection=append.output_port, 
+                                      transform=self.transform)
+        self._grids = _grids
+        return transF
             
     
     def _faces_default(self):
@@ -620,9 +632,11 @@ class GeneralLens(ShapedOptic):
             g[1].clip_function = self.shape.impl_func
         self.render=True
             
-    @observe("shape.cshape")
+    @observe("shape.updated")
     def on_shape_updated(self, evt):
-        self.updated=True
+        for face in self.surfaces:
+            face.cface.shape = self.shape.cshape
+        self.update=True
     
     @observe("shape.bounds, surfaces")
     def on_bounds_change(self, evt):
