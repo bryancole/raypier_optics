@@ -29,7 +29,7 @@ faces = [f1,f2,f3,f4]
 mats = [m1,m2,m3]
 
 lens = GeneralLens(centre=(0,0,50),
-                    shape=s1,
+                   shape=s1,
                    surfaces=faces,
                    materials=mats)
 

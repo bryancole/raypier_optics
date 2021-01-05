@@ -503,19 +503,20 @@ alist_editor = ListEditor(use_notebook=True,
                            page_name='.name')
     
     
-class GeneralLens(ShapedOptic):
+class GeneralLens(BaseLens):
     shape = Instance(BaseShape)
     
     surfaces = List(faces.PlanarFace)
     
     materials = List(OpticalMaterial)
     
-    _grids = List()
+    _grid = Instance(tvtk.PlaneSource, ())
+    _clip = Instance(tvtk.ClipPolyData, ())
     
     coating_material = Instance(OpticalMaterial, ())
     coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
     
-    grid_resolution = Tuple((200,200,30))
+    grid_resolution = Tuple((200,200))
     
     traits_view = View(Group(
                 Traceable.uigroup,
@@ -543,7 +544,7 @@ class GeneralLens(ShapedOptic):
     
     
     def _pipeline_default(self):
-        nx,ny,nz = self.grid_resolution
+        nx,ny = self.grid_resolution
         xmin,xmax,ymin,ymax,zmin,zmax = self.grid_extent
         
         shape = self.shape
@@ -553,14 +554,16 @@ class GeneralLens(ShapedOptic):
         
         append = tvtk.AppendPolyData()
         
-        grid = tvtk.PlaneSource(origin=(xmin,ymin,0),
-                                point1=(xmin,ymax,0),
-                                point2=(xmax,ymin,0),
-                                x_resolution=nx,
-                                y_resolution=ny)
+        grid = self._grid
+        grid.origin = (xmin,ymin,0)
+        grid.point1=(xmin,ymax,0)
+        grid.point2=(xmax,ymin,0)
+        grid.x_resolution=nx
+        grid.y_resolution=ny
     
-        clip = tvtk.ClipPolyData(input_connection=grid.output_port,
-                                     inside_out=1)
+        clip = self._clip
+        clip.inside_out=True
+        clip.input_connection = grid.output_port
         clip.clip_function = func
         
         bounds = tvtk.FeatureEdges(input_connection=clip.output_port)
@@ -586,9 +589,7 @@ class GeneralLens(ShapedOptic):
             warp.use_normal=True
             
             append.add_input_connection(warp.output_port)
-        
-        _grids.append( (grid,clip) )
-        
+                
         skirt = tvtk.ProgrammableFilter(input_connection=bounds.output_port)
         def calc_skirt(_skirt=skirt):
             in_data = _skirt.get_input_data_object(0,0)
@@ -615,11 +616,15 @@ class GeneralLens(ShapedOptic):
             out.polys = quads
             
         skirt.set_execute_method(calc_skirt)
+        
+        clean = tvtk.CleanPolyData(input_connection=skirt.output_port)
+        
         append.add_input_connection(skirt.output_port)
         
-        transF = tvtk.TransformFilter(input_connection=append.output_port, 
+        norms = tvtk.PolyDataNormals(input_connection=append.output_port)
+        
+        transF = tvtk.TransformFilter(input_connection=norms.output_port, 
                                       transform=self.transform)
-        self._grids = _grids
         return transF
             
     
@@ -660,9 +665,7 @@ class GeneralLens(ShapedOptic):
 
     @observe("shape.impl_func, surfaces")
     def on_impl_func_change(self, evt):
-        self.clip.clip_function = self.shape.impl_func
-        for g in self._grids:
-            g[1].clip_function = self.shape.impl_func
+        self._clip.clip_function = self.shape.impl_func
         self.render=True
             
     @observe("shape.updated")
@@ -673,20 +676,20 @@ class GeneralLens(ShapedOptic):
     
     @observe("shape.bounds, surfaces")
     def on_bounds_change(self, evt):
-        nx, ny, nz = self.grid_resolution
+        nx, ny = self.grid_resolution
         xmin, xmax, ymin, ymax = self.shape.bounds
         zmin, zmax = self.eval_z_extent(xmin, xmax, ymin, ymax)
         self.grid_extent = (xmin, xmax, ymin, ymax, zmin, zmax)
-        for g,c in self._grids:
-            g.origin=(xmin,ymin,0)
-            g.point1=(xmin,ymax,0)
-            g.point2=(xmax,ymin,0)
-            g.x_resolution=nx
-            g.y_resolution=ny
-            g.modified()
+        g = self._grid
+        g.origin=(xmin,ymin,0)
+        g.point1=(xmin,ymax,0)
+        g.point2=(xmax,ymin,0)
+        g.x_resolution=nx
+        g.y_resolution=ny
+        g.modified()
     
     def eval_z_extent(self, xmin, xmax, ymin, ymax):
-        nx, ny, nz = self.grid_resolution
+        nx, ny = self.grid_resolution
         try:
             top_face = self.surfaces[0]
             bottom_face = self.surfaces[-1]
@@ -697,16 +700,6 @@ class GeneralLens(ShapedOptic):
         tzmin, tzmax = top_face.cface.eval_z_extent(x,y)
         bzmin, bzmax = bottom_face.cface.eval_z_extent(x,y)
         return ( min(tzmin,bzmin), max(tzmax, bzmax) )
-    
-    def eval_sag_top(self, points):
-        top_face = self.surfaces[0]
-        z_top = top_face.cface.eval_implicit_points(points.astype('d'))
-        return z_top 
-    
-    def eval_sag_bottom(self, points):
-        bottom_face = self.surfaces[-1]
-        z_bottom = bottom_face.cface.eval_implicit_points(points.astype('d'))
-        return z_bottom 
 
         
 if __name__=="__main__":
