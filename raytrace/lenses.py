@@ -563,6 +563,11 @@ class GeneralLens(ShapedOptic):
                                      inside_out=1)
         clip.clip_function = func
         
+        bounds = tvtk.FeatureEdges(input_connection=clip.output_port)
+        bounds.extract_all_edge_types_off()
+        bounds.boundary_edges = True
+        bounds.coloring = False
+        
         for face in self.surfaces:
             attrb = tvtk.ProgrammableAttributeDataFilter(input_connection=clip.output_port)
             
@@ -583,6 +588,34 @@ class GeneralLens(ShapedOptic):
             append.add_input_connection(warp.output_port)
         
         _grids.append( (grid,clip) )
+        
+        skirt = tvtk.ProgrammableFilter(input_connection=bounds.output_port)
+        def calc_skirt(_skirt=skirt):
+            in_data = _skirt.get_input_data_object(0,0)
+            out = _skirt.get_output_data_object(0)
+            points = in_data.points.to_array().astype('d')
+            z_top = self.surfaces[0].cface.eval_z_points(points)
+            z_bottom = self.surfaces[-1].cface.eval_z_points(points)
+            
+            size = points.shape[0]
+            points_out = numpy.vstack([points,points])
+            points_out[:size,2] = z_top
+            points_out[size:,2] = z_bottom
+            
+            cell_data = in_data.lines.to_array().reshape(-1,3)
+            cells_out = numpy.empty((cell_data.shape[0], 5))
+            cells_out[:,0] = 4
+            cells_out[:,1] = cell_data[:,1]
+            cells_out[:,2] = cell_data[:,2]
+            cells_out[:,3] = cell_data[:,2] + size
+            cells_out[:,4] = cell_data[:,1] + size    
+            out.points = points_out.reshape(-1,3)
+            quads = tvtk.CellArray()
+            quads.set_cells(5, cells_out)
+            out.polys = quads
+            
+        skirt.set_execute_method(calc_skirt)
+        append.add_input_connection(skirt.output_port)
         
         transF = tvtk.TransformFilter(input_connection=append.output_port, 
                                       transform=self.transform)
