@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.api import Float, Instance, on_trait_change, Array, Property,\
-        cached_property, List, observe, Tuple
+        cached_property, List, observe, Tuple, cached_property
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Group, ListEditor
@@ -688,19 +688,8 @@ class GeneralLens(BaseLens):
     
     @observe("materials.items.dispersion_curve")
     def on_material_change(self, evt):
-        if evt.object is self:
-            if len(evt.new) + 1 != len(self.surfaces):
-                return
-            mats = [air,] + evt.new + [air,]
-            for i, face in enumerate(self.surfaces):
-                if face.trace and not face.mirror:
-                    face.cface.material.dispersion_outside = mats[i].dispersion_curve
-                    face.cface.material.dispersion_inside = mats[i+1].dispersion_curve
-        else:
-            idx = self.materials.index(evt.object)
-            for face in self.surfaces[idx:idx+2]:
-                if not face.mirror:
-                    face.cface.material.dispersion_inside = evt.new
+        self.config_cfaces()
+        self.update = True
         
     @observe("surfaces.items.updated, shape.updated")
     def on_surfaces_changed(self, evt):

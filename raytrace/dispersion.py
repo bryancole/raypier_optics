@@ -19,6 +19,8 @@ MATERIAL_DATABASE = pkg_resources.resource_filename("raytrace", GLASS_DATABASE_P
 
 class NondispersiveCurve(BaseDispersionCurve):
     def __init__(self, refractive_index=1.37, absorption=0.0):
+        self._refractive_index=refractive_index
+        self._absorption=absorption
         formula_id=0
         coefs = numpy.array([refractive_index,])
         wavelen_min=0.0
@@ -29,6 +31,9 @@ class NondispersiveCurve(BaseDispersionCurve):
                                                   wavelen_min,
                                                   wavelen_max
                                                   )
+        
+    def __repr__(self):
+        return f"<Nondispersion Curve: ri={self._refractive_index}, absorption={self._absorption}>"
         
 class FusedSilica(BaseDispersionCurve):
     def __init__(self, absorption=0.0):
@@ -70,6 +75,9 @@ class NamedDispersionCurve(BaseDispersionCurve):
         
         row=rows[0]
         fname, name, book, formula_id, wavelen_min, wavelen_max, n_coefs = row[:7]
+        
+        self._data = row
+        
         coefs = numpy.array(row[7:7+n_coefs], dtype=numpy.double)
         
         super(NamedDispersionCurve,self).__init__(formula_id,
@@ -78,6 +86,10 @@ class NamedDispersionCurve(BaseDispersionCurve):
                                                   wavelen_min,
                                                   wavelen_max
                                                   )
+        
+    def __repr__(self):
+        data = self._data
+        return f"<Named Dispersion: name={data[1]}, formula={data[3]}, coefs={data[6]}>"
         
     @classmethod
     def get_glass_names(cls):
