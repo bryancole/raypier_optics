@@ -29,7 +29,7 @@ from raytrace.bases import Optic, normaliseVector, NumEditor,\
     
 from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raytrace.ctracer import FaceList
-from raytrace.cmaterials import DielectricMaterial, CoatedDispersiveMaterial
+from raytrace.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial
 from raytrace.shapes import CircleShape, BaseShape
 from raytrace.vtk_algorithms import EmptyGridSource
 from . import faces
@@ -518,6 +518,11 @@ class GeneralLens(BaseLens):
     
     grid_resolution = Tuple((200,200))
     
+    glass_colour = Tuple((204,204,255,102))
+    mirror_colour = Tuple((104,64,104,255))
+    
+    
+    
     traits_view = View(Group(
                 Traceable.uigroup,
                 Group(
@@ -542,6 +547,17 @@ class GeneralLens(BaseLens):
             )
         )
     
+    def _actors_default(self):
+        pipeline = self.pipeline
+        
+        map = tvtk.PolyDataMapper(input_connection=pipeline.output_port,
+                                  scalar_mode="use_cell_data",
+                                  color_mode="direct_scalars")
+        map.scalar_visibility = True
+        act = tvtk.Actor(mapper=map)
+        actors = tvtk.ActorCollection()
+        actors.append(act)
+        return actors
     
     def _pipeline_default(self):
         nx,ny = self.grid_resolution
@@ -581,6 +597,13 @@ class GeneralLens(BaseLens):
                 z = _face.cface.eval_z_points(points.astype('d'))
                 out = _attrb.get_output_data_object(0)
                 out.point_data.scalars=z
+                ncells = in_data.polys.number_of_cells
+                colors = numpy.zeros((ncells,4), numpy.uint8)
+                if _face.mirror:
+                    colors[:] = self.mirror_colour
+                else:
+                    colors[:] = self.glass_colour
+                out.cell_data.scalars = colors
 
             attrb.set_execute_method(execute)
             
@@ -604,7 +627,8 @@ class GeneralLens(BaseLens):
             points_out[size:,2] = z_bottom
             
             cell_data = in_data.lines.to_array().reshape(-1,3)
-            cells_out = numpy.empty((cell_data.shape[0], 5))
+            ncells = cell_data.shape[0]
+            cells_out = numpy.empty((ncells, 5))
             cells_out[:,0] = 4
             cells_out[:,1] = cell_data[:,1]
             cells_out[:,2] = cell_data[:,2]
@@ -614,6 +638,11 @@ class GeneralLens(BaseLens):
             quads = tvtk.CellArray()
             quads.set_cells(5, cells_out)
             out.polys = quads
+            out.lines = None
+
+            colors = numpy.zeros((ncells*3,4), numpy.uint8)
+            colors[:] = self.glass_colour
+            out.cell_data.scalars = colors
             
         skirt.set_execute_method(calc_skirt)
         
@@ -627,52 +656,62 @@ class GeneralLens(BaseLens):
                                       transform=self.transform)
         return transF
             
+            
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self.config_cfaces()
     
     def _faces_default(self):
         fl = FaceList(owner=self)
-        fl.faces = [f.cface for f in self.surfaces]
-        for face in fl.faces:
-            face.owner=self
         return fl
+    
+    def config_cfaces(self):
+        surfaces = self.surfaces
+        cfaces = []
+        mats = [air,] + self.materials + [air,]
+        if len(mats) < len(surfaces) + 1:
+            mats += [air,] * (len(surfaces)-len(mats) + 1)
+        for i, face in enumerate(surfaces):
+            if face.trace:
+                cface = face.cface
+                cface.owner = self
+                cface.shape = self.shape.cshape
+                if face.mirror:
+                    cface.material = PECMaterial()
+                else:
+                    mat = CoatedDispersiveMaterial()
+                    mat.dispersion_outside = mats[i].dispersion_curve
+                    mat.dispersion_inside = mats[i+1].dispersion_curve
+                    cface.material = mat
+                cfaces.append(face.cface)
+        self.faces.faces = cfaces
     
     @observe("materials.items.dispersion_curve")
     def on_material_change(self, evt):
         if evt.object is self:
             if len(evt.new) + 1 != len(self.surfaces):
                 return
-            self.surfaces[0].cface.material.dispersion_outside = air
-            self.surfaces[1].cface.material.dispersion_inside = air
-            for (f1,f2),item in zip(pairwise(self.surfaces),evt.new):
-                f1.cface.material.dispersion_inside = item.dispersion_curve
-                f2.cface.material.dispersion_outside = item.dispersion_curve
+            mats = [air,] + evt.new + [air,]
+            for i, face in enumerate(self.surfaces):
+                if face.trace and not face.mirror:
+                    face.cface.material.dispersion_outside = mats[i].dispersion_curve
+                    face.cface.material.dispersion_inside = mats[i+1].dispersion_curve
         else:
             idx = self.materials.index(evt.object)
-            f1,f2 = self.surfaces[idx:idx+2]
-            f1.cface.material.dispersion_inside = evt.new
-            f2.cface.material.dispersion_outside = evt.new
+            for face in self.surfaces[idx:idx+2]:
+                if not face.mirror:
+                    face.cface.material.dispersion_inside = evt.new
         
-    @observe("surfaces.items.updated")
+    @observe("surfaces.items.updated, shape.updated")
     def on_surfaces_changed(self, evt):
-        if evt.object is self:
-            for item in evt.new:
-                item.cface.shape = self.shape.cshape
-                item.cface.material = CoatedDispersiveMaterial()
-        else:
-            print(evt)
-            evt.object.cface.shape = self.shape.cshape
-            evt.object.cface.material = CoatedDispersiveMaterial()
+        self.config_cfaces()
         self.on_bounds_change(None)
+        self.update = True
 
     @observe("shape.impl_func, surfaces")
     def on_impl_func_change(self, evt):
         self._clip.clip_function = self.shape.impl_func
         self.render=True
-            
-    @observe("shape.updated")
-    def on_shape_updated(self, evt):
-        for face in self.surfaces:
-            face.cface.shape = self.shape.cshape
-        self.update=True
     
     @observe("shape.bounds, surfaces")
     def on_bounds_change(self, evt):

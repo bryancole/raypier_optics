@@ -16,7 +16,8 @@ class PlanarFace(HasStrictTraits):
     z_height = Float(0.0)
     invert = Bool(False)
     updated = Event()
-     
+    mirror = Bool(False)
+    trace = Bool(True)
     cface = Instance(ShapedPlanarFace, (), )
     
     traits_view = View(VGroup(Item("z_height", editor=NumEditor, tooltip="surface height in mm")))
@@ -30,6 +31,10 @@ class PlanarFace(HasStrictTraits):
         
     def _invert_changed(self, vnew):
         self.cface.invert_normals = int(vnew)
+        self.updated=True
+        
+    @observe("trace, mirror")
+    def _params_changed(self, evt):
         self.updated=True
         
         

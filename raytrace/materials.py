@@ -15,7 +15,6 @@ from .editors import NumEditor
 
 GlassNames = sorted(NamedDispersionCurve.get_glass_names())
 
-air = NondispersiveCurve(1.0)
 
 
 class OpticalMaterial(HasStrictTraits):
@@ -43,4 +42,9 @@ class OpticalMaterial(HasStrictTraits):
                                   absorption=self.absorption)
     
     
+class AirMaterial(OpticalMaterial):
+    from_database = False
+    name = "Air"
     
+    
+air = AirMaterial()
