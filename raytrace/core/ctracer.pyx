@@ -5,6 +5,7 @@
 #cython: cdivision=True
 
 cdef extern from "math.h":
+    double M_PI
     double sqrt(double arg) nogil
     double fabs(double arg) nogil
     double atan2(double y, double x) nogil
@@ -32,7 +33,9 @@ import time
 import numpy as np
 cimport numpy as np_
 
-cdef int NPARA = 6
+cdef:
+    int NPARA = 6
+    
 
 ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('direction', np.double, (3,)),
@@ -1221,10 +1224,83 @@ cdef class GaussletCollection:
         cdef: 
             int size=data.shape[0]
             GaussletCollection rc = GaussletCollection(size)
-        assert data.dtype is gausslet_dtype
+            
+        if data.dtype != gausslet_dtype:
+            raise ValueError("Array must have gausslet_dtype dtype")
+        
         memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(gausslet_t))
         rc.n_rays = size
         return rc
+    
+    @classmethod
+    def from_rays(cls, np_.ndarray data):
+        cdef: 
+            int i, j, size=data.shape[0]
+            GaussletCollection rc = GaussletCollection(size)
+            gausslet_t *gc
+            ray_t *ray
+            para_t *p
+            ray_t *_data = <ray_t *>data.data
+            
+        if data.dtype != ray_dtype:
+            raise ValueError("Array must have gausslet_dtype dtype")
+            
+        for i in range(size):
+            gc = rc.rays+i
+            ray = &(_data[i])
+            gc.base_ray = ray[0]
+            for j in range(6):
+                p = gc.para + j
+                p.origin = ray.origin
+                p.direction = ray.direction
+                p.normal = ray.normal
+                p.length = ray.length
+        rc.n_rays = size
+        return rc
+    
+    def config_parabasal_rays(self, double[:] wavelength_list, double radius, double working_dist):
+        """
+        Initialise the parabasal rays for a symmetric (i.e. circular) modes, 
+        using the base_ray data for wavelength, and the given beam waist 1/e^2 radius.
+        'working_dist' indicates the distance from the base_ray origin to the centre 
+        of the gaussian beam waist. Negative values imply a beam waist before the origin. 
+        'radius' is given in microns.
+        """
+        cdef:
+            int i,j
+            gausslet_t *gc
+            double theta0
+            vector_t v, d1, d2
+            
+        for i in range(self.n_rays):
+            gc = self.rays+i
+            if gc.base_ray.direction.x > gc.base_ray.direction.y:
+                v.x=0.0
+                v.y=1.0
+                v.z=0.0
+            else:
+                v.x=1.0
+                v.y=0.0
+                v.z=0.0
+            d1 = norm_(cross_(gc.base_ray.direction, v))
+            d2 = norm_(cross_(gc.base_ray.direction, d1))
+            theta0 = wavelength_list[gc.base_ray.wavelength_idx]/(M_PI*radius*1000.0)
+            for j in range(0,6,2):
+                angle = i*2*M_PI/6
+                v = addvv_(multvs_(d1, radius*cos(angle)),
+                                multvs_(d2, radius*sin(angle)))
+                v = addvv_(gc.base_ray.origin, v)
+                gc.para[j].origin = v
+                gc.para[j+1].origin = v
+                v = addvv_(multvs_(d1, theta0*cos(angle)),
+                            multvs_(d2, theta0*sin(angle)))
+                gc.para[j].direction = addvv_(gc.base_ray.direction, v) 
+                gc.para[j+1].direction = subvv_(gc.base_ray.direction, v)
+                gc.para[j].normal = gc.base_ray.normal
+                gc.para[j+1].normal = gc.base_ray.normal 
+                gc.para[j].length = gc.base_ray.length
+                gc.para[j+1].length = gc.base_ray.length
+        
     
     property origin:
         def __get__(self):

@@ -21,12 +21,12 @@ f1 = SphericalFace(z_height=8.0, curvature=50.0)
 m1 = OpticalMaterial(from_database=False, refractive_index=1.5)
 f2 = PlanarFace(z_height=1.0)
 m2 = OpticalMaterial(from_database=False, refractive_index=1.1)
-f3 = SphericalFace(z_height=-8.0, curvature=-50.0, invert=True)
+f3 = SphericalFace(z_height=-8.0, curvature=-50.0)
 m3 = OpticalMaterial(from_database=False, refractive_index=1.6)
 f4 = PlanarFace(z_height=-9.0, invert=False)
 
-faces = [f1,f3]#[f1,f2,f3,f4]
-mats = [m1,]#[m2,m3]
+faces = [f1,f1,f2,f3,f4]
+mats = [m1, m2,m3]
 
 lens = GeneralLens(centre=(0,0,50),
                    shape=s1,
