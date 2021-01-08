@@ -234,7 +234,8 @@ class BaseRaySource(BaseBase):
         self.render = True
         
     def _show_normals_changed(self):
-        self.update=True
+        self.normals_source.modified()
+        self.render=True
         
     def _ray_mask_changed(self):
         self.update = True

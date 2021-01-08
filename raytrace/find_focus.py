@@ -4,14 +4,24 @@ Utility module
 
 from numpy.linalg import solve
 import numpy as np
-from raytrace.ctracer import RayCollection
+from raytrace.ctracer import RayCollection, GaussletCollection
 
 
 def find_ray_focus(ray_collection):
-    if not isinstance(ray_collection, RayCollection):
-        raise TypeError("Expecting a RayCollection object")
-    E1 = ray_collection.E1_amp
-    E2 = ray_collection.E2_amp
+    if isinstance(ray_collection, GaussletCollection):
+        data = ray_collection.copy_as_array()
+        ray = data['base_ray']
+        E1 = ray['E1_amp']
+        E2 = ray['E2_amp']
+        origin = ray['origin']
+        direction = ray['direction']
+    else:
+        if not isinstance(ray_collection, RayCollection):
+            raise TypeError("Expecting a RayCollection object")
+        E1 = ray_collection.E1_amp
+        E2 = ray_collection.E2_amp
+        origin = ray_collection.origin
+        direction = ray_collection.direction
     weights = E1.real**2 + E1.imag**2 + E2.real**2 + E2.imag**2
     weights /= weights.sum()
     return find_focus(ray_collection.origin, ray_collection.direction, weights=weights)

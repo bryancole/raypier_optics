@@ -1102,6 +1102,7 @@ cdef class RayCollection:
         cdef int size=data.shape[0]
         cdef RayCollection rc = RayCollection(size)
         assert data.dtype is ray_dtype
+        data = np.ascontiguousarray(data)
         memcpy(rc.rays, <np_.float64_t *>data.data, size*sizeof(ray_t))
         rc.n_rays = size
         return rc
@@ -1269,33 +1270,43 @@ cdef class GaussletCollection:
         cdef:
             int i,j
             gausslet_t *gc
-            double theta0
-            vector_t v, d1, d2
+            double theta0, denom, angle
+            vector_t o, d, d1, d2, base_d, da, db
             
         for i in range(self.n_rays):
             gc = self.rays+i
-            if gc.base_ray.direction.x > gc.base_ray.direction.y:
-                v.x=0.0
-                v.y=1.0
-                v.z=0.0
+            base_d = norm_(gc.base_ray.direction)
+            if base_d.x > base_d.y:
+                o.x=0.0
+                o.y=1.0
+                o.z=0.0
             else:
-                v.x=1.0
-                v.y=0.0
-                v.z=0.0
-            d1 = norm_(cross_(gc.base_ray.direction, v))
-            d2 = norm_(cross_(gc.base_ray.direction, d1))
+                o.x=1.0
+                o.y=0.0
+                o.z=0.0
+            d1 = norm_(cross_(base_d, o))
+            d2 = norm_(cross_(base_d, d1))
+            ### Divergence of the gausslet
             theta0 = wavelength_list[gc.base_ray.wavelength_idx]/(M_PI*radius*1000.0)
+            
             for j in range(0,6,2):
-                angle = i*2*M_PI/6
-                v = addvv_(multvs_(d1, radius*cos(angle)),
+                angle = (j*2*M_PI/6)# + i*(2*M_PI)/self.n_rays
+                o = addvv_(multvs_(d1, radius*cos(angle)),
                                 multvs_(d2, radius*sin(angle)))
-                v = addvv_(gc.base_ray.origin, v)
-                gc.para[j].origin = v
-                gc.para[j+1].origin = v
-                v = addvv_(multvs_(d1, theta0*cos(angle)),
-                            multvs_(d2, theta0*sin(angle)))
-                gc.para[j].direction = addvv_(gc.base_ray.direction, v) 
-                gc.para[j+1].direction = subvv_(gc.base_ray.direction, v)
+                o = addvv_(o, gc.base_ray.origin)
+                o = addvv_(o, multvs_(base_d, working_dist))
+                ###direction of ray
+                d = addvv_(multvs_(d1, theta0*sin(angle)),
+                            multvs_(d2, theta0*cos(angle)))
+                da = addvv_(base_d, d)
+                db = subvv_(base_d, d)
+                
+                gc.para[j].direction = norm_(da)
+                gc.para[j].origin = subvv_(o, multvs_(da,working_dist))
+                
+                gc.para[j+1].direction = norm_(db)
+                gc.para[j+1].origin = subvv_(o, multvs_(db,working_dist))
+                
                 gc.para[j].normal = gc.base_ray.normal
                 gc.para[j+1].normal = gc.base_ray.normal 
                 gc.para[j].length = gc.base_ray.length

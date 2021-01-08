@@ -1,13 +1,14 @@
 
 import numpy
 import itertools
-from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property
-
+from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, observe, Bool
+from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
 from tvtk.api import tvtk
 
 from raytrace.sources import BaseRaySource, UnitTupleVector, UnitVectorTrait
-from raytrace.ctracer import GaussletCollection, gausslet_dtype
+from raytrace.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
 from raytrace.tracer import normaliseVector
+from raytrace.editors import NumEditor
 
 
 class BaseGaussletSource(BaseRaySource):
@@ -17,6 +18,39 @@ class BaseGaussletSource(BaseRaySource):
     para_ray_actor = Instance(tvtk.Actor, transient=True)
     para_property = Instance(tvtk.Property, (), {'color':(0.0,0.5,0.5), 'opacity': 1.0}, transient=True)
     para_mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
+    
+    show_paras = Bool(False)
+    
+    wavelength = Float(0.78) # in microns
+    
+    display_grp = VGroup(Item('display'),
+                       Item('show_start'),
+                       Item('show_normals'),
+                       Item('show_paras'),
+                       Item('scale_factor'),
+                       Item('export_pipes',label="export as pipes"),
+                       Item('opacity', editor=NumEditor),
+                       label="Display")
+    
+    params_grp = VGroup(
+                       Item("max_angle"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
+                       Item('sample_spacing', tooltip="Sample spacing for the field in the aperture"),
+                       label="Parameters")
+    
+    traits_view = View(Item('name', show_label=False),
+                       Tabbed(VGroup(Group(Item('origin', show_label=False,resizable=True), 
+                                           show_border=True,
+                                    label="Origin position",
+                                    padding=0),
+                               Group(Item('direction', show_label=False, resizable=True),
+                                    show_border=True,
+                                    label="Direction"),
+                               Item("wavelength"),
+                               Include('params_grp'),
+                            ),
+                              display_grp)
+                       )
     
     def _TracedRays_changed(self):
         self.data_source.modified()
@@ -57,9 +91,16 @@ class BaseGaussletSource(BaseRaySource):
         source.set_execute_method(execute)
         return source
     
+    @observe("show_paras")
+    def _on_show_paras_changed(self, evt):
+        self.para_data_source.modified()
+        self.render=True
+    
     def _para_data_source_default(self):
         source = tvtk.ProgrammableSource()
         def execute():
+            if not self.show_paras:
+                return
             output = source.poly_data_output
             pointArrayList = []
             mask = self.ray_mask
@@ -136,12 +177,26 @@ class SingleGaussletSource(BaseGaussletSource):
                                 'labels':['x','y','z']})
     E1_amp = Complex(1.0+0.0j)
     E2_amp = Complex(0.0+0.0j)
-    wavelength = Float(0.78) # in microns
     
     beam_waist = Float(1.0)
     
     InputRays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, E2_amp, beam_waist")
+    
+    params_grp = VGroup(
+                       Item("wavelength"),
+                       Item("max_angle"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
+                       Item('sample_spacing', tooltip="Sample spacing for the field in the aperture"),
+                       label="Parameters")
+    
+    def _wavelength_list_default(self):
+        return [self.wavelength,]
+    
+    @observe("wavelength")
+    def _do_wavelength_changed(self, evt):
+        self.wavelength_list = [self.wavelength]
+        self.update=True
     
     @cached_property
     def _get_InputRays(self):
@@ -182,4 +237,80 @@ class SingleGaussletSource(BaseGaussletSource):
         #print("A", [g.length for g in gc[0].parabasal_rays] , [self.max_ray_len]*6 )
         assert [g.length for g in gc[0].parabasal_rays] == [self.max_ray_len]*6
         return gc
+    
+    
+class CollimatedGaussletSource(SingleGaussletSource):
+    radius = Float(10.,editor=NumEditor)
+    resolution = Float(10.0, editor=NumEditor)
+    
+    InputRays = Property(Instance(GaussletCollection), 
+                         depends_on="origin, direction, max_ray_len, E_vector, E1_amp, "
+                                    "E2_amp, radius, resolution, wavelength, beam_waist")
+    
+    params_grp = VGroup(
+                        Item("radius"),
+                        Item("resolution"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
+                       label="Parameters")
+    
+    @cached_property
+    def _get_InputRays(self):
+        self.wavelength_list = [self.wavelength]
+        origin = numpy.array(self.origin)
+        direction = numpy.array(self.direction)
+        radius = self.radius
+        spacing = radius/self.resolution
+        max_axis = numpy.abs(direction).argmax()
+        if max_axis==0:
+            v = numpy.array([0.,1.,0.])
+        else:
+            v = numpy.array([1.,0.,0.])
+        d1 = numpy.cross(direction, v)
+        d1 = normaliseVector(d1)
+        d2 = numpy.cross(direction, d1)
+        d2 = normaliseVector(d2)
+
+        E_vector = numpy.cross(self.E_vector, direction)
+        E_vector = numpy.cross(E_vector, direction)
+        
+        cosV = numpy.cos(numpy.pi*30/180.)
+        sinV = numpy.sin(numpy.pi*30/180.)
+        d2 = cosV*d2 + sinV*d1
+        
+        nsteps = int(radius/(spacing*numpy.cos(numpy.pi*30/180.)))
+        i = numpy.arange(-nsteps-1, nsteps+2)
+        j = numpy.arange(-nsteps-1, nsteps+2)
+        
+        vi, vj = numpy.meshgrid(i,j)
+        
+        vi.shape = -1
+        vj.shape = -1
+        
+        ri = ((vi + sinV*vj)**2 + (cosV*vj**2))
+        select = ri < (radius/spacing)**2
+        
+        xi = vi[select]
+        yj = vj[select]
+        
+        offsets = xi[:,None]*d1 + yj[:,None]*d2
+        offsets *= spacing
+        gauss = numpy.exp(-(ri[select]*(spacing**2)/((self.beam_waist)**2))) 
+        
+        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+            
+        ray_data['origin'] = offsets
+        ray_data['origin'] += origin
+        ray_data['direction'] = direction
+        ray_data['wavelength_idx'] = 0
+        ray_data['E_vector'] = [normaliseVector(E_vector)]
+        ray_data['E1_amp'] = self.E1_amp * gauss
+        ray_data['E2_amp'] = self.E2_amp * gauss
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        
+        rays = GaussletCollection.from_rays(ray_data)
+        working_dist = 0.0
+        rays.config_parabasal_rays(numpy.array(self.wavelength_list), spacing, working_dist)
+        return rays
+        
         

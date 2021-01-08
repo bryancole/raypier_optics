@@ -12,9 +12,10 @@ from tvtk.api import tvtk
 
 from raytrace.bases import Probe, Traceable, NumEditor
 from raytrace.sources import RayCollection, BaseRaySource
-from raytrace.cfields import sum_gaussian_modes, evaluate_modes as evaluate_modes_c
+from raytrace.core.cfields import sum_gaussian_modes, evaluate_modes as evaluate_modes_c
 from raytrace.find_focus import find_ray_focus
 from raytrace.utils import normaliseVector, dotprod
+from raytrace.core.ctracer import GaussletCollection, RayCollection
 
 import numpy
 
@@ -119,6 +120,25 @@ def evaluate_neighbours(rays, neighbours_idx):
     dx = (n_direction * E).sum(axis=-1)/dz 
     dy = (n_direction * H).sum(axis=-1)/dz
     return (rays[mask], x,y,dx,dy)
+
+
+def evaluate_neighbours_gc(gausslets):
+    ga=gausslets
+    origin = ga['base_ray']['origin'][:,None,:]
+    direction = ga['base_ray']['direction'][:,None,:]
+    n_direction = ga['para_rays']['direction']
+    E = ga['base_ray']['E_vector'][:,None,:]
+    H = numpy.cross(E, direction)
+    
+    offsets = ga['para_rays']['origin'] - origin
+    #alpha = -(offsets * direction).sum(axis=-1)/(n_direction * direction).sum(axis=-1)
+    ### Don't need to project onto origin normal plane as all para-rays start on this plane.
+    x = (offsets * E).sum(axis=-1)
+    y = (offsets * H).sum(axis=-1)
+    dz = (n_direction * direction).sum(axis=-1)
+    dx = (n_direction * E).sum(axis=-1)/dz 
+    dy = (n_direction * H).sum(axis=-1)/dz
+    return (ga['base_ray'], x, y, dx, dy)
     
     
 def evaluate_modes(neighbour_x, neighbour_y, dx, dy, blending=1.0):
@@ -160,6 +180,39 @@ def evaluate_modes(neighbour_x, neighbour_y, dx, dy, blending=1.0):
     return ((blending*1j)*im_coefs) + re_coefs
 
     
+def eval_Efield_from_rays(ray_collection, points, wavelengths, 
+                          blending=1.0,
+                          exit_pupil_offset=0.0, 
+                          exit_pupil_centre=(0.0,0.0,0.0)):
+    rays = ray_collection.copy_as_array() 
+    radius = exit_pupil_offset
+        
+    if radius:
+        projected = project_to_sphere(rays, exit_pupil_centre, radius)
+    else:
+        projected = rays
+    #projected = rays
+    
+    neighbours_idx = ray_collection.neighbours
+    rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
+
+    modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
+    
+    _rays = RayCollection.from_array(rays)
+    
+    E = sum_gaussian_modes(_rays, modes, wavelengths, points)
+    
+    return E
+
+
+def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
+                               blending=1.0, **kwds):
+    gc = gausslet_collection.copy_as_array() 
+    rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
+    modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
+    _rays = RayCollection.from_array(rays)
+    E = sum_gaussian_modes(_rays, modes, wavelengths, points)
+    return E
     
 class EFieldPlane(Probe):
     name = Str("E-Field Probe")
@@ -245,7 +298,6 @@ class EFieldPlane(Probe):
         E = self.E_field
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
-        
     def evaluate(self):
         ray_src = self.source
         start = time.time()
@@ -260,19 +312,7 @@ class EFieldPlane(Probe):
         ### Reliably finding the gen-idx is tricky ###
         #idx = find_ray_gen(centre, traced_rays)
         
-        rays = traced_rays[idx].copy_as_array() 
-        radius = self.exit_pupil_offset
-        
-        if radius:
-            projected = project_to_sphere(rays, centre, radius)
-        else:
-            projected = rays
-        #projected = rays
-        
-        neighbours_idx = traced_rays[idx].neighbours
-        rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
-
-        modes = evaluate_modes_c(x, y, dx, dy, blending=self.blending)
+        rays = traced_rays[idx]
         
         size = self.size
         side = self.width/2.
@@ -280,7 +320,6 @@ class EFieldPlane(Probe):
         px = numpy.linspace(-side,side,size)
         py = numpy.linspace(-yside, yside, size)
         points = numpy.dstack(numpy.meshgrid(px,py,0)).reshape(-1,3)
-        
         ###What a chore
         trns = self.transform
         pts_in = tvtk.Points()
@@ -289,9 +328,14 @@ class EFieldPlane(Probe):
         trns.transform_points(pts_in, pts_out)
         points2 = pts_out.to_array().astype('d')
         
-        _rays = RayCollection.from_array(rays)
-        
-        E = sum_gaussian_modes(_rays, modes, wavelengths, points2)
+        if isinstance(rays, GaussletCollection):
+            E = eval_Efield_from_gausslets(rays, points2, wavelengths, 
+                                           blending=self.blending)
+        else:
+            E = eval_Efield_from_rays(rays, points2, wavelengths, 
+                                      blending=self.blending,
+                                      exit_pupil_offset=self.exit_pupil_offset,
+                                      exit_pupil_centre=self.centre)
         
         self.E_field = E.reshape(self.size, self.size, 3)
         
