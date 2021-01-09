@@ -4,7 +4,10 @@ faulthandler.enable()
 
 
 from raytrace.gausslet_sources import SingleGaussletSource, CollimatedGaussletSource
-from raytrace.lenses import PlanoConvexLens
+from raytrace.lenses import PlanoConvexLens, GeneralLens
+from raytrace.shapes import CircleShape
+from raytrace.faces import SphericalFace
+from raytrace.materials import OpticalMaterial
 from raytrace.fields import EFieldPlane
 from raytrace.intensity_image import IntensityImageView
 from raytrace.intensity_surface import IntensitySurface
@@ -15,6 +18,17 @@ lens = PlanoConvexLens(centre=(0,0,50),
                        n_inside=1.5,
                        curvature=50.0,
                        diameter=30.0)
+
+shape = CircleShape(radius=12.3)
+f1 = SphericalFace(curvature=50.0, z_height=2.5)
+f2 = SphericalFace(curvature=-50.0, z_height=-2.5)
+m = OpticalMaterial(glass_name="N-BK7")
+lens = GeneralLens(centre=(0,0,50),
+                    shape=shape, 
+                    surfaces=[f1,f2], 
+                    materials=[m])
+
+
 
 #src = SingleGaussletSource(beam_waist=1.0, max_ray_len=55.0)
 src = CollimatedGaussletSource(radius=10.0, resolution=10,

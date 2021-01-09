@@ -714,7 +714,7 @@ cdef class Gausslet:
             return out
         
         def __set__(self, Ray r):
-            self.gausslet.base_ray = r
+            self.gausslet.base_ray = r.ray
             
     property parabasal_rays:
         def __get__(self):
@@ -1870,7 +1870,6 @@ cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face f
                             multvs_(para_ray.direction, 
                                     max_length))
             if face_set.intersect_para_c(para_ray, ray_end, face):
-                print("miss")
                 break
             
             point = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))

@@ -65,7 +65,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         np_.npy_complex128[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
         vector_t pt, H, E
         double complex U, A, B, C, E1, E2, detG0
-        double x,y,z, phase, k, inv_root_area
+        double x,y,z, phase, k, inv_root_area, invk
     
     with nogil:
         for iray in range(Nray):
@@ -74,6 +74,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             E = norm_(ray.E_vector)
             H = norm_(cross_(ray.direction, E))
             k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
+            invk = 2./k
             A = modes[iray, 0]
             B = modes[iray, 1]
             C = modes[iray, 2]
@@ -81,9 +82,9 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             ###normalisation factor 1/root(area)
             inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag))/M_PI)
             
-            A.imag /= k
-            B.imag /= k
-            C.imag /= k
+            A.imag *= invk
+            B.imag *= invk
+            C.imag *= invk
             detG0 = (A*C) - (B*B)
             phase = ray.phase + (ray.accumulated_path*k)
             
@@ -126,7 +127,7 @@ cdef double complex calc_mode_U(double complex A,
     x = dotprod_(pt, E)
     y = dotprod_(pt, H)
     z = dotprod_(pt, direction)
-    denom = 1 + (z*(A+C)) + (z*z)*detG0
+    denom = 2*(1 + (z*(A+C)) + (z*z)*detG0) ###This factor of 2 is work working quite right
     AA = (A + z*detG0)/denom
     CC = (C + z*detG0)/denom
     U = cexp( (I*phase) + I*k*(z + AA*(x*x) + B*(2*x*y)/denom + CC*(y*y) ) )

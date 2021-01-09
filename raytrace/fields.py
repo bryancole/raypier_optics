@@ -249,7 +249,7 @@ class EFieldPlane(Probe):
                        Item('gen_idx')
                    )))
     
-    @on_trait_change("size, width, height, exit_pupil_offset, blending")
+    @on_trait_change("size, width, height, exit_pupil_offset, blending, gen_idx")
     def config_pipeline(self):
         src = self._plane_src
         size = self.size
