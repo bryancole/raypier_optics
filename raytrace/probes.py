@@ -23,8 +23,9 @@ from traitsui.api import View, Item, VGroup, DropEditor
 from tvtk.api import tvtk
 import numpy
 
-from raytrace.bases import Probe, Traceable, NumEditor, Vector
-from raytrace.sources import RayCollection
+from raytrace.bases import Probe, Traceable, NumEditor, Vector, BaseRayCollection
+from raytrace.sources import RayCollection, GaussletCollection
+from raytrace.ctracer import FaceList, detect_segment, detect_gausslet
 
 from raytrace.utils import normaliseVector
 
@@ -33,6 +34,32 @@ try:
 except ImportError:
     PSF=None
 
+
+class CapturePlane(Probe):
+    width = Float(30.0)
+    height = Float(20.0)
+    
+    face_list = Instance(FaceList)
+    
+    captured = Instance(BaseRayCollection)
+    
+    def evaluate(self, src_list):
+        self.face_list.sync_transforms()
+        
+        funcs = {RayCollection: detect_segment, 
+                GaussletCollection: detect_gausslet}
+        
+        for src in src_list:
+            size = len(src.InputRays)
+            klass = type(src.InputRays)
+            container = klass(size)
+            detect = funcs[klass]
+            
+            for rays in src.TracedRays:
+                detect(rays, self.face_list, container)
+                
+            self.captured = container
+            
 
 class PolarisationProbe(Probe):
     name = "Polarisation Probe"

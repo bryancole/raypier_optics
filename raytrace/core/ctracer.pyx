@@ -1731,6 +1731,49 @@ cdef double ray_power_(ray_t ray):
     return (P1+P2) 
 
 
+def detect_segment(RayCollection in_rays,
+                  FaceList face_set,
+                  RayCollection out_rays,
+                  ):
+    cdef:
+        size_t i
+        ray_t ray
+        int idx
+        vector_t point
+        
+    for i in range(in_rays.n_rays):
+        ray = in_rays.rays[i] #need a copy of the ray to prevent mutating it in place
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    ray.length))
+        
+        idx = (<FaceList>face_set).intersect_c(&ray, point)
+        if idx >= 0:
+            out_rays.add_ray_c(ray)
+            
+            
+def detect_gausslet(GaussletCollection in_rays,
+                    FaceList face_set,
+                    GaussletCollection out_rays):
+    cdef:
+        size_t i
+        gausslet_t *g
+        ray_t ray
+        int idx
+        vector_t point
+        
+    for i in range(in_rays.n_rays):
+        g = in_rays.rays + i
+        ray = g.base_ray #need a copy of the ray to prevent mutating it in place
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    ray.length))
+        
+        idx = (<FaceList>face_set).intersect_c(&ray, point)
+        if idx >= 0:
+            out_rays.add_gausslet_c(g[0])
+
+
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 
                                     list all_faces,

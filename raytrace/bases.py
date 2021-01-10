@@ -32,11 +32,14 @@ import numpy
 import threading, os, itertools
 from itertools import chain, islice, count
 import yaml
+from abc import ABCMeta
+
 from raytrace.constraints import BaseConstraint
 from raytrace.has_queue import HasQueue, on_trait_change
 from raytrace.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
 from raytrace import ctracer, cmaterials
+from raytrace.ctracer import RayCollection, GaussletCollection
 from .shapes import BaseShape
 from raytrace.vtk_algorithms import EmptyGridSource
 from .editors import NumEditor, IntEditor, ComplexEditor, ROField, VectorEditor
@@ -44,6 +47,12 @@ from .editors import NumEditor, IntEditor, ComplexEditor, ROField, VectorEditor
 Vector = Array(shape=(3,))
 
 counter = count()
+
+
+class BaseRayCollection(metaclass=ABCMeta):
+    pass
+BaseRayCollection.register(RayCollection)
+BaseRayCollection.register(GaussletCollection)
 
 
 class Float(BaseFloat):

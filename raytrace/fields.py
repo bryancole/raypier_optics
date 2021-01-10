@@ -4,7 +4,7 @@ summation of General Astigmatic Gaussian Beams
 """
 
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Str, Array, cached_property
+        Property, Str, Array, cached_property, List
 
 from traitsui.api import View, Item, VGroup, Tabbed
 
@@ -216,7 +216,6 @@ def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
     
 class EFieldPlane(Probe):
     name = Str("E-Field Probe")
-    source = Instance(BaseRaySource)
     gen_idx = Int(-1)
     width = Float(0.5) #in mm
     height = Float(0.5)
@@ -231,7 +230,7 @@ class EFieldPlane(Probe):
     
     update = Event() #request re-tracing
     
-    
+    _src_list = List()
     _plane_src = Instance(tvtk.PlaneSource, (), 
                     {"x_resolution":1, "y_resolution":1},
                     transient=True)
@@ -268,7 +267,7 @@ class EFieldPlane(Probe):
     @on_trait_change("update")
     def on_change(self):
         try:
-            self.evaluate()
+            self.evaluate(None)
         except:
             traceback.print_exc()
     
@@ -298,46 +297,52 @@ class EFieldPlane(Probe):
         E = self.E_field
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
-    def evaluate(self):
-        ray_src = self.source
-        start = time.time()
-        traced_rays = ray_src.TracedRays
-        if not traced_rays:
-            return
-        wavelengths = numpy.asarray(ray_src.wavelength_list)
-        
-        centre = self.centre
-        idx = self.gen_idx
-        
-        ### Reliably finding the gen-idx is tricky ###
-        #idx = find_ray_gen(centre, traced_rays)
-        
-        rays = traced_rays[idx]
-        
-        size = self.size
-        side = self.width/2.
-        yside = self.height/2
-        px = numpy.linspace(-side,side,size)
-        py = numpy.linspace(-yside, yside, size)
-        points = numpy.dstack(numpy.meshgrid(px,py,0)).reshape(-1,3)
-        ###What a chore
-        trns = self.transform
-        pts_in = tvtk.Points()
-        pts_out = tvtk.Points()
-        pts_in.from_array(points)
-        trns.transform_points(pts_in, pts_out)
-        points2 = pts_out.to_array().astype('d')
-        
-        if isinstance(rays, GaussletCollection):
-            E = eval_Efield_from_gausslets(rays, points2, wavelengths, 
-                                           blending=self.blending)
+    def evaluate(self, src_list):
+        if src_list is None:
+            src_list = self._src_list
         else:
-            E = eval_Efield_from_rays(rays, points2, wavelengths, 
-                                      blending=self.blending,
-                                      exit_pupil_offset=self.exit_pupil_offset,
-                                      exit_pupil_centre=self.centre)
-        
-        self.E_field = E.reshape(self.size, self.size, 3)
+            self._src_list = src_list
+        start = time.time()
+        for ct, ray_src in enumerate(src_list):
+            traced_rays = ray_src.TracedRays
+            if not traced_rays:
+                return
+            wavelengths = numpy.asarray(ray_src.wavelength_list)
+            
+            idx = self.gen_idx
+            
+            ### Reliably finding the gen-idx is tricky ###
+            #idx = find_ray_gen(centre, traced_rays)
+            
+            rays = traced_rays[idx]
+            
+            size = self.size
+            side = self.width/2.
+            yside = self.height/2
+            px = numpy.linspace(-side,side,size)
+            py = numpy.linspace(-yside, yside, size)
+            points = numpy.dstack(numpy.meshgrid(px,py,0)).reshape(-1,3)
+            ###What a chore
+            trns = self.transform
+            pts_in = tvtk.Points()
+            pts_out = tvtk.Points()
+            pts_in.from_array(points)
+            trns.transform_points(pts_in, pts_out)
+            points2 = pts_out.to_array().astype('d')
+            
+            if isinstance(rays, GaussletCollection):
+                E = eval_Efield_from_gausslets(rays, points2, wavelengths, 
+                                               blending=self.blending)
+            else:
+                E = eval_Efield_from_rays(rays, points2, wavelengths, 
+                                          blending=self.blending,
+                                          exit_pupil_offset=self.exit_pupil_offset,
+                                          exit_pupil_centre=self.centre)
+            
+            if ct==0:
+                self.E_field = E.reshape(self.size, self.size, 3)
+            else:
+                self.E_field += E.reshape(self.size, self.size, 3)
         
         self._attrib.modified()
         end = time.time()

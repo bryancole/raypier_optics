@@ -19,7 +19,6 @@
 import numpy
 import itertools
 import traceback
-from abc import ABCMeta
 
 from traits.api import HasTraits, Int, Float, \
      Bool, Property, Array, Event, List, cached_property, Str,\
@@ -33,7 +32,7 @@ from tvtk.api import tvtk
 from raytrace.ctracer import RayCollection, GaussletCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
 from raytrace.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
-from raytrace.bases import RaytraceObject, NumEditor
+from raytrace.bases import RaytraceObject, NumEditor, BaseRayCollection
 from raytrace.gausslets import decompose_angle
 
 Vector = Array(shape=(3,))
@@ -41,12 +40,6 @@ Vector = Array(shape=(3,))
 
 class BaseBase(HasTraits, RaytraceObject):
     pass
-
-
-class BaseRayCollection(metaclass=ABCMeta):
-    pass
-BaseRayCollection.register(RayCollection)
-BaseRayCollection.register(GaussletCollection)
 
 
 class BaseRaySource(BaseBase):

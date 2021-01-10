@@ -298,7 +298,7 @@ class RayTraceModel(HasQueue):
                     self.trace_ray_source(ray_source, optics)
                 for probe in self.probes:
                     try:
-                        probe.evaluate()
+                        probe.evaluate(self.sources)
                     except:
                         traceback.print_exc()
                 for o in optics:
