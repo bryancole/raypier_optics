@@ -1471,6 +1471,11 @@ cdef class InterfaceMaterial(object):
         para_out.length = INF
         return para_out
     
+    cdef void eval_decomposed_rays_c(self, GaussletCollection child_rays):
+        ### This function is called at the end of tracing to comput additional rays
+        ### due to mode decomposition.
+        return
+    
     def eval_child_ray(self, Ray old_ray, ray_idx, point, 
                         normal, tangent, RayCollection new_rays):
         cdef:
@@ -1729,9 +1734,11 @@ cdef double ray_power_(ray_t ray):
 cdef RayCollection trace_segment_c(RayCollection rays, 
                                     list face_sets, 
                                     list all_faces,
+                                    list decomp_faces,
                                     float max_length):
     cdef:
         FaceList face_set #a FaceList
+        Face face
         size_t i, j, n_sets=len(face_sets)
         vector_t point
         orientation_t orient
@@ -1778,27 +1785,31 @@ cdef RayCollection trace_segment_c(RayCollection rays,
 def trace_segment(RayCollection rays, 
                     list face_sets, 
                     list all_faces,
-                    max_length=100):
+                    max_length=100,
+                    decomp_faces=[]):
     for fs in face_sets:
         fs.sync_transforms()
-    return trace_segment_c(rays, face_sets, all_faces, max_length)
+    return trace_segment_c(rays, face_sets, all_faces, decomp_faces, max_length)
 
 def trace_gausslet(GaussletCollection rays, 
                     list face_sets, 
                     list all_faces,
-                    max_length=100):
+                    max_length=100,
+                    decomp_faces=[]):
     for fs in face_sets:
         (<FaceList>fs).sync_transforms()
-    return trace_gausslet_c(rays, face_sets, all_faces, max_length)
+    return trace_gausslet_c(rays, face_sets, all_faces, decomp_faces, max_length)
 
 
 cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
                                     list face_sets, 
                                     list all_faces,
+                                    list decomp_faces,
                                     double max_length):
     cdef:
         FaceList face_set #a FaceList
-        size_t i, j, n_sets=len(face_sets)
+        Face face
+        size_t i, j, n_sets=len(face_sets), n_decomp = len(decomp_faces)
         vector_t point
         orientation_t orient
         int idx, nearest_set=-1, nearest_idx=-1
@@ -1846,6 +1857,11 @@ cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets,
                                                     child_rays
                                                     )
             trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length)
+            
+    for j in range(n_decomp):
+        face = decomp_faces[j]
+        if face.count:
+            (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(child_rays)
             
     new_gausslets.reset_length_c(max_length)
     return new_gausslets

@@ -177,6 +177,8 @@ cdef class InterfaceMaterial(object):
                                    orientation_t orient,
                                    unsigned int ray_type_id, #indicates if it's a transmitted or reflected ray 
                                    )
+    
+    cdef void eval_decomposed_rays_c(self, GaussletCollection child_rays)
 
     cdef on_set_wavelengths(self)
     
@@ -222,11 +224,13 @@ cdef class FaceList(object):
 cdef RayCollection trace_segment_c(RayCollection rays,
                                     list face_sets,
                                     list all_faces,
+                                    list decomp_faces,
                                     float max_length)
 
 cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
                                     list face_sets, 
                                     list all_faces,
+                                    list decomp_faces,
                                     double max_length)
 
 cdef double ray_power_(ray_t ray)
