@@ -1536,7 +1536,7 @@ cdef class Face(object):
         self.invert_normal = int(kwds.get('invert_normal', 0))
         
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """returns the distance of the nearest valid intersection between 
         p1 and p2. p1 and p2 are in the local coordinate system
         """
@@ -1550,14 +1550,14 @@ cdef class Face(object):
             v = getattr(self.owner, name)
             setattr(self, name, v)
     
-    def intersect(self, p1, p2):
+    def intersect(self, p1, p2, int is_base_ray):
         cdef:
             vector_t p1_, p2_
             double dist
         
         p1_ = set_v(p1)
         p2_ = set_v(p2)
-        dist = self.intersect_c(p1_, p2_)
+        dist = self.intersect_c(p1_, p2_, is_base_ray)
         return dist
 
     cdef vector_t compute_normal_c(self, vector_t p):
@@ -1654,7 +1654,7 @@ cdef class FaceList(object):
         
         for i in xrange(len(faces)):
             face = faces[i]
-            dist = face.intersect_c(p1, p2)
+            dist = face.intersect_c(p1, p2, 1)
             if face.tolerance < dist < ray.length:
                 ray.length = dist
                 all_idx = face.idx
@@ -1676,7 +1676,7 @@ cdef class FaceList(object):
             unsigned int i
             double dist
         
-        dist = face.intersect_c(p1, p2)
+        dist = face.intersect_c(p1, p2, 0)
         if face.tolerance < dist < ray.length:
             ray.length = dist
             return 0

@@ -136,7 +136,7 @@ cdef class CircularFace(Face):
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -159,7 +159,7 @@ cdef class CircularFace(Face):
             return 0
         X = p1.x + h*(p2.x-p1.x) - self.offset
         Y = p1.y + h*(p2.y-p1.y)
-        if (X*X + Y*Y) > (d*d/4):
+        if is_base_ray and (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
             return 0
         return h * max_length
@@ -182,7 +182,7 @@ cdef class ShapedPlanarFace(ShapedFace):
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -203,7 +203,7 @@ cdef class ShapedPlanarFace(ShapedFace):
         
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
-        if (<Shape>self.shape).point_inside_c(X,Y):
+        if is_base_ray and (<Shape>self.shape).point_inside_c(X,Y):
             return h*max_length
         return -1
         
@@ -233,7 +233,7 @@ cdef class ElipticalPlaneFace(Face):
         self.g_x = kwds.get('g_x', 0.0)
         self.g_y = kwds.get('g_y', 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double max_length = sep_(p1, p2)
             double h = (self.g_x*p1.x + self.g_y*p1.y - p1.z) / \
@@ -246,7 +246,7 @@ cdef class ElipticalPlaneFace(Face):
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         Z = p1.z + h*(p2.z-p1.z)
-        if (X*X + Y*Y) > (d*d/4):
+        if is_base_ray and (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
             return 0
         return h * max_length
@@ -273,7 +273,7 @@ cdef class RectangularFace(Face):
         self.length = kwds.get("length", 5.0)
         self.offset = kwds.get("offset", 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -291,19 +291,18 @@ cdef class RectangularFace(Face):
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
             double X, Y, lngth=self.length, wdth = self.width
             
-        #print "CFACE", p1, p2
-        
         if (h<self.tolerance) or (h>1.0):
-            #print "H", h
             return 0
-        X = p1.x + h*(p2.x-p1.x) - self.offset
-        Y = p1.y + h*(p2.y-p1.y)
         
-        #if x or y displacement is greater than length or width of rectangle, no intersect
-        if X*X > lngth*lngth/4:
-            return 0
-        if Y*Y > wdth*wdth/4:
-            return 0 
+        if is_base_ray:
+            X = p1.x + h*(p2.x-p1.x) - self.offset
+            Y = p1.y + h*(p2.y-p1.y)
+            
+            #if x or y displacement is greater than length or width of rectangle, no intersect
+            if X*X > lngth*lngth/4:
+                return 0
+            if Y*Y > wdth*wdth/4:
+                return 0 
         return h * max_length
 
     cdef vector_t compute_normal_c(self, vector_t p):
@@ -327,7 +326,7 @@ cdef class SphericalFace(Face):
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)
     
-    cdef double intersect_c(self, vector_t r, vector_t p2):
+    cdef double intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -379,10 +378,11 @@ cdef class SphericalFace(Face):
             
         D = self.diameter*self.diameter/4.
         
-        if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
-            a1 = INF
-        if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
-            a2 = INF
+        if is_base_ray:
+            if (pt1.x*pt1.x + pt1.y*pt1.y) > D:
+                a1 = INF
+            if (pt2.x*pt2.x + pt2.y*pt2.y) > D:
+                a2 = INF
         
         if a2 < a1:
             a1 = a2
@@ -416,7 +416,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.curvature = kwds.get("curvature", 100.0)
     
-    cdef double intersect_c(self, vector_t r, vector_t p2):
+    cdef double intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -466,10 +466,11 @@ cdef class ShapedSphericalFace(ShapedFace):
             if pt2.z > cz:
                 a2 = INF
            
-        if not (<Shape>self.shape).point_inside_c( pt1.x, pt1.y ):
-            a1 = INF
-        if not (<Shape>self.shape).point_inside_c( pt2.x, pt2.y ):
-            a2 = INF
+        if is_base_ray:
+            if not (<Shape>self.shape).point_inside_c( pt1.x, pt1.y ):
+                a1 = INF
+            if not (<Shape>self.shape).point_inside_c( pt2.x, pt2.y ):
+                a2 = INF
         
         if a2 < a1:
             a1 = a2
@@ -565,7 +566,7 @@ cdef class ExtrudedPlanarFace(Face):
         n.z = 0
         self.normal = norm_(n)
         
-    cdef double intersect_c(self, vector_t r, vector_t p2):
+    cdef double intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
         cdef: 
             vector_t s, u, v
             double a, dz
@@ -578,24 +579,26 @@ cdef class ExtrudedPlanarFace(Face):
         
         s = subvv_(p2, r)
         
-        #fractional distance of intersection along edge
-        a = (s.y*(u.x-r.x) - s.x*(u.y-r.y)) / (s.x*v.y - s.y*v.x)
-        #print "dist along edge:", a, r, s, v, u
-        if a<0:
-            return 0
-        if a>1:
-            return 0
+        if is_base_ray:
+            #fractional distance of intersection along edge
+            a = (s.y*(u.x-r.x) - s.x*(u.y-r.y)) / (s.x*v.y - s.y*v.x)
+            
+            if a<0:
+                return 0
+            if a>1:
+                return 0
         #distance of intersection along ray (in XY plane)
         a = (v.x*(r.y-u.y) - v.y*(r.x-u.x)) / (s.x*v.y - s.y*v.x)
-        #print "dist along ray:", a 
         
-        #distance in 3D
-        dz = a*(p2.z - r.z)
-        
-        if self.z1 < (r.z+dz) < self.z2:
-            return a * mag_(s)
+        if is_base_ray:
+            #distance in 3D
+            dz = a*(p2.z - r.z)
+            if self.z1 < (r.z+dz) < self.z2:
+                return a * mag_(s)
+            else:
+                return 0
         else:
-            return 0
+            return a * mag_(s)
     
     cdef vector_t compute_normal_c(self, vector_t p):
         return self.normal
@@ -756,7 +759,7 @@ cdef class ExtrudedBezierFace(Face):
         self.mincorner = temp1
         self.maxcorner = temp2
 
-    cdef double intersect_c(self, vector_t ar, vector_t pee2):
+    cdef double intersect_c(self, vector_t ar, vector_t pee2, int is_base_ray):
 
         cdef: 
             flatvector_t tempvector
@@ -980,7 +983,7 @@ cdef class PolygonFace(Face):
             data = np.ascontiguousarray(pts, dtype=np.float64).reshape(-1,2)
             self._xy_points=data
             
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
@@ -992,7 +995,7 @@ cdef class PolygonFace(Face):
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         #test for (X,Y) in polygon
-        if point_in_polygon_c(X,Y, self._xy_points)==1:
+        if is_base_ray and point_in_polygon_c(X,Y, self._xy_points)==1:
             return h * max_length
         else:
             return 0.0
@@ -1012,7 +1015,7 @@ cdef class OffAxisParabolicFace(Face):
     cdef:
         public double EFL, diameter, height
                 
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -1066,13 +1069,14 @@ cdef class OffAxisParabolicFace(Face):
             pt1.x -= efl
             pt2.x -= efl
             
-            d = self.diameter
-            d *= d/4.
-            
-            if (pt1.x*pt1.x + pt1.y*pt1.y) > d:
-                a1 = INF
-            if (pt2.x*pt2.x + pt2.y*pt2.y) > d:
-                a2 = INF
+            if is_base_ray:
+                d = self.diameter
+                d *= d/4.
+                
+                if (pt1.x*pt1.x + pt1.y*pt1.y) > d:
+                    a1 = INF
+                if (pt2.x*pt2.x + pt2.y*pt2.y) > d:
+                    a2 = INF
             
             if a2 < a1:
                 a1 = a2
@@ -1125,7 +1129,7 @@ cdef class EllipsoidalFace(Face):
             t.trans = self.inv_trans
             return t
             
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double B,A, a, b, c, d
             
@@ -1149,19 +1153,20 @@ cdef class EllipsoidalFace(Face):
         p2 = addvv_(p1, multvs_(S, root2))
         p1 = addvv_(p1, multvs_(S, root1))
         
-        if not self.x1 < p2.x < self.x2:
-            root2 = 2
-        if not self.y1 < p2.y < self.y2:
-            root2 = 2
-        if not self.z1 < p2.z < self.z2:
-            root2 = 2
-            
-        if not self.x1 < p1.x < self.x2:
-            root1 = 2
-        if not self.y1 < p1.y < self.y2:
-            root1 = 2
-        if not self.z1 < p1.z < self.z2:
-            root1 = 2
+        if is_base_ray:
+            if not self.x1 < p2.x < self.x2:
+                root2 = 2
+            if not self.y1 < p2.y < self.y2:
+                root2 = 2
+            if not self.z1 < p2.z < self.z2:
+                root2 = 2
+                
+            if not self.x1 < p1.x < self.x2:
+                root1 = 2
+            if not self.y1 < p1.y < self.y2:
+                root1 = 2
+            if not self.z1 < p1.z < self.z2:
+                root1 = 2
         
         if root1 < self.tolerance:
             root1 = 2
@@ -1278,7 +1283,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 10.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -1301,7 +1306,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         
         pt1 = addvv_(a, multvs_(d, a1))
             
-        if not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+        if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
             return INF
             
         if a1>1.0 or a1<self.tolerance:
@@ -1415,7 +1420,7 @@ cdef class AsphericFace(ShapedFace):
         self.A16 = kwds.get('A16',0.0)
         self.atol = kwds.get("atol", 1.0e-8)
         
-    cdef double intersect_c(self, vector_t p1, vector_t p2):
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -1473,7 +1478,7 @@ cdef class AsphericFace(ShapedFace):
         
         pt1 = addvv_(a, multvs_(d, a1))
 
-        if not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+        if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
             return INF
             
         if a1>1.0 or a1<self.tolerance:

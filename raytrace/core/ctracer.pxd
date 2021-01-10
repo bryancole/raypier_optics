@@ -196,7 +196,7 @@ cdef class Face(object):
         public short int invert_normal
         public unsigned int count    
 
-    cdef double intersect_c(self, vector_t p1, vector_t p2)
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray)
 
     cdef vector_t compute_normal_c(self, vector_t p)
     cdef vector_t compute_tangent_c(self, vector_t p)

@@ -504,6 +504,7 @@ alist_editor = ListEditor(use_notebook=True,
     
     
 class GeneralLens(BaseLens):
+    name = Str("General Lens")
     shape = Instance(BaseShape)
     
     surfaces = List(faces.PlanarFace)
