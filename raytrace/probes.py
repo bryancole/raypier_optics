@@ -16,16 +16,18 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Button, Str, Array
+        Property, Button, Str, Array, List, observe
 
 from traitsui.api import View, Item, VGroup, DropEditor
 
 from tvtk.api import tvtk
 import numpy
+import time
 
 from raytrace.bases import Probe, Traceable, NumEditor, Vector, BaseRayCollection
 from raytrace.sources import RayCollection, GaussletCollection
 from raytrace.ctracer import FaceList, detect_segment, detect_gausslet
+from raytrace.cfaces import RectangularFace
 
 from raytrace.utils import normaliseVector
 
@@ -36,19 +38,78 @@ except ImportError:
 
 
 class CapturePlane(Probe):
+    name = Str("Capture Plane")
     width = Float(30.0)
     height = Float(20.0)
     
     face_list = Instance(FaceList)
     
-    captured = Instance(BaseRayCollection)
+    plane_src = Instance(tvtk.PlaneSource, ())
+    
+    captured = List()
+    
+    vtkproperty = Instance(tvtk.Property, (), {'opacity': 1.0, 'color': (0.1,0.1,0.1),
+                                               'representation': 'wireframe'})
+    _mtime = Float(0.0)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('width', editor=NumEditor),
+                       Item('height', editor=NumEditor),
+                        ),
+                   )
+    
+    @observe("centre, orientation, width, height")
+    def config_pipeline(self, evt):
+        centre = self.centre
+        hwidth = self.width/2.
+        hheight = self.height/2.
+        plane = self.plane_src
+        plane.origin = (centre[0]-hwidth, centre[1]-hheight,0.0)
+        plane.point1 = (centre[0]+hwidth, centre[1]-hheight,0.0)
+        plane.point2 = (centre[0]-hwidth, centre[1]+hheight,0.0)
+        plane.modified()
+        
+        face = self.face_list.faces[0]
+        face.length=self.height
+        face.width = self.width
+        
+        self._mtime = 0.0
+        self.update = True
+    
+    def _actors_default(self):
+        plane = self.plane_src
+        self.config_pipeline(None)
+        
+        trans = tvtk.TransformFilter(input_connection = plane.output_port,
+                                     transform=self.transform)
+        
+        map = tvtk.PolyDataMapper(input_connection=trans.output_port)
+        map.scalar_visibility = False
+        act = tvtk.Actor(mapper=map)
+        act.property = self.vtkproperty
+        actors = tvtk.ActorCollection()
+        actors.append(act)
+        print("ACT!")
+        return actors
+    
+    def _face_list_default(self):
+        face = RectangularFace(length=self.height, width=self.width, offset=0.0, z_plane=0.0)
+        fl = FaceList(owner=self)
+        fl.faces = [face,]
+        return fl
     
     def evaluate(self, src_list):
+        print("start capturing!")
+        mtime = self._mtime
+        if all(mtime > src._mtime for src in src_list):
+            return
         self.face_list.sync_transforms()
         
         funcs = {RayCollection: detect_segment, 
                 GaussletCollection: detect_gausslet}
-        
+        print("capturing!")
+        captured=[]
         for src in src_list:
             size = len(src.InputRays)
             klass = type(src.InputRays)
@@ -58,7 +119,9 @@ class CapturePlane(Probe):
             for rays in src.TracedRays:
                 detect(rays, self.face_list, container)
                 
-            self.captured = container
+            captured.append( container )
+        self.captured = captured
+        self._mtime = time.monotonic()
             
 
 class PolarisationProbe(Probe):

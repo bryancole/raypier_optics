@@ -287,7 +287,7 @@ class RayTraceModel(HasQueue):
     @on_trait_change("update", dispatch="queued")
     def do_update(self):
         optics = self.optics
-        #print "trace", 
+        print( "trace") 
         next(counter)
         try:
             if optics is not None:

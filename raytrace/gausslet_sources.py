@@ -1,6 +1,7 @@
 
 import numpy
 import itertools
+import time
 from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, observe, Bool
 from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
 from tvtk.api import tvtk
@@ -56,6 +57,7 @@ class BaseGaussletSource(BaseRaySource):
         self.data_source.modified()
         self.para_data_source.modified()
         self.normals_source.modified()
+        self._mtime = time.monotonic()
         
     def _opacity_changed(self):
         self.vtkproperty.opacity = self.opacity

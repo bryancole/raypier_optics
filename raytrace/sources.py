@@ -17,6 +17,7 @@
 
 
 import numpy
+import time
 import itertools
 import traceback
 
@@ -47,6 +48,8 @@ class BaseRaySource(BaseBase):
     subclasses = set()
     name = Title("Ray Source", allow_selection=False)
     
+    ### Updated to the current timestamp whenever the traced rays are changed (i.e. after a tracing operation)
+    _mtime = Float(0.0)
     
     ### The update event trigger a new tracing operation
     update = Event()
@@ -213,6 +216,8 @@ class BaseRaySource(BaseBase):
     def _TracedRays_changed(self):
         self.data_source.modified()
         self.normals_source.modified()
+        self._mtime = time.monotonic()
+        print("SET MTIME")
         
     def _get_InputRays(self):
         return None

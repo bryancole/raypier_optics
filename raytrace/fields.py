@@ -4,13 +4,14 @@ summation of General Astigmatic Gaussian Beams
 """
 
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Str, Array, cached_property, List
+        Property, Str, Array, cached_property, List, Bool, observe
 
 from traitsui.api import View, Item, VGroup, Tabbed
 
 from tvtk.api import tvtk
 
 from raytrace.bases import Probe, Traceable, NumEditor
+from raytrace.probes import CapturePlane
 from raytrace.sources import RayCollection, BaseRaySource
 from raytrace.core.cfields import sum_gaussian_modes, evaluate_modes as evaluate_modes_c
 from raytrace.find_focus import find_ray_focus
@@ -214,8 +215,12 @@ def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
     E = sum_gaussian_modes(_rays, modes, wavelengths, points)
     return E
     
+    
 class EFieldPlane(Probe):
     name = Str("E-Field Probe")
+    detector = Instance(CapturePlane)
+    align_detector = Bool(True)
+    
     gen_idx = Int(-1)
     width = Float(0.5) #in mm
     height = Float(0.5)
@@ -227,9 +232,8 @@ class EFieldPlane(Probe):
     ###The output of the probe
     E_field = Array()
     intensity = Property(Array, depends_on="E_field")
-    
-    update = Event() #request re-tracing
-    
+        
+    _mtime = Float(0.0)
     _src_list = List()
     _plane_src = Instance(tvtk.PlaneSource, (), 
                     {"x_resolution":1, "y_resolution":1},
@@ -248,7 +252,15 @@ class EFieldPlane(Probe):
                        Item('gen_idx')
                    )))
     
-    @on_trait_change("size, width, height, exit_pupil_offset, blending, gen_idx")
+    @observe("centre")
+    def on_move(self, evt):
+        detector = self.detector
+        if detector is not None:
+            detector.centre = evt.new
+        self._mtime = 0.0
+        self.on_change()
+    
+    @on_trait_change("orientation, size, width, height, exit_pupil_offset, blending, gen_idx")
     def config_pipeline(self):
         src = self._plane_src
         size = self.size
@@ -262,7 +274,8 @@ class EFieldPlane(Probe):
         src.x_resolution = size
         src.y_resolution = size
         
-        self.update=True
+        self._mtime = 0.0
+        self.on_change()
         
     @on_trait_change("update")
     def on_change(self):
@@ -298,23 +311,30 @@ class EFieldPlane(Probe):
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
     def evaluate(self, src_list):
+        print("Evaluating!")
+        mtime = self._mtime
+        detector = self.detector
         if src_list is None:
             src_list = self._src_list
         else:
             self._src_list = src_list
-        start = time.time()
-        for ct, ray_src in enumerate(src_list):
-            traced_rays = ray_src.TracedRays
-            if not traced_rays:
+        
+        start = time.monotonic()
+            
+        if detector is not None:
+            if all(mtime > src._mtime for src in src_list):
+                print("bail")
                 return
-            wavelengths = numpy.asarray(ray_src.wavelength_list)
-            
+            detector.evaluate(src_list)
+            ray_list = detector.captured
+        else:
             idx = self.gen_idx
+            ray_list = [src.TracedRays[idx] for src in src_list if src.TracedRays]
             
-            ### Reliably finding the gen-idx is tricky ###
-            #idx = find_ray_gen(centre, traced_rays)
-            
-            rays = traced_rays[idx]
+        wl_list = [numpy.asarray(ray_src.wavelength_list) for ray_src in src_list]
+        
+        for ct, rays in enumerate(ray_list):
+            wavelengths = wl_list[ct]
             
             size = self.size
             side = self.width/2.
@@ -345,7 +365,8 @@ class EFieldPlane(Probe):
                 self.E_field += E.reshape(self.size, self.size, 3)
         
         self._attrib.modified()
-        end = time.time()
+        end = time.monotonic()
+        self._mtime = end
         print("Took:", end-start)
         
             
