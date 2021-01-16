@@ -64,8 +64,8 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         ray_t ray
         np_.npy_complex128[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
         vector_t pt, H, E
-        double complex U, A, B, C, E1, E2, detG0
-        double x,y,z, phase, k, inv_root_area, invk, n
+        double complex U, A, B, C, E1, E2, detG0, kz
+        double x,y,z, phase, k, inv_root_area, invk
     
     with nogil:
         for iray in range(Nray):
@@ -77,14 +77,14 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             ### Hence, need to calculate it before applying the refractive index of the last leg.
             phase = ray.phase + (ray.accumulated_path*k)
             
-            n = ray.refractive_index.real
-            k *= n
-            invk = 2./k
+            kz = ray.refractive_index.real + I*ray.refractive_index.imag
+            kz *= k
+            invk = 2./kz.real
             A = modes[iray, 0]
             B = modes[iray, 1]
             C = modes[iray, 2]
             
-            ###normalisation factor 1/root(area)
+            ###normalisation factor 1/root(area). Yes, there really is a double square root.
             inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag))/M_PI)
             
             A.imag *= invk
@@ -98,7 +98,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
                 pt.z = points[ipt,2]
                 pt = subvv_(pt, ray.origin)
                 
-                U = calc_mode_U(A,B,C, detG0, pt, E, H, ray.direction, k, phase, inv_root_area)
+                U = calc_mode_U(A,B,C, detG0, pt, E, H, ray.direction, kz, phase, inv_root_area)
                 
                 E1 = (ray.E1_amp.real + I*ray.E1_amp.imag) * U
                 E2 = (ray.E2_amp.real + I*ray.E2_amp.imag) * U
@@ -121,7 +121,7 @@ cdef double complex calc_mode_U(double complex A,
                                 vector_t E, 
                                 vector_t H,
                                 vector_t direction,
-                                double k,
+                                double complex k,
                                 double phase, 
                                 double inv_root_area) nogil:
     cdef:
@@ -131,10 +131,10 @@ cdef double complex calc_mode_U(double complex A,
     x = dotprod_(pt, E)
     y = dotprod_(pt, H)
     z = dotprod_(pt, direction)
-    denom = 2*(1 + (z*(A+C)) + (z*z)*detG0) ###This factor of 2 is work working quite right
+    denom = 2*(1 + (z*(A+C)) + (z*z)*detG0)
     AA = (A + z*detG0)/denom
     CC = (C + z*detG0)/denom
-    U = cexp( (I*phase) + I*k*(z + AA*(x*x) + B*(2*x*y)/denom + CC*(y*y) ) )
+    U = cexp( I*(phase + k*(z + AA*(x*x) + B*(2*x*y)/denom + CC*(y*y) ) ) )
     ###Normalisation factor
     ### I've added an extra 1I factor here in order to rotate the phase away from the 0/2pi wrapping point.
     ### Seems like the csqrt (or cpow) functions struggle with accuracy near phase zero where we're summing 

@@ -98,10 +98,6 @@ class BaseCapturePlane(Probe):
         fl.faces = [face,]
         return fl
     
-    @observe("_mtime")
-    def on_mtime(self, evt):
-        print("mtime set:", self._mtime)
-    
     def evaluate(self, src_list):
         mtime = self._mtime
         if any(src._mtime > mtime for src in src_list):
@@ -109,9 +105,6 @@ class BaseCapturePlane(Probe):
             for src in src_list:
                 all_rays.extend(src.TracedRays)
             self._all_rays = all_rays
-            print("New capture")
-        else:
-            print(f"No capture: {self._mtime, [s._mtime for s in src_list]}")
     
     @observe("centre, orientation, width, height, _all_rays")
     def on_input_changed(self, evt):
