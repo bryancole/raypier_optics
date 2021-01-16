@@ -30,7 +30,7 @@ from cython.parallel import prange
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, cross_, RayCollection
+                rotate_c, cross_, RayCollection, complex_t
 
 from ctracer import ray_dtype
 cimport cython
@@ -62,7 +62,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         size_t Npt=points.shape[0]
         
         ray_t ray
-        np_.npy_complex128[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
+        complex_t[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
         vector_t pt, H, E
         double complex U, A, B, C, E1, E2, detG0, kz
         double x,y,z, phase, k, inv_root_area, invk
@@ -77,7 +77,8 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             ### Hence, need to calculate it before applying the refractive index of the last leg.
             phase = ray.phase + (ray.accumulated_path*k)
             
-            kz = ray.refractive_index.real + I*ray.refractive_index.imag
+            #kz = ray.refractive_index.real + I*ray.refractive_index.imag
+            kz = ray.refractive_index
             kz *= k
             invk = 2./kz.real
             A = modes[iray, 0]
@@ -100,16 +101,12 @@ cpdef  sum_gaussian_modes(RayCollection rays,
                 
                 U = calc_mode_U(A,B,C, detG0, pt, E, H, ray.direction, kz, phase, inv_root_area)
                 
-                E1 = (ray.E1_amp.real + I*ray.E1_amp.imag) * U
-                E2 = (ray.E2_amp.real + I*ray.E2_amp.imag) * U
-                 
-                out[ipt,0].real += (E1.real * E.x) + (E2.real * H.x) 
-                out[ipt,0].imag += (E1.imag * E.x) + (E2.imag * H.x)
-                out[ipt,1].real += (E1.real * E.y) + (E2.real * H.y)
-                out[ipt,1].imag += (E1.imag * E.y) + (E2.imag * H.y)
-                out[ipt,2].real += (E1.real * E.z) + (E2.real * H.z)
-                out[ipt,2].imag += (E1.imag * E.z) + (E2.imag * H.z)
-            
+                E1 = ray.E1_amp * U
+                E2 = ray.E2_amp * U
+                
+                out[ipt,0] += (E1*E.x + E2*H.x)
+                out[ipt,1] += (E1*E.y + E2*H.y)
+                out[ipt,2] += (E1*E.z + E2*H.z)
     return np.asarray(out)
 
         

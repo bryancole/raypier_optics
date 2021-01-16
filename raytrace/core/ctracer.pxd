@@ -29,9 +29,10 @@ cdef struct orientation_t:
 IF UNAME_SYSNAME == "Windows":
     ctypedef double complex complex_t
 ELSE:
-    cdef struct complex_t:
-        double real
-        double imag
+    ctypedef double complex complex_t
+#     cdef struct complex_t:
+#         double real
+#         double imag
         
 cdef:
     public unsigned int REFL_RAY=1<<0
