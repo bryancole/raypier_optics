@@ -11,7 +11,7 @@ from raytrace.materials import OpticalMaterial
 from raytrace.fields import EFieldPlane
 from raytrace.intensity_image import IntensityImageView
 from raytrace.intensity_surface import IntensitySurface
-from raytrace.probes import CapturePlane
+from raytrace.probes import GaussletCapturePlane
 
 from raytrace.tracer import RayTraceModel
 
@@ -36,7 +36,7 @@ src = CollimatedGaussletSource(radius=10.0, resolution=10,
                                beam_waist=10.0,
                                wavelength=1.0)
 
-cap = CapturePlane(centre=(0,0,120))
+cap = GaussletCapturePlane(centre=(0,0,120))
 
 probe = EFieldPlane(detector=cap,
                     align_detector=True,

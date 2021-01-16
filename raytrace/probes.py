@@ -26,7 +26,7 @@ import time
 
 from raytrace.bases import Probe, Traceable, NumEditor, Vector, BaseRayCollection
 from raytrace.sources import RayCollection, GaussletCollection
-from raytrace.ctracer import FaceList, detect_segment, detect_gausslet
+from raytrace.ctracer import FaceList, select_ray_intersections, select_gausslet_intersections#detect_segment, detect_gausslet
 from raytrace.cfaces import RectangularFace
 
 from raytrace.utils import normaliseVector
@@ -37,8 +37,8 @@ except ImportError:
     PSF=None
 
 
-class CapturePlane(Probe):
-    name = Str("Capture Plane")
+class BaseCapturePlane(Probe):
+    name = Str("Ray Capture Plane")
     width = Float(30.0)
     height = Float(20.0)
     
@@ -46,11 +46,12 @@ class CapturePlane(Probe):
     
     plane_src = Instance(tvtk.PlaneSource, ())
     
-    captured = List()
+    captured = List(Instance(RayCollection))
     
     vtkproperty = Instance(tvtk.Property, (), {'opacity': 1.0, 'color': (0.1,0.1,0.1),
                                                'representation': 'wireframe'})
     _mtime = Float(0.0)
+    _all_rays = List()
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
@@ -74,7 +75,6 @@ class CapturePlane(Probe):
         face.length=self.height
         face.width = self.width
         
-        self._mtime = 0.0
         self.update = True
     
     def _actors_default(self):
@@ -90,7 +90,6 @@ class CapturePlane(Probe):
         act.property = self.vtkproperty
         actors = tvtk.ActorCollection()
         actors.append(act)
-        print("ACT!")
         return actors
     
     def _face_list_default(self):
@@ -100,26 +99,44 @@ class CapturePlane(Probe):
         return fl
     
     def evaluate(self, src_list):
-        print("start capturing!")
         mtime = self._mtime
-        if all(mtime > src._mtime for src in src_list):
-            return
-        self.face_list.sync_transforms()
+        if any(src._mtime > mtime for src in src_list):
+            all_rays = []
+            for src in src_list:
+                all_rays.extend(src.TracedRays)
+            self._all_rays = all_rays
+    
+    @observe("centre, orientation, width, height, _all_rays")
+    def on_input_changed(self, evt):
+        self._evaluate()
+    
+    def _evaluate(self):
+        raise NotImplementedError()
         
-        funcs = {RayCollection: detect_segment, 
-                GaussletCollection: detect_gausslet}
-        print("capturing!")
-        captured=[]
-        for src in src_list:
-            size = len(src.InputRays)
-            klass = type(src.InputRays)
-            container = klass(size)
-            detect = funcs[klass]
-            
-            for rays in src.TracedRays:
-                detect(rays, self.face_list, container)
-                
-            captured.append( container )
+        
+class RayCapturePlace(BaseCapturePlane):
+    def _evaluate(self):
+        all_rays = self._all_rays
+        if not all_rays:
+            return
+        fl = self.face_list
+        fl.sync_transforms()
+        captured = select_ray_intersections(fl, list(all_rays))
+        self.captured = captured
+        self._mtime = time.monotonic()
+        
+        
+class GaussletCapturePlane(BaseCapturePlane):
+    name = Str("Gausslet Capture Plane")
+    captured = Instance(GaussletCollection)
+    
+    def _evaluate(self):
+        all_rays = self._all_rays
+        if not all_rays:
+            return
+        fl = self.face_list
+        fl.sync_transforms()
+        captured = select_gausslet_intersections(fl, list(all_rays))
         self.captured = captured
         self._mtime = time.monotonic()
             

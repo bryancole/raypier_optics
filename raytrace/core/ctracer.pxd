@@ -124,6 +124,7 @@ cdef class RayCollection:
         ray_t *rays
         readonly unsigned long n_rays, max_size
         RayCollection _parent
+        double[:] _wavelengths
         
         int[:,:] _neighbours
         double _mtime        
@@ -140,7 +141,8 @@ cdef class GaussletCollection:
     cdef: 
         gausslet_t *rays
         readonly unsigned long n_rays, max_size
-        GaussletCollection _parent     
+        GaussletCollection _parent
+        double[:] _wavelengths
 
     cdef add_gausslet_c(self, gausslet_t r)
     cdef void reset_length_c(self, double max_length)

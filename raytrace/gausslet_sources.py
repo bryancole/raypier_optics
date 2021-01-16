@@ -57,7 +57,10 @@ class BaseGaussletSource(BaseRaySource):
         self.data_source.modified()
         self.para_data_source.modified()
         self.normals_source.modified()
+        
+    def _InputRays_changed(self):
         self._mtime = time.monotonic()
+        self.update=True
         
     def _opacity_changed(self):
         self.vtkproperty.opacity = self.opacity
@@ -311,8 +314,10 @@ class CollimatedGaussletSource(SingleGaussletSource):
         ray_data['normal'] = [[0,1,0]]
         
         rays = GaussletCollection.from_rays(ray_data)
+        wl = numpy.array(self.wavelength_list)
+        rays.wavelengths = wl
         working_dist = 0.0
-        rays.config_parabasal_rays(numpy.array(self.wavelength_list), spacing, working_dist)
+        rays.config_parabasal_rays(wl, spacing, working_dist)
         return rays
         
         

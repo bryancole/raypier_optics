@@ -833,6 +833,13 @@ cdef class RayCollection:
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
     
+    property wavelengths:
+        def __get__(self):
+            return self._wavelengths
+        
+        def __set__(self, wl_list):
+            self._wavelengths = np.asarray(wl_list, dtype=np.double)
+    
     cdef double get_mtime(self, unsigned long guard):
         cdef:
             double pmtime
@@ -905,6 +912,7 @@ cdef class RayCollection:
         def __set__(self, RayCollection rc):
             self._parent = rc
             self._neighbours = None
+            self._wavelengths = rc._wavelengths
             
     property origin:
         def __get__(self):
@@ -1135,6 +1143,7 @@ cdef class GaussletCollection:
         
         def __set__(self, GaussletCollection gc):
             self._parent = gc
+            self._wavelengths = gc._wavelengths
         
     cdef add_gausslet_c(self, gausslet_t r):
         if self.n_rays == self.max_size:
@@ -1311,7 +1320,14 @@ cdef class GaussletCollection:
                 gc.para[j+1].normal = gc.base_ray.normal 
                 gc.para[j].length = gc.base_ray.length
                 gc.para[j+1].length = gc.base_ray.length
+                
+                
+    property wavelengths:
+        def __get__(self):
+            return np.asarray(self._wavelengths)
         
+        def __set__(self, wl_list):
+            self._wavelengths = np.asarray(wl_list, dtype=np.double)
     
     property origin:
         def __get__(self):
@@ -1729,49 +1745,83 @@ cdef double ray_power_(ray_t ray):
     ### We don't need to handle incident aspect area here as the ray already compensate for this
     #aspect = abs(dotprod(norm(ray.direction), normal))
     return (P1+P2) 
-
-
-def detect_segment(RayCollection in_rays,
-                  FaceList face_set,
-                  RayCollection out_rays,
-                  ):
-    cdef:
-        size_t i
-        ray_t ray
-        int idx
-        vector_t point
-        
-    for i in range(in_rays.n_rays):
-        ray = in_rays.rays[i] #need a copy of the ray to prevent mutating it in place
-        point = addvv_(ray.origin, 
-                            multvs_(ray.direction, 
-                                    ray.length))
-        
-        idx = (<FaceList>face_set).intersect_c(&ray, point)
-        if idx >= 0:
-            out_rays.add_ray_c(ray)
             
             
-def detect_gausslet(GaussletCollection in_rays,
-                    FaceList face_set,
-                    GaussletCollection out_rays):
+def select_ray_intersections(FaceList face_set, list ray_col_list):
     cdef:
-        size_t i
-        gausslet_t *g
+        size_t i,j
         ray_t ray
-        int idx
+        int idx, wl_offset=0
         vector_t point
+        RayCollection rc, rc_out
+        list wl_list=[]
+        np_.int64_t[:] inverse
         
-    for i in range(in_rays.n_rays):
-        g = in_rays.rays + i
-        ray = g.base_ray #need a copy of the ray to prevent mutating it in place
-        point = addvv_(ray.origin, 
-                            multvs_(ray.direction, 
-                                    ray.length))
+    rc_out = RayCollection(len(ray_col_list[0]))
         
-        idx = (<FaceList>face_set).intersect_c(&ray, point)
-        if idx >= 0:
-            out_rays.add_gausslet_c(g[0])
+    for j in range(len(ray_col_list)):
+        rc = <RayCollection>ray_col_list[j]
+        wl_list.append(rc.wavelengths)
+        
+        for i in range(rc.n_rays):
+            ray = rc.rays[i] #need a copy of the ray to prevent mutating it in place
+            point = addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        ray.length))
+            
+            idx = (<FaceList>face_set).intersect_c(&ray, point)
+            if idx >= 0:
+                ray.wavelength_idx += wl_offset
+                rc_out.add_ray_c(ray)
+        wl_offset += len(rc.wavelengths)
+        
+    reduced, inverse = np.unique(np.concatenate(wl_list), return_inverse=True)
+    for i in range(len(rc_out)):
+        idx = rc_out.rays[i].wavelength_idx
+        rc_out.rays[i].wavelength_idx = inverse[idx]
+        
+    rc_out.wavelengths = reduced
+    return rc_out
+    
+    
+def select_gausslet_intersections(FaceList face_set, list ray_col_list):
+    cdef:
+        size_t i,j
+        gausslet_t g
+        ray_t *ray
+        int idx, wl_offset=0
+        vector_t point
+        GaussletCollection rc, rc_out
+        list wl_list=[]
+        np_.int64_t[:] inverse
+        
+    rc_out = GaussletCollection(len(ray_col_list[0]))
+        
+    for j in range(len(ray_col_list)):
+        rc = <GaussletCollection>ray_col_list[j]
+        wl_list.append(rc.wavelengths)
+        
+        for i in range(rc.n_rays):
+            g = rc.rays[i] #need a copy of the ray to prevent mutating it in place
+            ray = &g.base_ray
+            point = addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        ray.length))
+            
+            idx = (<FaceList>face_set).intersect_c(ray, point)
+            if idx >= 0:
+                ray.wavelength_idx += wl_offset
+                rc_out.add_gausslet_c(g)
+        wl_offset += len(rc.wavelengths)
+        
+    reduced, inverse = np.unique(np.concatenate(wl_list), return_inverse=True)
+    for i in range(len(rc_out)):
+        idx = rc_out.rays[i].base_ray.wavelength_idx
+        rc_out.rays[i].base_ray.wavelength_idx = inverse[idx]
+        
+    rc_out.wavelengths = reduced
+    return rc_out
+    
 
 
 cdef RayCollection trace_segment_c(RayCollection rays, 

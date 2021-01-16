@@ -250,7 +250,15 @@ class ModelObject(Renderable):
         
         
 class Probe(ModelObject):
-    pass
+    """An object which calculates some result from the raytrace output, based on the
+    probe geometry.
+    
+    Although probes inheret the 'update' trait from its superclass, this event doesn't trigger
+    a new tracing operation.
+    """ 
+    
+    def evaluate(self, src_list):
+        """called once after all sources have been traced"""
         
     
 class Traceable(ModelObject):

@@ -4,14 +4,14 @@ summation of General Astigmatic Gaussian Beams
 """
 
 from traits.api import on_trait_change, Float, Instance,Event, Int,\
-        Property, Str, Array, cached_property, List, Bool, observe
+        Property, Str, Array, cached_property, List, Bool, observe, Button
 
 from traitsui.api import View, Item, VGroup, Tabbed
 
 from tvtk.api import tvtk
 
 from raytrace.bases import Probe, Traceable, NumEditor
-from raytrace.probes import CapturePlane
+from raytrace.probes import BaseCapturePlane
 from raytrace.sources import RayCollection, BaseRaySource
 from raytrace.core.cfields import sum_gaussian_modes, evaluate_modes as evaluate_modes_c
 from raytrace.find_focus import find_ray_focus
@@ -218,7 +218,7 @@ def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
     
 class EFieldPlane(Probe):
     name = Str("E-Field Probe")
-    detector = Instance(CapturePlane)
+    detector = Instance(BaseCapturePlane)
     align_detector = Bool(True)
     
     gen_idx = Int(-1)
@@ -228,6 +228,8 @@ class EFieldPlane(Probe):
             
     exit_pupil_offset = Float(10.0) #in mm
     blending = Float(1.0)
+    
+    centre_on_focus_btn = Button()
     
     ###The output of the probe
     E_field = Array()
@@ -249,7 +251,8 @@ class EFieldPlane(Probe):
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
                        Item('blending', editor=NumEditor),
-                       Item('gen_idx')
+                       Item('gen_idx'),
+                       Item('centre_on_focus_btn', show_label=False, label="Centre on focus")
                    )))
     
     @observe("centre")
@@ -311,7 +314,6 @@ class EFieldPlane(Probe):
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
         
     def evaluate(self, src_list):
-        print("Evaluating!")
         mtime = self._mtime
         detector = self.detector
         if src_list is None:
@@ -322,19 +324,18 @@ class EFieldPlane(Probe):
         start = time.monotonic()
             
         if detector is not None:
-            if all(mtime > src._mtime for src in src_list):
-                print("bail")
-                return
             detector.evaluate(src_list)
-            ray_list = detector.captured
+            if detector.captured is None:
+                return
+            if mtime > detector._mtime:
+                return
+            ray_list = [detector.captured,]
         else:
             idx = self.gen_idx
             ray_list = [src.TracedRays[idx] for src in src_list if src.TracedRays]
-            
-        wl_list = [numpy.asarray(ray_src.wavelength_list) for ray_src in src_list]
         
         for ct, rays in enumerate(ray_list):
-            wavelengths = wl_list[ct]
+            wavelengths = rays.wavelengths
             
             size = self.size
             side = self.width/2.
@@ -367,7 +368,7 @@ class EFieldPlane(Probe):
         self._attrib.modified()
         end = time.monotonic()
         self._mtime = end
-        print("Took:", end-start)
+        print(f"Field calculation took: {end-start} s")
         
             
     def intersect_plane(self, rays):
@@ -379,13 +380,21 @@ class EFieldPlane(Probe):
         #raise NotImplementedError
         pass
     
+    @observe("centre_on_focus_btn")
+    def do_centre_on_focus(self, evt):
+        self.centre_on_focus()
+    
     def centre_on_focus(self, idx=-1, offset=(0,0,0)):
         """
         Locate the centre of the field-probe on the point of closest approach 
         for the indicated RayCollection (by default, the last one).
         """
-        src = self.source
-        rays = src.TracedRays[idx]
+        detector = self.detector
+        if detector is None:
+            src = self.source
+            rays = src.TracedRays[idx]
+        else:
+            rays = detector.captured
         self.centre = tuple(a+b for a,b in zip(find_ray_focus(rays), offset))
     
     
