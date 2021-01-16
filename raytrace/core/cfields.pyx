@@ -65,15 +65,20 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         np_.npy_complex128[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
         vector_t pt, H, E
         double complex U, A, B, C, E1, E2, detG0
-        double x,y,z, phase, k, inv_root_area, invk
+        double x,y,z, phase, k, inv_root_area, invk, n
     
     with nogil:
         for iray in range(Nray):
-            
             ray = rays.rays[iray]
             E = norm_(ray.E_vector)
             H = norm_(cross_(ray.direction, E))
             k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
+            ### The accumulated path length already includes the refractive index of up-stream rays
+            ### Hence, need to calculate it before applying the refractive index of the last leg.
+            phase = ray.phase + (ray.accumulated_path*k)
+            
+            n = ray.refractive_index.real
+            k *= n
             invk = 2./k
             A = modes[iray, 0]
             B = modes[iray, 1]
@@ -86,7 +91,6 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             B.imag *= invk
             C.imag *= invk
             detG0 = (A*C) - (B*B)
-            phase = ray.phase + (ray.accumulated_path*k)
             
             for ipt in prange(Npt):
                 pt.x = points[ipt,0]

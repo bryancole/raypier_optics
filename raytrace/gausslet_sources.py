@@ -57,9 +57,11 @@ class BaseGaussletSource(BaseRaySource):
         self.data_source.modified()
         self.para_data_source.modified()
         self.normals_source.modified()
+        self._mtime = time.monotonic()
+        print("New traced rays")
         
     def _InputRays_changed(self):
-        self._mtime = time.monotonic()
+        print("New input rays")
         self.update=True
         
     def _opacity_changed(self):
