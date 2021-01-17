@@ -146,6 +146,7 @@ cdef class GaussletCollection:
         double[:] _wavelengths
 
     cdef add_gausslet_c(self, gausslet_t r)
+    cdef void extend_c(self, GaussletCollection gc)
     cdef void reset_length_c(self, double max_length)
     
     

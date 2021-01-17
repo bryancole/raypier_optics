@@ -1225,6 +1225,15 @@ cdef class GaussletCollection:
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(gausslet_t))
         return out
     
+    def extend(self, GaussletCollection gc):
+        self.extend_c(gc)
+        
+    cdef void extend_c(self, GaussletCollection gc):
+        if (self.n_rays + gc.n_rays) > self.max_size:
+            self.max_size = (self.n_rays*2 + gc.n_rays)
+            self.rays = <gausslet_t*>realloc(self.rays, self.max_size*sizeof(gausslet_t))
+        memcpy(self.rays + self.n_rays, gc.rays, gc.n_rays*sizeof(gausslet_t))
+    
     @classmethod
     def from_array(cls, np_.ndarray data):
         """Creates a new RayCollection from the given numpy array. The array
@@ -1486,6 +1495,9 @@ cdef class InterfaceMaterial(object):
         para_out.normal = normal
         para_out.length = INF
         return para_out
+    
+    def is_decomp_material(self):
+        return False
     
     cdef void eval_decomposed_rays_c(self, GaussletCollection child_rays):
         ### This function is called at the end of tracing to comput additional rays
@@ -1954,7 +1966,7 @@ cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets,
     for j in range(n_decomp):
         face = decomp_faces[j]
         if face.count:
-            (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(child_rays)
+            (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(new_gausslets)
             
     new_gausslets.reset_length_c(max_length)
     return new_gausslets

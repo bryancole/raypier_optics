@@ -312,6 +312,7 @@ class CollimatedGaussletSource(SingleGaussletSource):
         ray_data['E2_amp'] = self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
+        ray_data['ray_type_id'] = (1<<1) #indicates Gausslets
         
         rays = GaussletCollection.from_rays(ray_data)
         wl = numpy.array(self.wavelength_list)

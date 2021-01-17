@@ -378,11 +378,11 @@ class RayTraceModel(HasQueue):
         rays.reset_length(max_length)
         traced_rays = []
         trace_func = ctracer.trace_segment if isinstance(rays, RayCollection) else ctracer.trace_gausslet
-        
         limit = self.recursion_limit
         count = 0
         face_sets = list(self.face_sets)
         all_faces = list(self.all_faces)
+        decomp_faces = [f for f in all_faces if f.material.is_decomp_material()]
         wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
         for face in all_faces:
             face.material.wavelengths = wavelengths
@@ -392,7 +392,8 @@ class RayTraceModel(HasQueue):
                 #print "count", count
                 traced_rays.append(rays)
                 rays = trace_func(rays, face_sets, all_faces, 
-                                             max_length=max_length)
+                                             max_length=max_length,
+                                             decomp_faces=decomp_faces)
                 count += 1
             ray_source.TracedRays = traced_rays
         finally:

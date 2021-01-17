@@ -1448,7 +1448,27 @@ cdef class ResampleGaussletMaterial(InterfaceMaterial):
     """
     cdef:
         public int capture_count
-        RayCollection captured_rays
+        public GaussletCollection captured_rays
+        object _evaluation_func
+        
+    def __cinit__(self, **kwds):
+        size = kwds.get("size", 2)
+        func = kwds.get("eval_func", None)
+        self.captured_rays = GaussletCollection(size)
+        if func is not None:
+            self.eval_func = func
+        
+    property eval_func:
+        def __get__(self):
+            return self._evaluation_func
+        
+        def __set__(self, obj):
+            if not callable(obj):
+                raise ValueError("The eval_func property must be a callable.")
+            self._evaluation_func = obj
+            
+    def is_decomp_material(self):
+        return True
     
     cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -1457,11 +1477,24 @@ cdef class ResampleGaussletMaterial(InterfaceMaterial):
                             orientation_t orient,
                             RayCollection new_rays):
         """
-        Capture each incident ray in an internal RayCollection.
+        Capture each incident ray in an internal GaussletCollection.
         """
-        pass
+        cdef:
+            gausslet_t *in_g
+            
+        if in_ray[0].ray_type_id & 2: #check GAUSSLET bit
+            in_g = <gausslet_t *>in_ray #oooh, dangerous! Works because each gausslet_t starts with a ray_t
+            self.captured_rays.add_gausslet_c(in_g[0])
+            self.capture_count += 1
     
-    cdef void append_new_rays_c(self, RayCollection new_rays):
+    cdef void eval_decomposed_rays_c(self, GaussletCollection new_rays):
         """
         Here we compute the new rays and append them to the new_rays object.
         """
+        cdef:
+            GaussletCollection gc
+            
+        gc = self._evaluation_func(self.captured_rays)
+        new_rays.extend_c(gc)
+        #Clear the captured rays
+        self.captured_rays.n_rays = 0

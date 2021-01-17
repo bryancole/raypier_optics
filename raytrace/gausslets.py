@@ -8,7 +8,13 @@ from numpy import fft
 from scipy.interpolate import RectBivariateSpline
 
 from raytrace.utils import normaliseVector
-from raytrace.ctracer import ray_dtype, RayCollection
+from raytrace.ctracer import ray_dtype, GaussletCollection, FaceList
+from raytrace.bases import Traceable
+from raytrace.cmaterials import ResampleGaussletMaterial
+from raytrace.cfaces import CircularFace
+
+from traits.api import Range, Float, Array, Property, Instance
+
 
 
 def next_power_of_two(n):
@@ -105,11 +111,45 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     ray_data['refractive_index'] = 1.0+0.0j
     ray_data['normal'] = [[0,1,0]]
     ray_data['phase'] = 0.0
-    rays = RayCollection.from_array(ray_data)
-    
+    rays = GaussletCollection.from_rays(ray_data)
+    rays.wavelengths = wl = numpy.array([wavelength])
+    working_dist=0.0
+    #calculate beam-waists in microns
+    gausslet_radius = 2000.0*numpy.pi/k_grid_spacing 
+    rays.config__parabasal_rays(wl, gausslet_radius, working_dist)
     return rays
 
 
 def decompose_position():
     pass
 
+
+class AngleDecompositionPlance(Traceable):
+    sample_spacing = Float(0.01)
+    
+    width = Range(0,512,64)
+    height = Range(0,512,64)
+    
+    _mask = Array()
+    mask = Property()
+    
+    ### Sets the geometry of the intersection face
+    diameter = Float(25.0)
+    offset = Float(0.0)
+    
+    material = Instance(ResampleGaussletMaterial)
+    
+    def evaluate_decomposed_rays(self, input_rays):
+        pass
+    
+    def _material_default(self):
+        m = ResampleGaussletMaterial(eval_func=self.evaluate_decomposed_rays)
+        return m
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces =  [CircularFace(owner=self, z_plane=0.0, material=self.material)]
+        
+    def _pipeline_default(self):
+        pass
+    
