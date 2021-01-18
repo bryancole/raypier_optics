@@ -1494,6 +1494,7 @@ cdef class ResampleGaussletMaterial(InterfaceMaterial):
         cdef:
             GaussletCollection gc
             
+        self.captured_rays._wavelengths = new_rays._wavelengths
         gc = self._evaluation_func(self.captured_rays)
         new_rays.extend_c(gc)
         #Clear the captured rays

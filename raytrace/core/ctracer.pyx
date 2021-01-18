@@ -1233,6 +1233,7 @@ cdef class GaussletCollection:
             self.max_size = (self.n_rays*2 + gc.n_rays)
             self.rays = <gausslet_t*>realloc(self.rays, self.max_size*sizeof(gausslet_t))
         memcpy(self.rays + self.n_rays, gc.rays, gc.n_rays*sizeof(gausslet_t))
+        self.n_rays += gc.n_rays
     
     @classmethod
     def from_array(cls, np_.ndarray data):
@@ -1967,6 +1968,7 @@ cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets,
         face = decomp_faces[j]
         if face.count:
             (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(new_gausslets)
+            face.count = 0
             
     new_gausslets.reset_length_c(max_length)
     return new_gausslets

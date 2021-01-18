@@ -12,9 +12,10 @@ from raytrace.ctracer import ray_dtype, GaussletCollection, FaceList
 from raytrace.bases import Traceable
 from raytrace.cmaterials import ResampleGaussletMaterial
 from raytrace.cfaces import CircularFace
+from raytrace.fields import eval_Efield_from_gausslets
 
-from traits.api import Range, Float, Array, Property, Instance
-
+from traits.api import Range, Float, Array, Property, Instance, observe
+from tvtk.api import tvtk
 
 
 def next_power_of_two(n):
@@ -95,8 +96,10 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     directions = direction[None,:] - offsets
     directions = normaliseVector(directions)
     
-    E1 = RectBivariateSpline(kr,kr,data_out[0,:,:])(x, y, grid=False)
-    E2 = RectBivariateSpline(kr,kr,data_out[1,:,:])(x, y, grid=False)
+    E1_real = RectBivariateSpline(kr,kr,data_out[0,:,:].real)(x, y, grid=False)
+    E1_imag = RectBivariateSpline(kr,kr,data_out[0,:,:].imag)(x, y, grid=False)
+    E2_real = RectBivariateSpline(kr,kr,data_out[1,:,:].real)(x, y, grid=False)
+    E2_imag = RectBivariateSpline(kr,kr,data_out[1,:,:].imag)(x, y, grid=False)
     
     E_vectors = normaliseVector(numpy.cross(directions, d2))
     
@@ -106,8 +109,8 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     ray_data['direction'] = directions
     ray_data['wavelength_idx'] = 0
     ray_data['E_vector'] = E_vectors
-    ray_data['E1_amp'] = E1
-    ray_data['E2_amp'] = E2
+    ray_data['E1_amp'] = (E1_real + 1.0j*E1_imag)
+    ray_data['E2_amp'] = (E2_real + 1.0j*E2_imag)
     ray_data['refractive_index'] = 1.0+0.0j
     ray_data['normal'] = [[0,1,0]]
     ray_data['phase'] = 0.0
@@ -116,7 +119,8 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     working_dist=0.0
     #calculate beam-waists in microns
     gausslet_radius = 2000.0*numpy.pi/k_grid_spacing 
-    rays.config__parabasal_rays(wl, gausslet_radius, working_dist)
+    rays.config_parabasal_rays(wl, gausslet_radius, working_dist)
+    rays.wavelengths = wl
     return rays
 
 
@@ -124,23 +128,73 @@ def decompose_position():
     pass
 
 
-class AngleDecompositionPlance(Traceable):
-    sample_spacing = Float(0.01)
+class AngleDecompositionPlane(Traceable):
+    sample_spacing = Float(1.0) #in microns
     
     width = Range(0,512,64)
     height = Range(0,512,64)
     
-    _mask = Array()
+    _mask = Instance(numpy.ndarray)
     mask = Property()
     
     ### Sets the geometry of the intersection face
     diameter = Float(25.0)
     offset = Float(0.0)
     
+    ### Maximum ray ange in degrees
+    max_angle = Float(30.0)
+    
     material = Instance(ResampleGaussletMaterial)
     
     def evaluate_decomposed_rays(self, input_rays):
-        pass
+        origin = numpy.asarray(self.centre)
+        direction = numpy.asarray(self.direction)
+        axis1 = numpy.asarray(self.x_axis)
+        axis2 = numpy.cross(axis1, direction)
+        spacing = self.sample_spacing
+        
+        wavelengths = input_rays.wavelengths
+        
+        x = numpy.arange(self.width)*spacing
+        x -= x.mean()
+        y = numpy.arange(self.height)*spacing
+        y -= y.mean()
+        
+        points = x[:,None,None]*axis1[None,None,:] + y[None,:,None]*axis2[None,None,:]
+        points += origin[None,None,:]
+        
+        E_field = eval_Efield_from_gausslets(input_rays, points.reshape(-1,3), wavelengths)
+        mask = self._mask
+        if mask is not None:
+            E_field *= mask
+        print("Efield:", E_field.shape)
+        
+        x_field = numpy.dot(E_field, axis1).reshape(points.shape[:2])
+        y_field = numpy.dot(E_field, axis2).reshape(points.shape[:2])
+        TotalField = numpy.stack([x_field, y_field], axis=0)
+        print("Total Field:", TotalField.shape)
+        max_angle = self.max_angle
+        new_rays = decompose_angle(origin, direction, axis1, TotalField, spacing, 
+                                   max_angle, wavelengths[0], oversample=4)
+        print("Decomposed rays count:", len(new_rays))
+        return new_rays
+    
+    def _get_mask(self):
+        return self._mask
+    
+    def _set_mask(self, obj):
+        w,h = obj.shape
+        self._mask = numpy.clip(obj.astype('d'), 0.0, 1.0)
+        self.width = w
+        self.height = h
+        
+    @observe("width, height")
+    def _chk_dims(self, evt):
+        mask = self._mask
+        if mask is None:
+            return
+        if (self.width, self.height) != mask.shape:
+            raise ValueError("Width and height must match shape of mask.")
     
     def _material_default(self):
         m = ResampleGaussletMaterial(eval_func=self.evaluate_decomposed_rays)
@@ -149,7 +203,17 @@ class AngleDecompositionPlance(Traceable):
     def _faces_default(self):
         fl = FaceList(owner=self)
         fl.faces =  [CircularFace(owner=self, z_plane=0.0, material=self.material)]
+        return fl
         
     def _pipeline_default(self):
-        pass
-    
+        radius = self.diameter/2.
+        circle = tvtk.ArcSource(use_normal_and_angle=True,
+                                center=[0.0,0.0,0.0],
+                                polar_vector=[0.0, radius, 0.0],
+                                normal=[0.0,0.0,1.0],
+                                angle=360.0
+                                )
+        
+        trans = tvtk.TransformFilter(input_connection=circle.output_port,
+                                     transform=self.transform)
+        return trans
