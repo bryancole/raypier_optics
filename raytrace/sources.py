@@ -728,6 +728,7 @@ class GaussianBeamRaySource(SingleRaySource):
             ray_data['refractive_index'] = 1.0+0.0j
             ray_data['normal'] = [[0,1,0]]
             rays = RayCollection.from_array(ray_data)
+            rays.wavelengths = numpy.asarray(self.wavelength_list)
         except:
             import traceback
             traceback.print_exc()

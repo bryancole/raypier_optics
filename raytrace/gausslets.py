@@ -15,6 +15,8 @@ from raytrace.cfaces import CircularFace
 from raytrace.fields import eval_Efield_from_gausslets
 
 from traits.api import Range, Float, Array, Property, Instance, observe
+from traitsui.api import View, Group
+
 from tvtk.api import tvtk
 
 
@@ -79,23 +81,29 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     data_out = fft.fft2(data_in)
     data_out = fft.fftshift(data_out, axes=(1,2))
     
+    debug_k = numpy.dstack([data_out[0,:,:], data_out[1,:,:], numpy.zeros(data_out.shape[1:])])
+    
     ###The individual gausslet beam-waist radii at the origin are determined from the
     ### angular spacing of the output gausslets, and the wavelength.
-    kmax = 1000.0*numpy.pi/input_spacing #
+    kmax = 2000.0*numpy.pi/input_spacing #
     kz = 2000.0*numpy.pi/wavelength #where wavelength is in microns
     
-    kr = numpy.linspace(-kmax,kmax,data_out.shape[-1])/kz
+    ##No 2*pi factors for FFTs
+    kmax = 1000.0/input_spacing
+    kz = 1000.0/wavelength
     
-    k_limit = numpy.tan(numpy.pi*max_angle/180.0)
-    k_grid_spacing = (kr[1]-kr[0])*oversample #The spacing for the hexagonal grid
+    kr = numpy.linspace(-kmax,kmax,data_out.shape[-1])
+    
+    k_limit = kz*numpy.tan(numpy.pi*max_angle/180.0)
+    k_grid_spacing = (kr[1]-kr[0])#*oversample #The spacing for the hexagonal grid
     
     x,y = make_hexagonal_grid(k_limit, spacing=k_grid_spacing)
     
-    offsets = x[:,None]*d1 + y[:,None]*d2
+    offsets = (x[:,None]*d1 + y[:,None]*d2)/kz
     
     directions = direction[None,:] - offsets
     directions = normaliseVector(directions)
-    
+    print("interp:", x.min(),x.max(),y.min(),y.max(), kmax, kz, k_limit)
     E1_real = RectBivariateSpline(kr,kr,data_out[0,:,:].real)(x, y, grid=False)
     E1_imag = RectBivariateSpline(kr,kr,data_out[0,:,:].imag)(x, y, grid=False)
     E2_real = RectBivariateSpline(kr,kr,data_out[1,:,:].real)(x, y, grid=False)
@@ -118,10 +126,11 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     rays.wavelengths = wl = numpy.array([wavelength])
     working_dist=0.0
     #calculate beam-waists in microns
-    gausslet_radius = 2000.0*numpy.pi/k_grid_spacing 
+    gausslet_radius = 2.0*numpy.pi/(k_grid_spacing * oversample)
+    print("Gausslet radius:", gausslet_radius)
     rays.config_parabasal_rays(wl, gausslet_radius, working_dist)
     rays.wavelengths = wl
-    return rays
+    return rays, debug_k
 
 
 def decompose_position():
@@ -146,6 +155,12 @@ class AngleDecompositionPlane(Traceable):
     
     material = Instance(ResampleGaussletMaterial)
     
+    _E_field = Array() #store the E_field at the aperture for debugging purposes
+    
+    traits_view = View(Group(
+                    Traceable.uigroup
+                    ))
+    
     def evaluate_decomposed_rays(self, input_rays):
         origin = numpy.asarray(self.centre)
         direction = numpy.asarray(self.direction)
@@ -155,15 +170,25 @@ class AngleDecompositionPlane(Traceable):
         
         wavelengths = input_rays.wavelengths
         
-        x = numpy.arange(self.width)*spacing
+        x = numpy.arange(self.width)*spacing/1000.0
         x -= x.mean()
-        y = numpy.arange(self.height)*spacing
+        y = numpy.arange(self.height)*spacing/1000.0
         y -= y.mean()
         
-        points = x[:,None,None]*axis1[None,None,:] + y[None,:,None]*axis2[None,None,:]
-        points += origin[None,None,:]
+        #points = x[:,None,None]*axis1[None,None,:] + y[None,:,None]*axis2[None,None,:]
+        #points += origin[None,None,:]
         
-        E_field = eval_Efield_from_gausslets(input_rays, points.reshape(-1,3), wavelengths)
+        points = numpy.dstack(numpy.meshgrid(x,y,0))
+        ###What a chore
+        trns = self.transform
+        pts_in = tvtk.Points()
+        pts_out = tvtk.Points()
+        pts_in.from_array(points.reshape(-1,3))
+        trns.transform_points(pts_in, pts_out)
+        points2 = pts_out.to_array().astype('d')
+        
+        E_field = eval_Efield_from_gausslets(input_rays, points2.reshape(-1,3), wavelengths)
+        self._E_field = E_field.reshape(*points.shape)
         mask = self._mask
         if mask is not None:
             E_field *= mask
@@ -173,10 +198,12 @@ class AngleDecompositionPlane(Traceable):
         y_field = numpy.dot(E_field, axis2).reshape(points.shape[:2])
         TotalField = numpy.stack([x_field, y_field], axis=0)
         print("Total Field:", TotalField.shape)
+        print("spacing:", spacing)
         max_angle = self.max_angle
-        new_rays = decompose_angle(origin, direction, axis1, TotalField, spacing, 
+        new_rays, debug_k = decompose_angle(origin, direction, axis1, TotalField, spacing, 
                                    max_angle, wavelengths[0], oversample=4)
         print("Decomposed rays count:", len(new_rays))
+        self._E_field = debug_k
         return new_rays
     
     def _get_mask(self):

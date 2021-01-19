@@ -208,6 +208,7 @@ def eval_Efield_from_rays(ray_collection, points, wavelengths,
 
 def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
                                blending=1.0, **kwds):
+    print("Points:", points[:,0].min(),points[:,0].max(), points[:,1].min(),points[:,1].max(), points[:,2].min(),points[:,2].max())
     gc = gausslet_collection.copy_as_array() 
     rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
     modes = evaluate_modes_c(x, y, dx, dy, blending=blending)

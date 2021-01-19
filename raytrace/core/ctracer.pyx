@@ -1284,7 +1284,7 @@ cdef class GaussletCollection:
         using the base_ray data for wavelength, and the given beam waist 1/e^2 radius.
         'working_dist' indicates the distance from the base_ray origin to the centre 
         of the gaussian beam waist. Negative values imply a beam waist before the origin. 
-        'radius' is given in microns.
+        'radius' is given in mm.
         """
         cdef:
             int i,j
