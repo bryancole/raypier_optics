@@ -14,7 +14,7 @@ from raytrace.cmaterials import ResampleGaussletMaterial
 from raytrace.cfaces import CircularFace
 from raytrace.fields import eval_Efield_from_gausslets
 
-from traits.api import Range, Float, Array, Property, Instance, observe
+from traits.api import Range, Float, Array, Property, Instance, observe, Str
 from traitsui.api import View, Group
 
 from tvtk.api import tvtk
@@ -86,28 +86,30 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     ###The individual gausslet beam-waist radii at the origin are determined from the
     ### angular spacing of the output gausslets, and the wavelength.
     kmax = 2000.0*numpy.pi/input_spacing #
-    kz = 2000.0*numpy.pi/wavelength #where wavelength is in microns
+    kz = 0.5*2000.0*numpy.pi/wavelength #where wavelength is in microns
     
     ##No 2*pi factors for FFTs
     kmax = 1000.0/input_spacing
-    kz = 1000.0/wavelength
+    kz = 0.5*1000.0/wavelength
     
     kr = numpy.linspace(-kmax,kmax,data_out.shape[-1])
     
     k_limit = kz*numpy.tan(numpy.pi*max_angle/180.0)
-    k_grid_spacing = (kr[1]-kr[0])#*oversample #The spacing for the hexagonal grid
+    k_grid_spacing = (kr[1]-kr[0]) #The spacing for the hexagonal grid
     
     x,y = make_hexagonal_grid(k_limit, spacing=k_grid_spacing)
+    _x = x*2
+    _y = y*2
     
     offsets = (x[:,None]*d1 + y[:,None]*d2)/kz
     
     directions = direction[None,:] - offsets
     directions = normaliseVector(directions)
     print("interp:", x.min(),x.max(),y.min(),y.max(), kmax, kz, k_limit)
-    E1_real = RectBivariateSpline(kr,kr,data_out[0,:,:].real)(x, y, grid=False)
-    E1_imag = RectBivariateSpline(kr,kr,data_out[0,:,:].imag)(x, y, grid=False)
-    E2_real = RectBivariateSpline(kr,kr,data_out[1,:,:].real)(x, y, grid=False)
-    E2_imag = RectBivariateSpline(kr,kr,data_out[1,:,:].imag)(x, y, grid=False)
+    E1_real = RectBivariateSpline(kr,kr,data_out[0,:,:].real)(_x, _y, grid=False)
+    E1_imag = RectBivariateSpline(kr,kr,data_out[0,:,:].imag)(_x, _y, grid=False)
+    E2_real = RectBivariateSpline(kr,kr,data_out[1,:,:].real)(_x, _y, grid=False)
+    E2_imag = RectBivariateSpline(kr,kr,data_out[1,:,:].imag)(_x, _y, grid=False)
     
     E_vectors = normaliseVector(numpy.cross(directions, d2))
     
@@ -126,7 +128,8 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     rays.wavelengths = wl = numpy.array([wavelength])
     working_dist=0.0
     #calculate beam-waists in microns
-    gausslet_radius = 2.0*numpy.pi/(k_grid_spacing * oversample)
+    #gausslet_radius = 2.0*numpy.pi/(k_grid_spacing * oversample)
+    gausslet_radius = 0.5*wavelength*kz/(1000.0*k_grid_spacing*numpy.pi)
     print("Gausslet radius:", gausslet_radius)
     rays.config_parabasal_rays(wl, gausslet_radius, working_dist)
     rays.wavelengths = wl
@@ -138,6 +141,7 @@ def decompose_position():
 
 
 class AngleDecompositionPlane(Traceable):
+    name = Str("Angle Decomposition")
     sample_spacing = Float(1.0) #in microns
     
     width = Range(0,512,64)

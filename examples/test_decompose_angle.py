@@ -49,8 +49,8 @@ probe = EFieldPlane(detector=cap,
 img = IntensityImageView(field_probe=probe)
 surf = IntensitySurface(field_probe=probe)
 
-decomp = AngleDecompositionPlane(sample_spacing=2.0,
-                                 width=32, height=32,
+decomp = AngleDecompositionPlane(sample_spacing=1.0,
+                                 width=64, height=64,
                                  centre = (0,0,100.52),
                                  direction = (0,0,1),
                                  diameter=25.0,
