@@ -25,6 +25,9 @@ class BaseGaussletSource(BaseRaySource):
     
     wavelength = Float(0.78) # in microns
     
+    ###Total power in the source beam, in Watts
+    beam_power = Float(1.0)
+    
     display_grp = VGroup(Item('display'),
                        Item('show_start'),
                        Item('show_normals'),
@@ -365,14 +368,24 @@ class CollimatedGaussletSource(SingleGaussletSource):
         gauss = numpy.exp(-(ri[select]*(spacing**2)/((self.beam_waist)**2))) 
         
         ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+        
+        E1_amp = self.E1_amp
+        E2_amp = self.E2_amp
+        P1 = (E1_amp * E1_amp.conjugate()).real
+        P2 = (E2_amp * E1_amp.conjugate()).real
+        
+        ### The true E_field is E1_amp (or E2_amp) * sqrt(area of beam)###
+        beamlet_area = (spacing**2) * numpy.pi
+        total_power = ((P1 + P2) * (gauss**2)).sum() * beamlet_area
+        scaling = numpy.sqrt(total_power/self.beam_power)
             
         ray_data['origin'] = offsets
         ray_data['origin'] += origin
         ray_data['direction'] = direction
         ray_data['wavelength_idx'] = 0
         ray_data['E_vector'] = [normaliseVector(E_vector)]
-        ray_data['E1_amp'] = self.E1_amp * gauss
-        ray_data['E2_amp'] = self.E2_amp * gauss
+        ray_data['E1_amp'] = scaling * self.E1_amp * gauss
+        ray_data['E2_amp'] = scaling * self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
         ray_data['ray_type_id'] = (1<<1) #indicates Gausslets
