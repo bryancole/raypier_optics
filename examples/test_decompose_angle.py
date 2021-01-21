@@ -30,7 +30,7 @@ lens = GeneralLens(centre=(0,0,50),
 
 
 #src = SingleGaussletSource(beam_waist=1.0, max_ray_len=55.0)
-src = CollimatedGaussletSource(radius=10.0, resolution=10,
+src = CollimatedGaussletSource(radius=1.0, resolution=10,
                                beam_waist=10.0,
                                wavelength=1.0,
                                display="wires",
@@ -51,12 +51,12 @@ probe = EFieldPlane(detector=cap,
 img = IntensityImageView(field_probe=probe)
 surf = IntensitySurface(field_probe=probe)
 
-decomp = AngleDecompositionPlane(sample_spacing=1.0,
+decomp = AngleDecompositionPlane(sample_spacing=5.0,
                                  width=128, height=128,
                                  centre = (0,0,100.52),
                                  direction = (0,0,1),
                                  diameter=25.0,
-                                 max_angle=10.0)
+                                 max_angle=2.0)
 
 
 model = RayTraceModel(sources=[src], optics=[lens, decomp], probes=[probe, cap],

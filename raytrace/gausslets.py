@@ -87,13 +87,12 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     ###The individual gausslet beam-waist radii at the origin are determined from the
     ### angular spacing of the output gausslets, and the wavelength.
     kmax = 2.0*numpy.pi/(2*input_spacing) #
-    
     k_abs = 2.0*numpy.pi/wavelength #where wavelength is in microns
     
-    kr = numpy.linspace(-kmax,kmax,data_out.shape[0])
+    kr = numpy.linspace(-kmax,kmax,data_out.shape[0]+1)[:-1]
     
     k_limit = k_abs*numpy.sin(numpy.pi*max_angle/180.0)
-    k_grid_spacing = (kr[1]-kr[0]) #*oversample #The spacing for the hexagonal grid
+    k_grid_spacing = (kr[1]-kr[0])*oversample #The spacing for the hexagonal grid
     
     kx,ky = make_hexagonal_grid(k_limit, spacing=k_grid_spacing)
     _x = kx
@@ -115,17 +114,17 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     E_real = numpy.column_stack((Ex_real, Ey_real, Ez_real))
     E_imag = numpy.column_stack((Ex_imag, Ey_imag, Ez_imag))
     
-    E_full = E_real - 1.0j*E_imag
+    E_full = -(1.0j*E_real + E_imag)
     
     E_vectors = normaliseVector(numpy.cross(directions, d2))
-    E2_vectors = normaliseVector(numpy.cross(E_vectors, directions))
+    E2_vectors = normaliseVector(numpy.cross(directions, E_vectors))
     
     E1_amp = (E_vectors * E_full).sum(axis=1)
     E2_amp = (E2_vectors * E_full).sum(axis=1)
     
     ray_data = numpy.zeros(directions.shape[0], dtype=ray_dtype)
     
-    ray_data['origin'] = origin
+    ray_data['origin'] = origin - ((d1+d2)*(input_spacing*0.5))
     ray_data['direction'] = directions
     ray_data['wavelength_idx'] = 0
     ray_data['E_vector'] = E_vectors
@@ -219,6 +218,34 @@ class AngleDecompositionPlane(Traceable):
         self._mask = numpy.clip(obj.astype('d'), 0.0, 1.0)
         self.width = w
         self.height = h
+        
+    def set_circular_mask(self, diameter):
+        w = self.width
+        h = self.height
+        x = numpy.arange(w)*self.sample_spacing
+        x -= x.mean()
+        y = numpy.arange(h)*self.sample_spacing
+        y -= y.mean()
+        mask = numpy.zeros((w,h))
+        X,Y = numpy.meshgrid(x,y)
+        inside = (X**2) + (Y**2) <= ((diameter/2)**2)
+        mask[inside] = 1.0
+        self.mask = mask
+        self.update = True
+        
+    def set_rectangular_mask(self, width, height):
+        w = self.width
+        h = self.height
+        x = numpy.arange(w)*self.sample_spacing
+        x -= x.mean()
+        y = numpy.arange(h)*self.sample_spacing
+        y -= y.mean()
+        X,Y = numpy.meshgrid(x,y)
+        inside = numpy.maximum(numpy.abs(X)-(width/2), numpy.abs(Y)-(height/2)) <= 0.0
+        mask = numpy.zeros((w,h))
+        mask[inside] = 1.0
+        self.mask = mask
+        self.update = True
         
     @observe("width, height")
     def _chk_dims(self, evt):
