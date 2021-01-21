@@ -1331,6 +1331,33 @@ cdef class GaussletCollection:
                 gc.para[j].length = gc.base_ray.length
                 gc.para[j+1].length = gc.base_ray.length
                 
+    property base_rays:
+        def __get__(self):
+            cdef:
+                RayCollection rc = RayCollection(self.n_rays)
+                unsigned long n_rays
+                
+            for i in range(self.n_rays):
+                rc.rays[i] = self.rays[i].base_ray
+            rc.n_rays = self.n_rays
+            return rc
+        
+    property total_power:
+        def __get__(self):
+            cdef:
+                unsigned long i
+                double pwr=0.0
+                ray_t *ray
+                double n
+                
+            for i in range(self.n_rays):
+                ray = &(self.rays[i].base_ray)
+                n = ray.refractive_index.real
+                pwr += (ray.E1_amp.real * ray.E1_amp.real)*n
+                pwr += (ray.E1_amp.imag * ray.E1_amp.imag)*n
+                pwr += (ray.E2_amp.real * ray.E2_amp.real)*n
+                pwr += (ray.E2_amp.imag * ray.E2_amp.imag)*n
+            return pwr
                 
     property wavelengths:
         def __get__(self):

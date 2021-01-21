@@ -18,8 +18,10 @@ from traits.api import Range, Float, Array, Property, Instance, observe, Str
 from traitsui.api import View, Group, Item
 
 from tvtk.api import tvtk
-from raytrace.editors import NumEditor
+from raytrace.editors import NumEditor, IntEditor
 
+
+root_pi = numpy.sqrt(numpy.pi)
 
 def next_power_of_two(n):
     return int(2**numpy.ceil(numpy.log2(n)))
@@ -46,7 +48,8 @@ def make_hexagonal_grid(radius, spacing=1.0):
     return x[select], y[select]
 
 
-def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle, wavelength, oversample=4):
+def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle, wavelength, 
+                    oversample=4, input_power=1.0):
     """
     Compute a set of Gausslets over a range of directions, where the gausslet amplitude is
     obtained by FFT of the input E-field profile. The Gausslets all have an origin at the given
@@ -124,21 +127,24 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     
     ray_data = numpy.zeros(directions.shape[0], dtype=ray_dtype)
     
+    gausslet_radius = wavelength*k_abs/(k_grid_spacing*numpy.pi)
+    
+    power = (E1_amp.real**2 + E1_amp.imag**2 + E2_amp.real**2 + E2_amp.imag**2).sum()
+    scaling = numpy.sqrt(input_power/power)
+    
     ray_data['origin'] = origin - ((d1+d2)*(input_spacing*0.5))
     ray_data['direction'] = directions
     ray_data['wavelength_idx'] = 0
     ray_data['E_vector'] = E_vectors
-    ray_data['E1_amp'] = E1_amp
-    ray_data['E2_amp'] = E2_amp
+    ray_data['E1_amp'] = E1_amp*scaling
+    ray_data['E2_amp'] = E2_amp*scaling
     ray_data['refractive_index'] = 1.0+0.0j
     ray_data['normal'] = [[0,1,0]]
     ray_data['phase'] = 0.0
     rays = GaussletCollection.from_rays(ray_data)
     rays.wavelengths = wl = numpy.array([wavelength])
     working_dist=0.0
-    #calculate beam-waists in microns
-    #gausslet_radius = 2.0*numpy.pi/(k_grid_spacing * oversample)
-    gausslet_radius = wavelength*k_abs/(k_grid_spacing*numpy.pi)
+    
     print("Gausslet radius:", gausslet_radius)
     rays.config_parabasal_rays(wl, gausslet_radius, working_dist)
     rays.wavelengths = wl
@@ -174,8 +180,8 @@ class AngleDecompositionPlane(Traceable):
     traits_view = View(Group(
                     Traceable.uigroup,
                     Item("sample_spacing", editor=NumEditor),
-                    Item("width", editor=NumEditor),
-                    Item("height", editor=NumEditor),
+                    Item("width", editor=IntEditor),
+                    Item("height", editor=IntEditor),
                     Item("max_angle", editor=NumEditor)
                     ))
     
@@ -204,8 +210,9 @@ class AngleDecompositionPlane(Traceable):
         print("Efield:", E_field.shape)
         print("spacing:", spacing)
         max_angle = self.max_angle
+        power_in = input_rays.total_power
         new_rays, debug_k = decompose_angle(origin, direction, axis1, E_field, spacing, 
-                                   max_angle, wavelengths[0], oversample=4)
+                                   max_angle, wavelengths[0], oversample=4, input_power=power_in)
         print("Decomposed rays count:", len(new_rays))
         self._k_field = debug_k
         return new_rays

@@ -376,8 +376,8 @@ class CollimatedGaussletSource(SingleGaussletSource):
         
         ### The true E_field is E1_amp (or E2_amp) * sqrt(area of beam)###
         beamlet_area = (spacing**2) * numpy.pi
-        total_power = ((P1 + P2) * (gauss**2)).sum() * beamlet_area
-        scaling = numpy.sqrt(total_power/self.beam_power)
+        total_power = ((P1 + P2) * (gauss**2)).sum() #* beamlet_area
+        scaling = numpy.sqrt(self.beam_power/total_power)
             
         ray_data['origin'] = offsets
         ray_data['origin'] += origin
