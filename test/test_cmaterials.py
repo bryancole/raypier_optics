@@ -471,12 +471,17 @@ class TestSingleLayerCoatedMaterial(unittest.TestCase):
 
         #textbook reflection and transmission coefficients
         R = ((n_in - n_out)/(n_in + n_out))**2
-        T = (n_in/n_out)*((2*n_out/(n_out+n_in))**2)
+        
+        ### Remember that the optical power is proportional to (n*E)^2
+        T = ((n_in/n_out)*(2*n_out/(n_out+n_in))**2)
 
         self.assertAlmostEqual(1, T+R)
 
         refl_pow = ray_power(out[0])
         self.assertAlmostEqual(R, refl_pow/P_in)
+        
+        self.assertEqual(out[0].refractive_index, n_out)
+        self.assertEqual(out[1].refractive_index, n_in)
 
         trans_pow = ray_power(out[1])
         self.assertAlmostEqual(T, trans_pow/P_in)

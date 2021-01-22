@@ -822,36 +822,36 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
         M00 = -ep1*( (n1cos1-n2cos2)*(n2cos2+n3cos3) + 
                      (n1cos1+n2cos2)*(n2cos2-n3cos3)*ep2 )
                      
-        M01 = -ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3) + 
-                     (n1cos1+n2cos2)*(n2cos2+n3cos3)*ep2 )
-        
-        M10 = -ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3)*ep2 + 
+        M01 = ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3)*ep2 + 
                      (n1cos1+n2cos2)*(n2cos2+n3cos3) )
+        
+        M10 = ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3) + 
+                     (n1cos1+n2cos2)*(n2cos2+n3cos3)*ep2 )
         
         M11 = -ep1*( (n1cos1-n2cos2)*(n2cos2+n3cos3)*ep2 + 
                      (n1cos1+n2cos2)*(n2cos2-n3cos3) )
         
         R_s = -M00/M01
-        T_s = M10 - M11*R_s
+        T_s = M10 + M11*R_s
         
         n1cos2 = n1*cos2
         n2cos1 = n2*cos1
         n2cos3 = n2*cos3
         n3cos2 = n3*cos2
-        M00 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2)*ep2 +
-                      (n1cos2+n2cos1)*(n2cos3-n3cos2) )
-        
-        M01 = -ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2) +
-                      (n1cos2+n2cos1)*(n2cos3+n3cos2)*ep2 )
-        
-        M10 = -ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2)*ep1 +
-                      (n1cos2+n2cos1)*(n2cos3+n3cos2) )
-        
-        M11 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2) +
+        M00 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2) +
                       (n1cos2+n2cos1)*(n2cos3-n3cos2)*ep2 )
         
+        M01 = ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2)*ep2 +
+                      (n1cos2+n2cos1)*(n2cos3+n3cos2) )
+        
+        M10 = ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2) +
+                      (n1cos2+n2cos1)*(n2cos3+n3cos2)*ep2 )
+        
+        M11 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2)*ep2 +
+                      (n1cos2+n2cos1)*(n2cos3-n3cos2) )
+        
         R_p = -M00/M01
-        T_p = M10 - M11*R_p
+        T_p = M10 + M11*R_p
         
         #modify in place to get reflected amplitudes
         R_s *= E1_amp
@@ -887,7 +887,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
         T_s *= (E1_amp*aspect)
         T_p *= (E2_amp*aspect)
         
-        if ( n2.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
+        if ( n3.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = transmitted
@@ -897,8 +897,8 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.E2_amp.real = T_p.real
             sp_ray.E2_amp.imag = T_p.imag
             sp_ray.parent_idx = idx
-            sp_ray.refractive_index.real = n2.real
-            sp_ray.refractive_index.imag = n2.imag
+            sp_ray.refractive_index.real = n3.real
+            sp_ray.refractive_index.imag = n3.imag
             sp_ray.ray_type_id &= ~REFL_RAY
             new_rays.add_ray_c(sp_ray)
     
@@ -971,7 +971,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         
         ctemp = self.n_coating[in_ray.wavelength_idx]
         n2 = ctemp.real + I*ctemp.imag#self.n_coating_.real + 1.0j*self.n_coating_.imag
-        
+        print("coating:", n2, self.coating_thickness, wavelength)
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
             ctemp = self.n_outside[in_ray.wavelength_idx]
@@ -1015,36 +1015,36 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         M00 = -ep1*( (n1cos1-n2cos2)*(n2cos2+n3cos3) + 
                      (n1cos1+n2cos2)*(n2cos2-n3cos3)*ep2 )
                      
-        M01 = -ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3) + 
-                     (n1cos1+n2cos2)*(n2cos2+n3cos3)*ep2 )
-        
-        M10 = -ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3)*ep2 + 
+        M01 = ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3)*ep2 + 
                      (n1cos1+n2cos2)*(n2cos2+n3cos3) )
+        
+        M10 = ep1*( (n1cos1-n2cos2)*(n2cos2-n3cos3) + 
+                     (n1cos1+n2cos2)*(n2cos2+n3cos3)*ep2 )
         
         M11 = -ep1*( (n1cos1-n2cos2)*(n2cos2+n3cos3)*ep2 + 
                      (n1cos1+n2cos2)*(n2cos2-n3cos3) )
         
         R_s = -M00/M01
-        T_s = M10 - M11*R_s
+        T_s = M10 + M11*R_s
         
         n1cos2 = n1*cos2
         n2cos1 = n2*cos1
         n2cos3 = n2*cos3
         n3cos2 = n3*cos2
-        M00 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2)*ep2 +
-                      (n1cos2+n2cos1)*(n2cos3-n3cos2) )
-        
-        M01 = -ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2) +
-                      (n1cos2+n2cos1)*(n2cos3+n3cos2)*ep2 )
-        
-        M10 = -ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2)*ep1 +
-                      (n1cos2+n2cos1)*(n2cos3+n3cos2) )
-        
-        M11 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2) +
+        M00 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2) +
                       (n1cos2+n2cos1)*(n2cos3-n3cos2)*ep2 )
         
+        M01 = ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2)*ep2 +
+                      (n1cos2+n2cos1)*(n2cos3+n3cos2) )
+        
+        M10 = ep1*( (n1cos2-n2cos1)*(n2cos3-n3cos2) +
+                      (n1cos2+n2cos1)*(n2cos3+n3cos2)*ep2 )
+        
+        M11 = -ep1*( (n1cos2-n2cos1)*(n2cos3+n3cos2)*ep2 +
+                      (n1cos2+n2cos1)*(n2cos3-n3cos2) )
+        
         R_p = -M00/M01
-        T_p = M10 - M11*R_p
+        T_p = M10 + M11*R_p
         
         #modify in place to get reflected amplitudes
         R_s *= E1_amp
@@ -1080,7 +1080,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         T_s *= (E1_amp*aspect)
         T_p *= (E2_amp*aspect)
         
-        if ( n2.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
+        if ( n3.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
             sp_ray.origin = point
             sp_ray.normal = normal
             sp_ray.direction = transmitted

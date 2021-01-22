@@ -29,7 +29,9 @@ m = OpticalMaterial(glass_name="N-BK7")
 lens = GeneralLens(centre=(0,0,50),
                     shape=shape, 
                     surfaces=[f1,f2], 
-                    materials=[m])
+                    materials=[m],
+                    coating_material=OpticalMaterial(from_database=False,refractive_index=1.25),
+                    coating_thickness=0.2)
 
 
 
@@ -63,7 +65,7 @@ decomp = AngleDecompositionPlane(sample_spacing=5.0,
                                  max_angle=2.0)
 
 
-model = RayTraceModel(sources=[src], optics=[lens2, decomp], probes=[probe, cap],
+model = RayTraceModel(sources=[src], optics=[lens, decomp], probes=[probe, cap],
                       results=[img, surf])
 model.configure_traits()
 

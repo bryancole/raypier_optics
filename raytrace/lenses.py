@@ -689,6 +689,11 @@ class GeneralLens(BaseLens):
                     mat = CoatedDispersiveMaterial()
                     mat.dispersion_outside = mats[i].dispersion_curve
                     mat.dispersion_inside = mats[i+1].dispersion_curve
+                    if i in {0, len(surfaces)-1}:
+                        mat.dispersion_coating = self.coating_material.dispersion_curve
+                        mat.coating_thickness = self.coating_thickness
+                    else:
+                        mat.coating_thickness = 0.0
                     cface.material = mat
                 cfaces.append(face.cface)
         self.faces.faces = cfaces
