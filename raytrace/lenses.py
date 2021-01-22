@@ -29,7 +29,7 @@ from raytrace.bases import Optic, normaliseVector, NumEditor,\
     
 from raytrace.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raytrace.ctracer import FaceList
-from raytrace.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial
+from raytrace.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial, SingleLayerCoatedMaterial
 from raytrace.shapes import CircleShape, BaseShape
 from raytrace.vtk_algorithms import EmptyGridSource
 from . import faces
@@ -71,6 +71,12 @@ class PlanoConvexLens(BaseLens):
                        Item('curvature', editor=NumEditor)
                        )
                     )
+    
+    def _material_default(self):
+        #return BaseLens._material_default(self)
+        return SingleLayerCoatedMaterial(n_inside=self.n_inside,
+                                         n_outside=self.n_outside,
+                                         n_coating=1.3, coating_thickness=0.25)
     
     def _faces_default(self):
         fl = FaceList(owner=self)

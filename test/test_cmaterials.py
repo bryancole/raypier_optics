@@ -433,6 +433,58 @@ class TestFullDielectricMaterial(unittest.TestCase):
                                             trans_direction)), 1)
 
 class TestSingleLayerCoatedMaterial(unittest.TestCase):
+    def test_normal_incidence(self):
+        n_out = 1.3
+        n_in = 2.0
+
+        ray_in = Ray(origin=(0.0,0.0,-1.0),
+                     direction=(0.0,0.0,3.0),
+                     E_vector=(5.0,0.0,0.0),
+                     E1_amp = (1.0+1.0j),
+                     E2_amp = (2.0+0.0j),
+                     refractive_index=n_out)
+
+        mat = SingleLayerCoatedMaterial(n_inside=n_in,
+                                     n_outside=n_out,
+                                     n_coating=n_out,
+                                     coating_thickness=0.0,
+                                     reflection_threshold=-0.01,
+                                     transmission_threshold=-0.01)
+        mat.wavelengths = numpy.array([1.0])
+
+        out = RayCollection(8)
+        ray_idx = 123
+        point = (0.0,0.0,0.0)
+        normal = (0.0,0.0,-1.0)
+        tangent = (0.0,-1.0,0.0)
+
+        P_in = ray_power(ray_in)
+
+        mat.eval_child_ray(ray_in,
+                           ray_idx,
+                           point,
+                           normal,
+                           tangent,
+                           out)
+
+        self.assertEqual(len(out),2)
+
+        #textbook reflection and transmission coefficients
+        R = ((n_in - n_out)/(n_in + n_out))**2
+        T = (n_in/n_out)*((2*n_out/(n_out+n_in))**2)
+
+        self.assertAlmostEqual(1, T+R)
+
+        refl_pow = ray_power(out[0])
+        self.assertAlmostEqual(R, refl_pow/P_in)
+
+        trans_pow = ray_power(out[1])
+        self.assertAlmostEqual(T, trans_pow/P_in)
+
+        self.assertAlmostEqual(P_in, refl_pow+trans_pow)
+
+        print(ray_in.E_left, ray_in.E_right)
+    
     def test_brewster_angle(self):
         n_out = 1.2
         n_in = 2.0

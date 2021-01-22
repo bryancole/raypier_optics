@@ -3,6 +3,7 @@
 from raytrace.gausslet_sources import SingleGaussletSource, CollimatedGaussletSource
 from raytrace.gausslets import AngleDecompositionPlane
 from raytrace.lenses import PlanoConvexLens, GeneralLens
+from raytrace.achromats import EdmundOptic45806
 from raytrace.shapes import CircleShape
 from raytrace.faces import SphericalFace
 from raytrace.materials import OpticalMaterial
@@ -13,7 +14,10 @@ from raytrace.probes import GaussletCapturePlane
 
 from raytrace.tracer import RayTraceModel
 
-lens = PlanoConvexLens(centre=(0,0,50),
+lens3 = EdmundOptic45806(centre=(0,0,50),
+                         direction=(0,0,1))
+
+lens2 = PlanoConvexLens(centre=(0,0,50),
                        n_inside=1.5,
                        curvature=50.0,
                        diameter=30.0)
@@ -59,7 +63,7 @@ decomp = AngleDecompositionPlane(sample_spacing=5.0,
                                  max_angle=2.0)
 
 
-model = RayTraceModel(sources=[src], optics=[lens, decomp], probes=[probe, cap],
+model = RayTraceModel(sources=[src], optics=[lens2, decomp], probes=[probe, cap],
                       results=[img, surf])
 model.configure_traits()
 
