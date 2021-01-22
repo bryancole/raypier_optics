@@ -86,7 +86,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             C = modes[iray, 2]
             
             ###normalisation factor 1/root(area). Yes, there really is a double square root.
-            inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag))/M_PI)
+            inv_root_area = sqrt(sqrt(A.imag*C.imag -(B.imag*B.imag))*(2.0/M_PI))
             
             A.imag *= invk
             B.imag *= invk

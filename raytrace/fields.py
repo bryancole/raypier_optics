@@ -19,6 +19,7 @@ from raytrace.utils import normaliseVector, dotprod
 from raytrace.core.ctracer import GaussletCollection, RayCollection
 
 import numpy
+from raytrace.editors import IntEditor
 
 scipy = None
     
@@ -235,6 +236,11 @@ class EFieldPlane(Probe):
     ###The output of the probe
     E_field = Array()
     intensity = Property(Array, depends_on="E_field")
+    total_power = Property(depends_on="intensity, width, height, size")
+    
+    ### The mean real part of the refractive index for the material where the probe plane lies
+    ### Get get this from the selected/captured rays.
+    refractive_index = Float(1.0)
         
     _mtime = Float(0.0)
     _src_list = List()
@@ -247,12 +253,12 @@ class EFieldPlane(Probe):
     traits_view = View(Tabbed(
                         VGroup(
                        Traceable.uigroup,
-                       Item('size'),
+                       Item('size', editor=IntEditor),
                        Item('width', editor=NumEditor),
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
                        Item('blending', editor=NumEditor),
-                       Item('gen_idx'),
+                       Item('gen_idx', editor=IntEditor),
                        Item('centre_on_focus_btn', show_label=False, label="Centre on focus")
                    )))
     
@@ -310,9 +316,14 @@ class EFieldPlane(Probe):
         return actors
     
     @cached_property
-    def _get_intensity(self):
+    def _get_intensity(self):        
         E = self.E_field
         return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
+    
+    def _get_total_power(self):
+        power = self.intensity.sum()*(self.width*self.height/(self.size**2))
+        power *= self.refractive_index
+        return power
         
     def evaluate(self, src_list):
         mtime = self._mtime
@@ -335,6 +346,7 @@ class EFieldPlane(Probe):
             idx = self.gen_idx
             ray_list = [src.TracedRays[idx] for src in src_list if src.TracedRays]
         
+        n_list = []
         for ct, rays in enumerate(ray_list):
             wavelengths = rays.wavelengths
             
@@ -353,9 +365,11 @@ class EFieldPlane(Probe):
             points2 = pts_out.to_array().astype('d')
             
             if isinstance(rays, GaussletCollection):
+                n_list.append(rays.base_rays.refractive_index.real)
                 E = eval_Efield_from_gausslets(rays, points2, wavelengths, 
                                                blending=self.blending)
             else:
+                n_list.append(rays.refractive_index.real)
                 E = eval_Efield_from_rays(rays, points2, wavelengths, 
                                           blending=self.blending,
                                           exit_pupil_offset=self.exit_pupil_offset,
@@ -365,6 +379,8 @@ class EFieldPlane(Probe):
                 self.E_field = E.reshape(self.size, self.size, 3)
             else:
                 self.E_field += E.reshape(self.size, self.size, 3)
+                
+        self.refractive_index = numpy.concatenate(n_list).mean()
         
         self._attrib.modified()
         end = time.monotonic()

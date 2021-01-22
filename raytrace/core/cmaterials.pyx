@@ -971,7 +971,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         
         ctemp = self.n_coating[in_ray.wavelength_idx]
         n2 = ctemp.real + I*ctemp.imag#self.n_coating_.real + 1.0j*self.n_coating_.imag
-        print("coating:", n2, self.coating_thickness, wavelength)
+
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
             ctemp = self.n_outside[in_ray.wavelength_idx]
