@@ -117,7 +117,7 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     E_real = numpy.column_stack((Ex_real, Ey_real, Ez_real))
     E_imag = numpy.column_stack((Ex_imag, Ey_imag, Ez_imag))
     
-    E_full = -(1.0j*E_real + E_imag)
+    E_full = -(-1.0j*E_real + E_imag)
     
     E_vectors = normaliseVector(numpy.cross(directions, d2))
     E2_vectors = normaliseVector(numpy.cross(directions, E_vectors))
@@ -129,8 +129,8 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     
     gausslet_radius = wavelength*k_abs/(k_grid_spacing*numpy.pi)
     
-    power = (E1_amp.real**2 + E1_amp.imag**2 + E2_amp.real**2 + E2_amp.imag**2).sum()
-    scaling = numpy.sqrt(input_power/power)
+    ### Some sort of guess to get the output power roughly right.
+    scaling = numpy.sqrt(2)*input_spacing*target_size
     
     ray_data['origin'] = origin - ((d1+d2)*(input_spacing*0.5))
     ray_data['direction'] = directions
