@@ -128,7 +128,8 @@ cdef double complex calc_mode_U(double complex A,
     x = dotprod_(pt, E)
     y = dotprod_(pt, H)
     z = dotprod_(pt, direction)
-    denom = 2*(1 + (z*(A+C)) + (z*z)*detG0)
+    ### Where did this factor of 2 come from?
+    denom = (1 + (z*(A+C)) + (z*z)*detG0) *2
     AA = (A + z*detG0)/denom
     CC = (C + z*detG0)/denom
     U = cexp( I*(phase + k*(z + AA*(x*x) + B*(2*x*y)/denom + CC*(y*y) ) ) )

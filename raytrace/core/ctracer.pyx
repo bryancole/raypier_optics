@@ -1315,7 +1315,7 @@ cdef class GaussletCollection:
                 o = addvv_(o, gc.base_ray.origin)
                 o = addvv_(o, multvs_(base_d, working_dist))
                 ###direction of ray
-                d = addvv_(multvs_(d1, theta0*sin(angle)),
+                d = addvv_(multvs_(d1, -theta0*sin(angle)),
                             multvs_(d2, theta0*cos(angle)))
                 da = addvv_(base_d, d)
                 db = subvv_(base_d, d)

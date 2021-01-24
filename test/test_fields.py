@@ -84,6 +84,35 @@ class TestEvalModes(unittest.TestCase):
         print(ret2)
         self.assertTrue(numpy.allclose(ret1, ret2))
         
+    def test_eval_modes_c_scale(self):
+        
+        xyz = numpy.array([[[ 0.        ,  0.1       ,  0.        ],
+                    [ 0.        ,  0.1       ,  0.        ],
+                    [-0.08660254, -0.05      ,  0.        ],
+                    [-0.08660254, -0.05      ,  0.        ],
+                    [ 0.08660254, -0.05      ,  0.        ],
+                    [ 0.08660254, -0.05      ,  0.        ]]])
+        print(xyz.shape)
+        x=xyz[:,:,0]
+        y=xyz[:,:,1]
+        dx =dy = numpy.zeros_like(x)
+        
+        ret1 = evaluate_modes_c(x, y, dx, dy)
+        print(ret1)
+        
+        xyz = numpy.array([[[-8.27605704e-02,  1.00000000e-01,  2.60000000e+01],
+                        [ 8.27605704e-02,  1.00000000e-01,  2.60000000e+01],
+                        [-4.52222552e-02,  2.16727564e-02,  2.60000000e+01],
+                        [-1.27982826e-01, -1.21672756e-01,  2.60000000e+01],
+                        [ 1.27982826e-01, -1.21672756e-01,  2.60000000e+01],
+                        [ 4.52222552e-02,  2.16727564e-02,  2.60000000e+01]]])
+        x=xyz[:,:,0]
+        y=xyz[:,:,1]
+        dx =dy = numpy.zeros_like(x)
+        
+        ret1 = evaluate_modes_c(x, y, dx, dy)
+        print(ret1)
+        
         
 class TestAreaOfEllipse(unittest.TestCase):
     def test_area_of_ellipse(self):

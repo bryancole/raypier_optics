@@ -140,6 +140,12 @@ def evaluate_neighbours_gc(gausslets):
     dz = (n_direction * direction).sum(axis=-1)
     dx = (n_direction * E).sum(axis=-1)/dz 
     dy = (n_direction * H).sum(axis=-1)/dz
+    
+    ###This doesn't help
+    #     r = x**2 + y**2
+    #     r2 = (dx*x + dy*y)/r
+    #     dx2 = x*r2
+    #     dy2 = y*r2
     return (ga['base_ray'], x, y, dx, dy)
     
     
@@ -181,6 +187,24 @@ def evaluate_modes(neighbour_x, neighbour_y, dx, dy, blending=1.0):
     
     return ((blending*1j)*im_coefs) + re_coefs
 
+
+def Gamma(z, A, B, C):
+    """Used in testing"""
+    detG0 = (A*C) - (B*B)
+    denom = (1 + (z*(A+C)) + (z*z)*detG0) #*2
+    AA = (A + z*detG0)/denom
+    BB = B/denom
+    CC = (C + z*detG0)/denom
+    return AA, BB, CC
+
+
+def ExtractGamma(gausslet_collection, blending=1.0):
+    """Used in Testing"""
+    gc = gausslet_collection.copy_as_array() 
+    rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
+    modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
+    return modes
+
     
 def eval_Efield_from_rays(ray_collection, points, wavelengths, 
                           blending=1.0,
@@ -193,7 +217,6 @@ def eval_Efield_from_rays(ray_collection, points, wavelengths,
         projected = project_to_sphere(rays, exit_pupil_centre, radius)
     else:
         projected = rays
-    #projected = rays
     
     neighbours_idx = ray_collection.neighbours
     rays, x, y, dx, dy = evaluate_neighbours(projected, neighbours_idx)
@@ -209,7 +232,6 @@ def eval_Efield_from_rays(ray_collection, points, wavelengths,
 
 def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
                                blending=1.0, **kwds):
-    print("Points:", points[:,0].min(),points[:,0].max(), points[:,1].min(),points[:,1].max(), points[:,2].min(),points[:,2].max())
     gc = gausslet_collection.copy_as_array() 
     rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
     modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
