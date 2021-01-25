@@ -65,7 +65,7 @@ decomp = AngleDecompositionPlane(sample_spacing=5.0,
                                  max_angle=2.0)
 
 
-model = RayTraceModel(sources=[src], optics=[lens2, decomp], probes=[probe, cap],
+model = RayTraceModel(sources=[src], optics=[lens, decomp], probes=[probe, cap],
                       results=[img, surf])
 model.configure_traits()
 

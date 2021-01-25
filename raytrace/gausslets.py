@@ -217,6 +217,9 @@ class AngleDecompositionPlane(Traceable):
         self._k_field = debug_k
         return new_rays
     
+    def _vtkproperty_default(self):
+        return tvtk.Property(color=(0.1,0.1,0.1) )
+    
     def _get_mask(self):
         return self._mask
     
@@ -277,7 +280,8 @@ class AngleDecompositionPlane(Traceable):
                                 center=[0.0,0.0,0.0],
                                 polar_vector=[0.0, radius, 0.0],
                                 normal=[0.0,0.0,1.0],
-                                angle=360.0
+                                angle=360.0,
+                                resolution=100
                                 )
         
         trans = tvtk.TransformFilter(input_connection=circle.output_port,
