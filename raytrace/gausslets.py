@@ -49,7 +49,7 @@ def make_hexagonal_grid(radius, spacing=1.0):
 
 
 def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle, wavelength, 
-                    oversample=4, input_power=1.0):
+                    oversample=4, E_max=None, pos_max=None):
     """
     Compute a set of Gausslets over a range of directions, where the gausslet amplitude is
     obtained by FFT of the input E-field profile. The Gausslets all have an origin at the given
@@ -132,7 +132,7 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     ### Some sort of guess to get the output power roughly right.
     scaling = numpy.sqrt(2)*input_spacing*target_size
     
-    ray_data['origin'] = origin - ((d1+d2)*(input_spacing*0.5))
+    ray_data['origin'] = origin + ((d1+d2)*(input_spacing*0.5))
     ray_data['direction'] = directions
     ray_data['wavelength_idx'] = 0
     ray_data['E_vector'] = E_vectors
@@ -148,6 +148,19 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     print("Gausslet radius:", gausslet_radius)
     rays.config_parabasal_rays(wl, gausslet_radius, working_dist)
     rays.wavelengths = wl
+    
+    if E_max is not None and pos_max is not None:
+        print("E_max:", E_max, "pos_max:", pos_max)
+        e_test = eval_Efield_from_gausslets(rays, pos_max[None,:], wl, blending=1.0)
+        print("e_test:", e_test)
+        scaling = (E_max/e_test).mean()
+        #ray_data['E1_amp'] *= scaling
+        #ray_data['E2_amp'] *= scaling
+        
+        rays = GaussletCollection.from_rays(ray_data)
+        rays.wavelengths = wl
+        rays.config_parabasal_rays(wl, gausslet_radius, working_dist)
+    
     return rays, data_out
 
 
@@ -202,17 +215,21 @@ class AngleDecompositionPlane(Traceable):
         points = x[:,None,None]*axis1[None,None,:] + y[None,:,None]*axis2[None,None,:]
         points += origin[None,None,:]
         
-        E_field = eval_Efield_from_gausslets(input_rays, points.reshape(-1,3), wavelengths).reshape(*points.shape)
+        flat_points = points.reshape(-1,3)
+        E_field = eval_Efield_from_gausslets(input_rays, flat_points, wavelengths).reshape(*points.shape)
         self._E_field = E_field
         mask = self._mask
         if mask is not None:
             E_field *= mask[:,:,None]
-        print("Efield:", E_field.shape)
-        print("spacing:", spacing)
         max_angle = self.max_angle
-        power_in = input_rays.total_power
+        
+        pwr = (E_field.real**2 + E_field.imag**2).sum(axis=-1)
+        imax = pwr.argmax()
+        E_max = E_field.reshape(-1,3)[imax,:]
+        p_max = flat_points[imax,:]
+        
         new_rays, debug_k = decompose_angle(origin, direction, axis1, E_field, spacing, 
-                                   max_angle, wavelengths[0], oversample=4, input_power=power_in)
+                                   max_angle, wavelengths[0], oversample=4, E_max=E_max, pos_max=p_max)
         print("Decomposed rays count:", len(new_rays))
         self._k_field = debug_k
         return new_rays

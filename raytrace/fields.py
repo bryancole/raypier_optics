@@ -275,6 +275,7 @@ class EFieldPlane(Probe):
     traits_view = View(Tabbed(
                         VGroup(
                        Traceable.uigroup,
+                       Item("total_power", style="readonly"),
                        Item('size', editor=IntEditor),
                        Item('width', editor=NumEditor),
                        Item('height', editor=NumEditor),
