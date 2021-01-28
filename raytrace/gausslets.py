@@ -28,6 +28,10 @@ def next_power_of_two(n):
 
 
 def make_hexagonal_grid(radius, spacing=1.0):
+    """Creates a 2d hexagonal grid.
+    Radius and spacing have the same units.
+    Returns - x,y: 1d arrays of the respective coordinate."""
+    
     cosV = numpy.cos(numpy.pi*30/180.)
     sinV = numpy.sin(numpy.pi*30/180.)
     
@@ -168,8 +172,84 @@ def decompose_position():
     pass
 
 
-class AngleDecompositionPlane(Traceable):
+class BaseDecompositionPlane(Traceable):
+    ### Sets the geometry of the intersection face
+    diameter = Float(25.0)
+    offset = Float(0.0)
+    
+    material = Instance(ResampleGaussletMaterial)
+    
+    def _material_default(self):
+        m = ResampleGaussletMaterial(eval_func=self.evaluate_decomposed_rays)
+        return m
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces =  [CircularFace(owner=self, z_plane=0.0, material=self.material)]
+        return fl
+        
+    def _pipeline_default(self):
+        radius = self.diameter/2.
+        circle = tvtk.ArcSource(use_normal_and_angle=True,
+                                center=[0.0,0.0,0.0],
+                                polar_vector=[0.0, radius, 0.0],
+                                normal=[0.0,0.0,1.0],
+                                angle=360.0,
+                                resolution=100
+                                )
+        
+        trans = tvtk.TransformFilter(input_connection=circle.output_port,
+                                     transform=self.transform)
+        return trans
+    
+    def evaluate_decomposed_rays(self, input_rays):
+        raise NotImplementedError()
+
+
+class PositionDecompositionPlane(BaseDecompositionPlane):
+    abstract=False
+    name = Str("Position Decomposition")
+    
+    ###Spacing of the output mode origins (and input sample points)
+    spacing = Float(0.2) #in mm
+    
+    ### Wavefront curvature estimate
+    curvature = Float(0.0)
+    
+    
+    
+    ### Keep the sample points and sampled fields around 
+    ### for debugging purposes
+    _sample_points = Array()
+    _E_field = Array()
+    
+    def evaluate_decomposed_rays(self, input_rays):
+        radius = self.diameter/2.
+        spacing = self.spacing
+        curvature = self.curvature
+        wavelengths = input_rays.wavelengths
+        
+        origin = numpy.asarray(self.centre)
+        direction = normaliseVector(numpy.asarray(self.direction))
+        axis1 = normaliseVector(numpy.asarray(self.x_axis))
+        axis2 = numpy.cross(axis1, direction)
+        
+        x,y = make_hexagonal_grid(radius, spacing=spacing)
+        
+        origins = origin[None,:] + x[:,None]*axis1[None,:] + y[:,None]*axis2[None,:]
+        
+        E_field = eval_Efield_from_gausslets(input_rays, origins, wavelengths)
+        
+        ###Figure out the phase at each sample-point
+        phase = unwrap_phase_hex(E_field, origins, curvature)
+        
+        dx, dy = eval_phase_gradient(phase, x,y)
+
+
+class AngleDecompositionPlane(BaseDecompositionPlane):
+    abstract=False
     name = Str("Angle Decomposition")
+    
     sample_spacing = Float(1.0) #in microns
     
     width = Range(0,512,64)
@@ -178,14 +258,8 @@ class AngleDecompositionPlane(Traceable):
     _mask = Instance(numpy.ndarray)
     mask = Property()
     
-    ### Sets the geometry of the intersection face
-    diameter = Float(25.0)
-    offset = Float(0.0)
-    
     ### Maximum ray ange in degrees
     max_angle = Float(30.0)
-    
-    material = Instance(ResampleGaussletMaterial)
     
     _E_field = Array() #store the E_field at the aperture for debugging purposes
     _k_field = Array()
@@ -282,25 +356,4 @@ class AngleDecompositionPlane(Traceable):
         if (self.width, self.height) != mask.shape:
             raise ValueError("Width and height must match shape of mask.")
     
-    def _material_default(self):
-        m = ResampleGaussletMaterial(eval_func=self.evaluate_decomposed_rays)
-        return m
     
-    def _faces_default(self):
-        fl = FaceList(owner=self)
-        fl.faces =  [CircularFace(owner=self, z_plane=0.0, material=self.material)]
-        return fl
-        
-    def _pipeline_default(self):
-        radius = self.diameter/2.
-        circle = tvtk.ArcSource(use_normal_and_angle=True,
-                                center=[0.0,0.0,0.0],
-                                polar_vector=[0.0, radius, 0.0],
-                                normal=[0.0,0.0,1.0],
-                                angle=360.0,
-                                resolution=100
-                                )
-        
-        trans = tvtk.TransformFilter(input_connection=circle.output_port,
-                                     transform=self.transform)
-        return trans
