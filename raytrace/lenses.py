@@ -16,7 +16,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from traits.api import Float, Instance, on_trait_change, Array, Property,\
-        cached_property, List, observe, Tuple, cached_property, Str
+        cached_property, List, observe, Tuple, cached_property, Str, Complex
 
 from traitsui.api import View, Item, ListEditor, VSplit,\
             RangeEditor, ScrubberEditor, HSplit, VGroup, Group, ListEditor
@@ -57,6 +57,9 @@ class PlanoConvexLens(BaseLens):
     offset = Float(0.0)
     curvature = Float(11.7, desc="radius of curvature for spherical face")    
     
+    n_coating = Complex(1.3+0.0j)
+    coating_thickness = Float(0.25)
+    
     vtk_grid = Instance(EmptyGridSource, ())
     vtk_cylinder = Instance(tvtk.Cylinder, ())
     vtk_sphere = Instance(tvtk.Sphere, ())
@@ -68,7 +71,9 @@ class PlanoConvexLens(BaseLens):
                        Item('n_inside'),
                        Item('CT', editor=NumEditor),
                        Item('diameter', editor=NumEditor),
-                       Item('curvature', editor=NumEditor)
+                       Item('curvature', editor=NumEditor),
+                       Item('n_coating'),
+                       Item('coating_thickness', editor=NumEditor)
                        )
                     )
     
@@ -76,7 +81,16 @@ class PlanoConvexLens(BaseLens):
         #return BaseLens._material_default(self)
         return SingleLayerCoatedMaterial(n_inside=self.n_inside,
                                          n_outside=self.n_outside,
-                                         n_coating=1.3, coating_thickness=0.25)
+                                         n_coating=self.n_coating, 
+                                         coating_thickness=self.coating_thickness)
+        
+    def _n_coating_changed(self, vnew):
+        self.material.n_coating = vnew
+        self.update = True
+        
+    def _coating_thickness_changed(self, vnew):
+        self.material.coating_thickness = vnew
+        self.update=True
     
     def _faces_default(self):
         fl = FaceList(owner=self)

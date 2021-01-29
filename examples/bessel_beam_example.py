@@ -38,12 +38,12 @@ src = CollimatedGaussletSource(origin=(0.001,0,-5.0),
                                )
 
 ###Add some sensors
-capture = GaussletCapturePlane(centre=(0,0,25), 
+capture = GaussletCapturePlane(centre=(0,0,13), 
                                direction=(0,0,1),
                                width=5.0,
                                height=5.0)
 
-field = EFieldPlane(centre=(0,0,2),
+field = EFieldPlane(centre=(0,0,13),
                     direction=(0,0,1),
                     detector=capture,
                     align_detector=True,

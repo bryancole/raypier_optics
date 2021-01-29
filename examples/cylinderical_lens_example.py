@@ -19,7 +19,7 @@ shape = CircleShape(radius=7.5)
 
 face1 = PlanarFace(z_height=0.0)
 face2 = CylindericalFace(z_height=4.0, curvature=100.0)
-face2 = SphericalFace(z_height=4.0, curvature=50.0)
+#face2 = SphericalFace(z_height=4.0, curvature=50.0)
 
 mat = OpticalMaterial(refractive_index=1.5)
 
@@ -31,12 +31,15 @@ lens = GeneralLens(name = "Cylinderincal Lens",
                                face1], 
                      materials=[mat])
 
-lens2 = PlanoConvexLens(centre=(0,0,0),
-                        diameter=15.0,
-                       CT=4.0,
-                       n_inside=1.5,
-                       curvature=50.0
-                       )
+lens2 = GeneralLens(name = "Cylinderincal Lens",
+                     centre = (0,0,10),
+                     direction=(0,0,-1),
+                     shape=shape, 
+                     surfaces=[face2, 
+                               face1], 
+                     materials=[mat])
+
+
 
 class TestLens(PlanoConvexLens):
     def _faces_default(self):
@@ -94,7 +97,7 @@ image = IntensityImageView(field_probe=field)
 surf = IntensitySurface(field_probe=field)
 
 
-model = RayTraceModel(optics=[lens], 
+model = RayTraceModel(optics=[lens, lens2], 
                       sources=[src], 
                       probes=[capture,field],
                       results=[image,surf])

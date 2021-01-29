@@ -214,7 +214,7 @@ cdef class ShapedPlanarFace(ShapedFace):
         cdef vector_t normal
         normal.x=0
         normal.y=0
-        normal.z=-1
+        normal.z=1
         return normal
     
     cdef double eval_z_c(self, double x, double y) nogil:
@@ -1374,14 +1374,13 @@ cdef class AxiconFace(ShapedFace):
         given a point on the surface (also in local coords).
         """
         cdef:
-            double r2, b
+            double r, beta
             
-        p.z -= self.z_height
-        r2 = p.x*p.x + p.y*p.y
-        b = -p.z/sqrt(2*r2 + p.z*p.z)
-        p.z = sqrt(r2/(r2 + p.z*p.z))
-        p.x *= b
-        p.y *= b
+        beta = self.gradient
+        r = sqrt(p.x*p.x + p.y*p.y)
+        p.z = 1.0
+        p.x = beta * p.x/r
+        p.y = beta * p.y/r
         return p
     
     cdef double eval_z_c(self, double x, double y) nogil:

@@ -979,14 +979,14 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             ctemp = self.n_inside[in_ray.wavelength_idx]
             n3 = ctemp.real + I*ctemp.imag#self.n_inside_.real + 1.0j*self.n_inside_.imag
             flip = 1
-            #print "out to in", n1, n2
+            #print( "out to in", n1, n3)
         else:
             ctemp = self.n_inside[in_ray.wavelength_idx]
             n1 = ctemp.real + I*ctemp.imag
             ctemp = self.n_outside[in_ray.wavelength_idx]
             n3 = ctemp.real + I*ctemp.imag
             flip = -1
-            #print "in to out", n1, n2
+            #print( "in to out", n1, n3 )
             
         #apply Snell's law. These become complex.
         sin2 = (n1*sin1/n2)

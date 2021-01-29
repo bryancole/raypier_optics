@@ -288,7 +288,7 @@ class EFieldPlane(Probe):
     @observe("centre")
     def on_move(self, evt):
         detector = self.detector
-        if detector is not None:
+        if detector is not None and self.align_detector:
             detector.centre = evt.new
         self._mtime = 0.0
         self.on_change()
