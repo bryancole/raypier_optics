@@ -513,7 +513,7 @@ class GeneralLens(BaseLens):
     name = Str("General Lens")
     shape = Instance(BaseShape)
     
-    surfaces = List(faces.PlanarFace)
+    surfaces = List(faces.BaseFace)
     
     materials = List(OpticalMaterial)
     

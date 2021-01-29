@@ -53,7 +53,7 @@ cdef class ShapedFace(Face):
         return 0.0
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
-        return 0.0
+        return z - self.eval_z_c(x,y)
     
     @cython.boundscheck(False)  # Deactivate bounds checking
     @cython.wraparound(False)   # Deactivate negative indexing.
@@ -203,9 +203,9 @@ cdef class ShapedPlanarFace(ShapedFace):
         
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
-        if is_base_ray and (<Shape>self.shape).point_inside_c(X,Y):
-            return h*max_length
-        return -1
+        if is_base_ray and not (<Shape>self.shape).point_inside_c(X,Y):
+            return -1
+        return h*max_length
         
     cdef vector_t compute_normal_c(self, vector_t p):
         """Compute the surface normal in local coordinates,
@@ -1265,7 +1265,95 @@ cdef double intersect_conic(vector_t a, vector_t d, double curvature, double con
     else:
         #2nd root
         return (-B-D)/(2*A)
-     
+    
+    
+cdef class AxiconFace(ShapedFace):
+    """
+    While technically, we can use the conic surface to generate a cone, it requires setting some parameters to infinity which 
+    is often inaccurate to compute.
+    
+    The gradient is the slope of the sides, dz/dr
+    """
+    cdef:
+        public double z_height, gradient
+        
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.gradient = kwds.get('gradient', 0.0)
+        
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        cdef:
+            double a1, a2, root, ox2, oy2, oz2, dx2, dy2, dz2, beta2, denom
+            double beta = self.gradient
+            vector_t o, d, pt1, pt2
+            
+        d = subvv_(p2, p1)
+        o = p1
+        o.z -= self.z_height
+        
+        beta2 = beta*beta
+        ox2 = o.x*o.x
+        oy2 = o.y*o.y
+        oz2 = o.z*o.z
+        dx2 = d.x*d.x
+        dy2 = d.y*d.y
+        dz2 = d.z*d.z
+        
+        root = -beta2*dx2*oy2 + 2*beta2*d.x*d.y*o.x*o.y - beta2*dy2*ox2 + dx2*oz2 - 2*d.x*d.z*o.x*o.z + \
+                dy2*oz2 - 2*d.y*d.z*o.y*o.z + dz2*ox2 + dz2*oy2
+        denom = (beta2*dx2 + beta2*dy2 - dz2)
+                
+        if root < 0: #no intersection
+            return -1
+        
+        root = beta*sqrt(root)
+        
+        a1 = -beta2*d.x*o.x - beta2*d.y*o.y + d.z*o.z
+        a2 = a1 + root
+        a1 -= root
+        a1 /= denom
+        a2 /= denom
+        
+        pt1 = addvv_(p1, multvs_(d, a1))
+        pt2 = addvv_(p1, multvs_(d, a2))
+        
+        if pt1.z > self.z_height:
+            a1 = INF
+        if pt2.z > self.z_height:
+            a2 = INF
+        
+        if is_base_ray:
+            if not (<Shape>self.shape).point_inside_c( pt1.x, pt1.y ):
+                a1 = INF
+            if not (<Shape>self.shape).point_inside_c( pt2.x, pt2.y ):
+                a2 = INF
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+        return a1 * sep_(p1, p2)
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            double r2, b
+            
+        p.z -= self.z_height
+        r2 = p.x*p.x + p.y*p.y
+        b = -p.z/sqrt(2*r2 + p.z*p.z)
+        p.z = sqrt(r2/(r2 + p.z*p.z))
+        p.x *= b
+        p.y *= b
+        return p
+    
+    cdef double eval_z_c(self, double x, double y) nogil:
+        return self.z_height - (self.gradient * sqrt(x*x + y*y))
+    
+         
     
 cdef class ConicRevolutionFace(ShapedFace):
     """This is surface of revolution formed from a conic section. Spherical and ellipsoidal faces
