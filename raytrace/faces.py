@@ -5,7 +5,7 @@ Traited wrappers for cfaces objects
 
 
 from .core.cfaces import ShapedPlanarFace, ShapedSphericalFace, ConicRevolutionFace, AsphericFace as AsphericFace_,\
-            ShapedFace, AxiconFace as AxiconFace_
+            ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_
 from .shapes import BaseShape
 from .editors import NumEditor
 
@@ -88,6 +88,20 @@ class AxiconFace(BaseFace):
         self.cface.gradient = vnew
         self.updated=True
         
+        
+class CylindericalFace(SphericalFace):
+    cface = Instance(CylindericalFace_)
+    
+    def __repr__(self):
+        return f"<Cylinderical Face: z={self.z_height}, curvature={self.curvature}>"
+    
+    def _cface_default(self):
+        return CylindericalFace_(radius=self.curvature, z_height=self.z_height)
+    
+    def _curvature_changed(self, cnew):
+        self.cface.radius = cnew
+        self.updated=True
+    
         
 class ConicFace(SphericalFace):
     conic_const = Float(0.0)

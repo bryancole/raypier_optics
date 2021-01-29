@@ -33,6 +33,12 @@ class OpticalMaterial(HasStrictTraits):
             Item("absorption", editor=NumEditor),
         ))
     
+    def __init__(self, *args, **kwds):
+        if "from_database" not in kwds:
+            if ("refractive_index" in kwds) and ("glass_name" not in kwds):
+                kwds['from_database'] = False
+        return super().__init__(*args, **kwds)
+    
     @cached_property
     def _get_dispersion_curve(self):
         if self.from_database:

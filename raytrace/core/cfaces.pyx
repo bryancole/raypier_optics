@@ -1212,59 +1212,93 @@ cdef class EllipsoidalFace(Face):
         self.inverse_transform = Transform(rotation=rot, translation=dt)
     
         
-cdef double intersect_conic(vector_t a, vector_t d, double curvature, double conic_const):
+cdef class CylindericalFace(ShapedFace):
     cdef:
-        double beta = 1 + conic_const
-        double R = -curvature
-        double A,B,C,D
-        #double pt1, pt2
+        public double z_height, radius
     
-    #print("inputs:", a.x, a.y, a.z, d.x, d.y, d.z, beta, R)
-    ###Obtained by sympy evaluation of the equations
-    ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
-    A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
-    B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
-    C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
+    params = [] 
     
-    ##Get roots
-    D = B*B - 4*A*C
-    if D < 0: #no solution
-        return -1
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.radius = kwds.get("radius", 100.0)
+        
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        cdef:
+            double a1, a2, cz, ox2, oz2, dx2, dz2, denom, R=self.radius
+            double R2 = R*R
+            vector_t d,o, pt1, pt2
+            
+        o = p1
+        o.z -= self.z_height
+        d = subvv_(p2,p1)
+        
+        ox2 = o.x*o.x
+        oz2 = o.z*o.z
+        dx2 = d.x*d.x
+        dz2 = d.z*d.z
+        
+        root = R2*dz2 - 2*R*dx2*o.z + 2*R*d.x*d.z*o.x - dx2*oz2 + 2*d.x*d.z*o.x*o.z - dz2*ox2
+        
+        if root < 0:
+            return -1
+        
+        root = sqrt(root)
+        denom = dx2 + dz2
+        
+        a1 = a2 = -R*d.z - d.x*o.x - d.z*o.z
+        a1 += root
+        a2 -= root
+        a1 /= denom
+        a2 /= denom
+        
+        pt1 = addvv_(p1, multvs_(d, a1))
+        pt2 = addvv_(p1, multvs_(d, a2))
+        
+        cz = self.z_height - self.radius
+        
+        if R >= 0:
+            if pt1.z < cz:
+                a1 = INF
+            if pt2.z < cz:
+                a2 = INF
+        else:
+            if pt1.z > cz:
+                a1 = INF
+            if pt2.z > cz:
+                a2 = INF
+        
+        if is_base_ray:
+            if not (<Shape>self.shape).point_inside_c( pt1.x, pt1.y ):
+                a1 = INF
+            if not (<Shape>self.shape).point_inside_c( pt2.x, pt2.y ):
+                a2 = INF
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+        return a1 * sep_(p1, p2)
     
-    D = sqrt(D)
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        
+        p.z -= (self.z_height - self.radius)
+        if self.radius < 0:
+            p.z = -p.z
+            p.x = -p.x
+        p.y = 0
+        return norm_(p)
     
-### This turns out to not be necessary
-#     #1st root
-#     a1 = (-B+D)/(2*A) 
-#     pt1 = a.z + d.z*a1 #addvv_(a, multvs_(d, a1))
-#     #2nd root
-#     a2 = (-B-D)/(2*A)
-#     pt2 = a.z + d.z*a2 #addvv_(a, multvs_(d, a2))
-#     
-#     print("R.beta.dz:", R*beta*d.z, a1, pt1, a2, pt2, A, B, C, D)
-#     if R*beta*d.z <= 0:
-#         if pt1 < R/beta:
-#             a1 = INF
-#         if pt2 < R/beta:
-#             a2 = INF
-#     else:
-#         if pt1 > R/beta:
-#             a1 = INF
-#         if pt2 > R/beta:
-#             a2 = INF
-#             
-#     if a2 < a1:
-#         return a2
-#     else:
-#         return a1
-    
-    #print("R.beta.dz:", R*beta*d.z)
-    if R*beta*d.z <= 0:
-        #1st root
-        return (-B+D)/(2*A) 
-    else:
-        #2nd root
-        return (-B-D)/(2*A)
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef:
+            double R = self.radius
+        if R>=0:
+            return self.z_height + sqrt(R*R - x*x) - R
+        else:
+            return self.z_height - sqrt(R*R - x*x) - R
     
     
 cdef class AxiconFace(ShapedFace):
@@ -1352,6 +1386,61 @@ cdef class AxiconFace(ShapedFace):
     
     cdef double eval_z_c(self, double x, double y) nogil:
         return self.z_height - (self.gradient * sqrt(x*x + y*y))
+    
+    
+cdef double intersect_conic(vector_t a, vector_t d, double curvature, double conic_const):
+    cdef:
+        double beta = 1 + conic_const
+        double R = -curvature
+        double A,B,C,D
+        #double pt1, pt2
+    
+    #print("inputs:", a.x, a.y, a.z, d.x, d.y, d.z, beta, R)
+    ###Obtained by sympy evaluation of the equations
+    ### Arranged into quadratic form i.e. A*(alpha**2) + B*alpha + C = 0
+    A = beta**2*d.z**2 + beta*d.x**2 + beta*d.y**2
+    B = -2*R*beta*d.z + 2*a.x*beta*d.x + 2*a.y*beta*d.y + 2*a.z*beta**2*d.z
+    C = -2*R*a.z*beta + a.x**2*beta + a.y**2*beta + a.z**2*beta**2
+    
+    ##Get roots
+    D = B*B - 4*A*C
+    if D < 0: #no solution
+        return -1
+    
+    D = sqrt(D)
+    
+### This turns out to not be necessary
+#     #1st root
+#     a1 = (-B+D)/(2*A) 
+#     pt1 = a.z + d.z*a1 #addvv_(a, multvs_(d, a1))
+#     #2nd root
+#     a2 = (-B-D)/(2*A)
+#     pt2 = a.z + d.z*a2 #addvv_(a, multvs_(d, a2))
+#     
+#     print("R.beta.dz:", R*beta*d.z, a1, pt1, a2, pt2, A, B, C, D)
+#     if R*beta*d.z <= 0:
+#         if pt1 < R/beta:
+#             a1 = INF
+#         if pt2 < R/beta:
+#             a2 = INF
+#     else:
+#         if pt1 > R/beta:
+#             a1 = INF
+#         if pt2 > R/beta:
+#             a2 = INF
+#             
+#     if a2 < a1:
+#         return a2
+#     else:
+#         return a1
+    
+    #print("R.beta.dz:", R*beta*d.z)
+    if R*beta*d.z <= 0:
+        #1st root
+        return (-B+D)/(2*A) 
+    else:
+        #2nd root
+        return (-B-D)/(2*A)
     
          
     
