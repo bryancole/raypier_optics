@@ -2,7 +2,7 @@ import pydot
 import types
 import itertools
 
-from raytrace import (bases, ellipsoids, lenses, 
+from raypier import (bases, ellipsoids, lenses, 
                       mirrors, beamstop,
                       sources, tracer, splines,
                       beamstop, prisms, dielectrictroughs,

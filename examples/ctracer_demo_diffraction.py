@@ -5,9 +5,9 @@ sys.path.append('..')
 import pyximport
 pyximport.install()
 
-from raytrace.tracer import RayTraceModel
-from raytrace.sources import BroadbandRaySource
-from raytrace.diffraction_gratings import RectangularGrating
+from raypier.tracer import RayTraceModel
+from raypier.sources import BroadbandRaySource
+from raypier.diffraction_gratings import RectangularGrating
 
 
 source = BroadbandRaySource(number=5,

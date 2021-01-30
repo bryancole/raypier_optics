@@ -9,9 +9,9 @@ sys.path.append('..')
 #import pyximport
 #pyximport.install()
 
-from raytrace.sources import ConfocalRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.mirrors import PlanarWindow
+from raypier.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.mirrors import PlanarWindow
 
 import numpy
 

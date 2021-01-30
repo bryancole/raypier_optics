@@ -4,13 +4,13 @@ A simple example
 """
 import sys
 sys.path.append('..')
-from raytrace.sources import ConfocalRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.ellipsoids import Ellipsoid
-from raytrace.mirrors import PECMirror
-#from raytrace.probes import PolarisationProbe
-from raytrace.lenses import PlanoConvexLens
-#from raytrace.absorbers import AbsorberDisk
+from raypier.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.ellipsoids import Ellipsoid
+from raypier.mirrors import PECMirror
+#from raypier.probes import PolarisationProbe
+from raypier.lenses import PlanoConvexLens
+#from raypier.absorbers import AbsorberDisk
 import numpy
 
 #p1 = PolarisationProbe(centre=(30,30,30),

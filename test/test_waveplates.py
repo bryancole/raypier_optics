@@ -1,10 +1,10 @@
 
 import unittest
 
-from raytrace.tracer import RayTraceModel
-from raytrace.waveplates import Waveplate
-from raytrace.sources import ParallelRaySource, SingleRaySource
-from raytrace.mirrors import PECMirror
+from raypier.tracer import RayTraceModel
+from raypier.waveplates import Waveplate
+from raypier.sources import ParallelRaySource, SingleRaySource
+from raypier.mirrors import PECMirror
 
 from numpy import pi
 import numpy

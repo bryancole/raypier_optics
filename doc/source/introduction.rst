@@ -1,7 +1,7 @@
-Introduction to Raytrace
+Introduction to Raypier
 ========================
 
-Raytrace is a non-sequential optical ray-tracing program. It is intended as a 
+Raypier is a non-sequential optical ray-tracing program. It is intended as a 
 design tools for modelling optical systems (cameras, imaging systems, telescopes etc.).
 
 The main features of ray-trace are:
@@ -18,13 +18,13 @@ The main features of ray-trace are:
  - Various analysis algorithms including E-field evaluation by sum-of-Gaussian-Modes, and
    dispersion calculations for ultra-fast optics applications.
 
-At present, the primary means of using raytrace is to create your model in the
+At present, the primary means of using raypier is to create your model in the
 form of a python script. However, it is possible to launch an empty model and then 
 add in components from the GUI / Menu.
 
 A minimal empty model looks like::
 
-  from raytrace.tracer import RayTraceModel
+  from raypier.tracer import RayTraceModel
   model = RayTraceModel()
   model.configure_traits()
 
@@ -34,11 +34,11 @@ This opens a GUI window from which you can add model objects using the Insert me
 Build and Installation
 ======================
 
-Installing the dependencies is probably the biggest hurdle to using Raytrace. The conda
+Installing the dependencies is probably the biggest hurdle to using Raypier. The conda
 package/environment manager is far and away the easiest means of getting all the requirements
 installed.
 
-Once you have the requirements, building raytrace requires a compiler. The usual process of::
+Once you have the requirements, building raypier requires a compiler. The usual process of::
 
     python setup.py build
     sudo python setup.py install

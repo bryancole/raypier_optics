@@ -5,11 +5,11 @@ sys.path.append('..')
 #import pyximport
 #pyximport.install()
 
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.prisms import Extrusion
-from raytrace.cmaterials import PECMaterial, OpaqueMaterial
-from raytrace.results import Ratio
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.prisms import Extrusion
+from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.results import Ratio
 
 #mass copy from other file, this is not all needed:
 from traits.api import HasTraits, Array, Float, Complex,\
@@ -22,9 +22,9 @@ from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 from itertools import chain, islice, tee
-from raytrace.bases import Optic, Traceable
-from raytrace.cfaces import PolygonFace, ExtrudedPlanarFace
-from raytrace.ctracer import FaceList
+from raypier.bases import Optic, Traceable
+from raypier.cfaces import PolygonFace, ExtrudedPlanarFace
+from raypier.ctracer import FaceList
 ##
 
 

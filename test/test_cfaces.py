@@ -5,7 +5,7 @@
 
 import sys
 # sys.path.append('..')
-from raytrace import cfaces, ctracer
+from raypier import cfaces, ctracer
 import unittest
 from math import sqrt
 

@@ -4,10 +4,10 @@ import unittest
 import pyximport
 pyximport.install()
 
-from raytrace.sources import SingleRaySource
-from raytrace.diffraction_gratings import RectangularGrating
-from raytrace.tracer import RayTraceModel
-from raytrace.ctracer import cross
+from raypier.sources import SingleRaySource
+from raypier.diffraction_gratings import RectangularGrating
+from raypier.tracer import RayTraceModel
+from raypier.ctracer import cross
 
 import numpy
 

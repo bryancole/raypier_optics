@@ -2,13 +2,13 @@
 """
 A simple example
 """
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-#from raytrace.ellipsoids import Ellipsoid
-#from raytrace.mirrors import PECMirror
-#from raytrace.probes import PolarisationProbe
-#from raytrace.lenses import PlanoConvexLens
-from raytrace.involutes import CylindricalInvolute
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+#from raypier.ellipsoids import Ellipsoid
+#from raypier.mirrors import PECMirror
+#from raypier.probes import PolarisationProbe
+#from raypier.lenses import PlanoConvexLens
+from raypier.involutes import CylindricalInvolute
 import numpy
 
 #p1 = PolarisationProbe(centre=(30,30,30),

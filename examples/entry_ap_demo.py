@@ -3,12 +3,12 @@ A demonstration of how to use a Results subclass
 """
 
 
-from raytrace.sources import ConfocalRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.mirrors import PECMirror
-from raytrace.lenses import PlanoConvexLens
-from raytrace.results import Total_Efficency, Ratio
-from raytrace.apertures import RectAperture
+from raypier.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.mirrors import PECMirror
+from raypier.lenses import PlanoConvexLens
+from raypier.results import Total_Efficency, Ratio
+from raypier.apertures import RectAperture
 
 import numpy
 

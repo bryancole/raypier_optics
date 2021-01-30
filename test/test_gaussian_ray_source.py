@@ -1,6 +1,6 @@
-from raytrace.lenses import PlanoConvexLens
-from raytrace.sources import GaussianBeamRaySource
-from raytrace.tracer import RayTraceModel
+from raypier.lenses import PlanoConvexLens
+from raypier.sources import GaussianBeamRaySource
+from raypier.tracer import RayTraceModel
 
 m1 = PlanoConvexLens(name="L1",
                 centre=(0,-45, 0),

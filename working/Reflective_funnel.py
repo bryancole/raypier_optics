@@ -5,11 +5,11 @@ sys.path.append('..')
 #import pyximport
 #pyximport.install()
 
-from raytrace.sources import ParallelRaySource, RectRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.prisms import Sheet
-from raytrace.cmaterials import PECMaterial, OpaqueMaterial, TransparentMaterial
-from raytrace.results import Ratio
+from raypier.sources import ParallelRaySource, RectRaySource
+from raypier.tracer import RayTraceModel
+from raypier.prisms import Sheet
+from raypier.cmaterials import PECMaterial, OpaqueMaterial, TransparentMaterial
+from raypier.results import Ratio
 
 import numpy
 

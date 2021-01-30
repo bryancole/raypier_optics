@@ -1,13 +1,13 @@
 
 
-from raytrace.tracer import RayTraceModel
-from raytrace.sources import TopHatGaussletSource
-from raytrace.lenses import PlanoConvexLens
-from raytrace.apertures import CircularAperture
-from raytrace.fields import EFieldPlane
-from raytrace.constraints import BaseConstraint
-from raytrace.intensity_image import IntensityImageView
-from raytrace.intensity_surface import IntensitySurface
+from raypier.tracer import RayTraceModel
+from raypier.sources import TopHatGaussletSource
+from raypier.lenses import PlanoConvexLens
+from raypier.apertures import CircularAperture
+from raypier.fields import EFieldPlane
+from raypier.constraints import BaseConstraint
+from raypier.intensity_image import IntensityImageView
+from raypier.intensity_surface import IntensitySurface
 
 from traits.api import Range, on_trait_change
 from traitsui.api import View, Item

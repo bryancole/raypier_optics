@@ -2,11 +2,11 @@
 """
 A simple example of implementing a fresnel trough.  
 """
-from raytrace.test_sources import PlaneRaySource
-#from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.troughs import RectMirror
-from raytrace.absorbers import RectAbsorber
+from raypier.test_sources import PlaneRaySource
+#from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.troughs import RectMirror
+from raypier.absorbers import RectAbsorber
 
 
 import numpy

@@ -4,11 +4,11 @@ A demonstration of how to use a Results subclass
 import sys
 sys.path.append('..')
 
-from raytrace.sources import ConfocalRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.mirrors import PECMirror
-from raytrace.lenses import PlanoConvexLens
-from raytrace.results import Ratio
+from raypier.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.mirrors import PECMirror
+from raypier.lenses import PlanoConvexLens
+from raypier.results import Ratio
 
 import numpy
 

@@ -9,9 +9,9 @@ sys.path.append('..')
 import pyximport
 pyximport.install()
 
-from raytrace.sources import ConfocalRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.lenses import PlanoConvexLens
+from raypier.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.lenses import PlanoConvexLens
 
 import numpy
 

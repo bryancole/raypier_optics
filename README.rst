@@ -1,8 +1,8 @@
 =========================================================
-Raytrace - A Non-sequential optical ray-tracing framework
+Raypier - A Non-sequential optical ray-tracing framework
 =========================================================
 
-Raytrace is a non-sequential ray-tracing framework for modelling optical systems. Its main features are:
+Raypier is a non-sequential ray-tracing framework for modelling optical systems. Its main features are:
 
 #. It's pretty fast. The tracing algorithms are written in Cython (i.e. C) and use efficient data-structures for handling many thousands of rays.
 #. Correctly handles polarisation
@@ -24,7 +24,7 @@ There are still a few "big" features missing:
 Requirements
 ============
 
-Raytrace requires:
+Raypier requires:
 
 * python-3.6 (older versions work on 2.7) 
 * numpy
@@ -39,9 +39,9 @@ Raytrace requires:
 Installation
 ============
 
-The best way to install and run Raytrace is using a Conda environment. 
+The best way to install and run Raypier is using a Conda environment. 
 
 #. Install miniconda (or the full Anaconda distribution)
 #. Create a fresh conda-environment using the environment.yml file included 
-   in this raytrace repo.
+   in this raypier repo.
     

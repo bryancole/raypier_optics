@@ -13,11 +13,11 @@ sys.path.append('..')
 import pyximport
 pyximport.install()
 
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.achromats import EdmundOptic45805, Singlet
-from raytrace.dispersion import NondispersiveCurve, NamedDispersionCurve
-from raytrace.find_focus import find_ray_focus
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.achromats import EdmundOptic45805, Singlet
+from raypier.dispersion import NondispersiveCurve, NamedDispersionCurve
+from raypier.find_focus import find_ray_focus
 
 
 import numpy

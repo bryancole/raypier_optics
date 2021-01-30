@@ -1,4 +1,4 @@
-name: raytrace_py3
+name: raypier_py3
 channels:
   - https://repo.anaconda.com/pkgs/free
   - dlr-sc
@@ -212,4 +212,4 @@ dependencies:
     - enable==4.7.2
     - fonttools==3.34.2
     - pillow==5.3.0
-prefix: /home/bryan/miniconda3/envs/raytrace_py3
+prefix: /home/bryan/miniconda3/envs/raypier_py3

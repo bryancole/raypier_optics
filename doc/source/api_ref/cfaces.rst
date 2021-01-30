@@ -1,8 +1,8 @@
 
 ===============
-raytrace.cfaces
+raypier.cfaces
 ===============
 
 
-.. automodule:: raytrace.cfaces
+.. automodule:: raypier.cfaces
 	:members:

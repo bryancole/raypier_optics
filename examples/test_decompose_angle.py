@@ -1,18 +1,18 @@
 
 
-from raytrace.gausslet_sources import SingleGaussletSource, CollimatedGaussletSource
-from raytrace.gausslets import AngleDecompositionPlane
-from raytrace.lenses import PlanoConvexLens, GeneralLens
-from raytrace.achromats import EdmundOptic45806
-from raytrace.shapes import CircleShape
-from raytrace.faces import SphericalFace
-from raytrace.materials import OpticalMaterial
-from raytrace.fields import EFieldPlane
-from raytrace.intensity_image import IntensityImageView
-from raytrace.intensity_surface import IntensitySurface
-from raytrace.probes import GaussletCapturePlane
+from raypier.gausslet_sources import SingleGaussletSource, CollimatedGaussletSource
+from raypier.gausslets import AngleDecompositionPlane
+from raypier.lenses import PlanoConvexLens, GeneralLens
+from raypier.achromats import EdmundOptic45806
+from raypier.shapes import CircleShape
+from raypier.faces import SphericalFace
+from raypier.materials import OpticalMaterial
+from raypier.fields import EFieldPlane
+from raypier.intensity_image import IntensityImageView
+from raypier.intensity_surface import IntensitySurface
+from raypier.probes import GaussletCapturePlane
 
-from raytrace.tracer import RayTraceModel
+from raypier.tracer import RayTraceModel
 
 lens3 = EdmundOptic45806(centre=(0,0,50),
                          direction=(0,0,1))

@@ -5,18 +5,18 @@ syntax: glob
 *~
 *.so
 *.dll
-raytrace/*.h
-raytrace/*.c
-raytrace/*.html
-raytrace/core/*.c
-raytrace/core/*.h
-raytrace/core/*.html
+raypier/*.h
+raypier/*.c
+raypier/*.html
+raypier/core/*.c
+raypier/core/*.h
+raypier/core/*.html
 notebooks/.ipynb_checkpoints/*
 
 syntax: regexp
 ^build$
 syntax: regexp
-^raytrace\.egg-info$
+^raypier\.egg-info$
 syntax: glob
 teraview*.py
 doc/build/**

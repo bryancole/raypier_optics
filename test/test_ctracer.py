@@ -5,7 +5,7 @@
 
 import sys
 # sys.path.append('..')
-from raytrace import ctracer, cmaterials
+from raypier import ctracer, cmaterials
 import unittest
 from math import sqrt
 import random
@@ -253,7 +253,7 @@ class TestTransform(unittest.TestCase):
 
 class TestTraceSegment(unittest.TestCase):
     def test_trace_segment(self):
-        from raytrace import cfaces
+        from raypier import cfaces
 
         o = AnOwner(diameter=5.5, offset=6.6)
         c = cfaces.CircularFace(owner=o)

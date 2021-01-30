@@ -1,9 +1,9 @@
-from raytrace.splines import Extruded_interpolant
-from raytrace.sources import RectRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.cmaterials import OpaqueMaterial, PECMaterial, DielectricMaterial
-from raytrace.cfaces import ExtrudedPlanarFace
-from raytrace.dielectrictroughs import LDLF
+from raypier.splines import Extruded_interpolant
+from raypier.sources import RectRaySource
+from raypier.tracer import RayTraceModel
+from raypier.cmaterials import OpaqueMaterial, PECMaterial, DielectricMaterial
+from raypier.cfaces import ExtrudedPlanarFace
+from raypier.dielectrictroughs import LDLF
 
 import numpy as np
 

@@ -1,12 +1,12 @@
 
 import unittest
 
-from raytrace.sources import HexagonalRayFieldSource
-from raytrace.fields import evaluate_neighbours, project_to_sphere,\
+from raypier.sources import HexagonalRayFieldSource
+from raypier.fields import evaluate_neighbours, project_to_sphere,\
         evaluate_modes
-from raytrace.cfields import evaluate_modes as evaluate_modes_c
+from raypier.cfields import evaluate_modes as evaluate_modes_c
         
-#from raytrace.cfields import inv_area_of_ellipse
+#from raypier.cfields import inv_area_of_ellipse
 
 import numpy
 

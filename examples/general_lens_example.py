@@ -2,13 +2,13 @@
 
 
 
-from raytrace.shapes import CircleShape, RectangleShape
-from raytrace.faces import SphericalFace, PlanarFace
+from raypier.shapes import CircleShape, RectangleShape
+from raypier.faces import SphericalFace, PlanarFace
 
-from raytrace.materials import OpticalMaterial
-from raytrace.lenses import GeneralLens
-from raytrace.tracer import RayTraceModel
-from raytrace.sources import HexagonalRayFieldSource
+from raypier.materials import OpticalMaterial
+from raypier.lenses import GeneralLens
+from raypier.tracer import RayTraceModel
+from raypier.sources import HexagonalRayFieldSource
 
 
 #s1 = CircleShape(radius=20.0) ^ RectangleShape(width=5.,height=3.)

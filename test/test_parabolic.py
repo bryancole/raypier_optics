@@ -1,6 +1,6 @@
-from raytrace.tracer import RayTraceModel
-from raytrace.parabolics import OffAxisParabloid
-from raytrace.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.parabolics import OffAxisParabloid
+from raypier.sources import ConfocalRaySource
 
 h = 25.4
 

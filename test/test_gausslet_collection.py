@@ -2,7 +2,7 @@
 import unittest
 import numpy
 
-from raytrace.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype, RayCollection
+from raypier.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype, RayCollection
 
 
 class TestGaussletCollectionFromRays(unittest.TestCase):

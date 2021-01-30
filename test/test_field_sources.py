@@ -2,11 +2,11 @@
 import unittest
 import numpy
 
-from raytrace.sources import ConfocalRayFieldSource
-from raytrace.mirrors import PlanarWindow
-from raytrace.tracer import RayTraceModel
-from raytrace.ctracer import cross
-from raytrace.cmaterials import Convert_to_SP
+from raypier.sources import ConfocalRayFieldSource
+from raypier.mirrors import PlanarWindow
+from raypier.tracer import RayTraceModel
+from raypier.ctracer import cross
+from raypier.cmaterials import Convert_to_SP
 
 
 class TestConfocalPhase(unittest.TestCase):

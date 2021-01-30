@@ -1,6 +1,6 @@
-from raytrace.tracer import RayTraceModel
-from raytrace.paraxial import ParaxialLens
-from raytrace.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.paraxial import ParaxialLens
+from raypier.sources import ConfocalRaySource
 
 lens = ParaxialLens(diameter = 50.0,
                     focal_length = 50.0,

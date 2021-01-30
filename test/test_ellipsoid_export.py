@@ -1,4 +1,4 @@
-from raytrace.step_export import make_ellipsoid_mirror, export_shapes
+from raypier.step_export import make_ellipsoid_mirror, export_shapes
 
 f1 = (22.5, 45.1, 50.0)
 f2 = (92.5, 45.1, 20.0)

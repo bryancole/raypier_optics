@@ -5,10 +5,10 @@ sys.path.append('..')
 #import pyximport
 #pyximport.install()
 
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.prisms import Rhomboid
-from raytrace.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.prisms import Rhomboid
+from raypier.cmaterials import PECMaterial, OpaqueMaterial
 
 import numpy
 

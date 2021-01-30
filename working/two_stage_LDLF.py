@@ -5,11 +5,11 @@ sys.path.append('..')
 #import pyximport
 #pyximport.install()
 
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.prisms import LDLF
-from raytrace.cmaterials import PECMaterial, OpaqueMaterial
-from raytrace.constraints import BaseConstraint
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.prisms import LDLF
+from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.constraints import BaseConstraint
 from traits.api import Instance, on_trait_change, Tuple, Float
 import numpy
 

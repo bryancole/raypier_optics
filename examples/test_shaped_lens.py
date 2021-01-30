@@ -1,9 +1,9 @@
 
 
-from raytrace.tracer import RayTraceModel
-from raytrace.lenses import ShapedPlanoSphericLens
-from raytrace.sources import ConfocalRayFieldSource
-from raytrace.mirrors import SphericalMirrorWithHole
+from raypier.tracer import RayTraceModel
+from raypier.lenses import ShapedPlanoSphericLens
+from raypier.sources import ConfocalRayFieldSource
+from raypier.mirrors import SphericalMirrorWithHole
 
 
 lens = ShapedPlanoSphericLens(centre=(0,0,150), direction=(0,0,1),

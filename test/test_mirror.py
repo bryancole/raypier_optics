@@ -1,6 +1,6 @@
-from raytrace.mirrors import PECMirror
-from raytrace.sources import ConfocalRaySource
-from raytrace.tracer import RayTraceModel
+from raypier.mirrors import PECMirror
+from raypier.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
 
 m1 = PECMirror(name="M1",
                 centre=(0,-45, 0),

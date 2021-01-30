@@ -1,6 +1,6 @@
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.corner_cubes import HollowRetroreflector, SolidRetroreflector
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.corner_cubes import HollowRetroreflector, SolidRetroreflector
 
 
 source = ParallelRaySource(origin=(-10,0.1,50),
@@ -40,7 +40,7 @@ data = """
   direction: !!python/tuple [0.0, 0.0, 1.0]
   display: shaded
   elevation: 0.0
-  material: !!python/object:raytrace.cmaterials.DielectricMaterial {}
+  material: !!python/object:raypier.cmaterials.DielectricMaterial {}
   n_inside: !!python/complex '1.5'
   n_outside: !!python/complex '1.0'
   name: Solid Retroreflector

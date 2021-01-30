@@ -1,6 +1,6 @@
-from raytrace.tracer import RayTraceModel
-from raytrace.ellipsoids import Ellipsoid
-from raytrace.sources import ParallelRaySource, ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.ellipsoids import Ellipsoid
+from raypier.sources import ParallelRaySource, ConfocalRaySource
 
 e = Ellipsoid(focus1=(-50,0,0),
                     focus2=(0,50,0),

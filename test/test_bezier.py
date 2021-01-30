@@ -1,8 +1,8 @@
-from raytrace.splines import Extruded_bezier, b_spline_to_bezier_series
-from raytrace.sources import RectRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
-from raytrace.results import RayPaths
+from raypier.splines import Extruded_bezier, b_spline_to_bezier_series
+from raypier.sources import RectRaySource
+from raypier.tracer import RayTraceModel
+from raypier.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
+from raypier.results import RayPaths
 import numpy as np
 
 from scipy.interpolate import splprep, splev

@@ -8,11 +8,11 @@ faulthandler.enable()
 
 import sys
 # sys.path.append('..')
-from raytrace.cmaterials import FullDielectricMaterial, Convert_to_SP, \
+from raypier.cmaterials import FullDielectricMaterial, Convert_to_SP, \
     TransparentMaterial, WaveplateMaterial, CoatedDispersiveMaterial, \
     BaseDispersionCurve, SingleLayerCoatedMaterial
-from raytrace.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
-from raytrace.dispersion import NondispersiveCurve
+from raypier.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
+from raypier.dispersion import NondispersiveCurve
 import unittest
 from math import sqrt
 import random

@@ -5,12 +5,12 @@ sys.path.append('..')
 #import pyximport
 #pyximport.install()
 
-from raytrace.sources import RectRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.dielectrictroughs import LDLF
-from raytrace.cmaterials import PECMaterial, OpaqueMaterial
-from raytrace.results import Ratio, RayPaths
-from raytrace.render_utils import trace_pretty
+from raypier.sources import RectRaySource
+from raypier.tracer import RayTraceModel
+from raypier.dielectrictroughs import LDLF
+from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.results import Ratio, RayPaths
+from raypier.render_utils import trace_pretty
 import numpy
 
 slat_width = 20

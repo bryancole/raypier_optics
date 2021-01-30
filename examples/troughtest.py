@@ -2,9 +2,9 @@
 """
 A simple example
 """
-from raytrace.sources import ParallelRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.troughs import TroughParabloid
+from raypier.sources import ParallelRaySource
+from raypier.tracer import RayTraceModel
+from raypier.troughs import TroughParabloid
 import numpy
 
 #

@@ -2,15 +2,15 @@
 """
 An example of setting up a compound parabolic trough from parabolic troughs.
 """
-from raytrace.splines import Extruded_bezier
-from raytrace.beamstop import RectTarget
-from raytrace.sources import RectRaySource
-from raytrace.tracer import RayTraceModel
-from raytrace.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
-from raytrace.results import RayPaths
+from raypier.splines import Extruded_bezier
+from raypier.beamstop import RectTarget
+from raypier.sources import RectRaySource
+from raypier.tracer import RayTraceModel
+from raypier.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
+from raypier.results import RayPaths
 import numpy as np
 
-#from raytrace.more_utils import transform_pts
+#from raypier.more_utils import transform_pts
 
 import numpy as np
 

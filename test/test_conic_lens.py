@@ -1,9 +1,9 @@
 import pyximport
 pyximport.install(language_level=3)
 
-from raytrace.tracer import RayTraceModel
-from raytrace.lenses import PlanoConicLens, PlanoConvexLens, BiConicLens, AsphericLens
-from raytrace.sources import ConfocalRaySource
+from raypier.tracer import RayTraceModel
+from raypier.lenses import PlanoConicLens, PlanoConvexLens, BiConicLens, AsphericLens
+from raypier.sources import ConfocalRaySource
 
 lens = PlanoConicLens(centre=(20,0,0),
                        direction=(1,0,0),

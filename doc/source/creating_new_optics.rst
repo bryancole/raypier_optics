@@ -1,13 +1,13 @@
 Cython branch: How to Add New Optics
 ====================================
 
-When working with the cython raytrace branch, be sure you have the latest 
+When working with the cython raypier branch, be sure you have the latest 
 Cython version installed (as of writing, v0.12.1 was the latest).
 
 Creating a new Face
 -------------------
 
-Subclasses of raytrace.ctracer.Face perform the mechanics of the ray-tracing operation.
+Subclasses of raypier.ctracer.Face perform the mechanics of the ray-tracing operation.
 Most existing subclasses are defined in cfaces.pyx. To define a new face object,
 two "C" methods need to be defined:
 
@@ -101,7 +101,7 @@ initiated.
 Creating a new Traceable
 ------------------------
 
-Traceables (i.e. subclasses of raytrace.bases.Traceable) are the basic unit of
+Traceables (i.e. subclasses of raypier.bases.Traceable) are the basic unit of
 an optical model. Most of the functionality in the Traceable subclasses is 
 to implement their VTK visual representation. The ray-tracing operation is 
 handled by Face objects. Traceables own an instance of a ctracer.FaceList 
@@ -112,7 +112,7 @@ and the local coords of the Traceable. Thus, all Faces belonging to a Traceable
 share a common transform.
 
 To create a new Traceable, you subclass Traceable or some other more suitable
-subclass (transmitting optical components can derive from raytrace.bases.Optic,
+subclass (transmitting optical components can derive from raypier.bases.Optic,
 which provides a complex refractive index). You should define a new _faces_default
 method which creates the FaceList for that object and populates it with the
 Faces appropriate to the object. Simple synchronisation between the Traceable

@@ -1,8 +1,8 @@
 #    Copyright 2009, Teraview Ltd., Bryan Cole
 #
-#    This file is part of Raytrace.
+#    This file is part of Raypier.
 #
-#    Raytrace is free software: you can redistribute it and/or modify
+#    Raypier is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
@@ -38,7 +38,7 @@ import subprocess, os, sys
 #         raise CythonError("Failed to compile %s with Cython"%pyx_name)
 
 # for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
-#     create_module("raytrace/%s"%fname)
+#     create_module("raypier/%s"%fname)
 
 import numpy
 includes = [numpy.get_include()]
@@ -52,7 +52,7 @@ Win64 = sys.platform.startswith("win")
 #     includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
 #     libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
-ext_modules = cythonize("raytrace/core/*.pyx",
+ext_modules = cythonize("raypier/core/*.pyx",
                         language="c++" if Win64 else None,
                         include_path=[numpy.get_include()])
 
@@ -61,12 +61,12 @@ for module in ext_modules:
     module.extra_link_args.append('-fopenmp')
 
 setup(
-    name="raytrace",
+    name="raypier",
     version="0.1dev",
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
-    #ext_package = "raytrace", ###Not needed on linux. Is it necessary on Win64?
+    #ext_package = "raypier", ###Not needed on linux. Is it necessary on Win64?
     ext_modules = ext_modules,
     include_dirs = [numpy.get_include()],
     zip_safe = True, #why not!
@@ -88,6 +88,6 @@ visualisation of mirror/lens systems. Good support for off-axis aspheric \
 surfaces is a priority",
     license = "GPL3",
     keywords = "science engineering optics ray-tracing physcics",
-    url = "python-raytrace@googlegroups.com",
-    #download_url="http://bitbucket.org/bryancole/raytrace/get/"
+    url = "python-raypier@googlegroups.com",
+    #download_url="http://bitbucket.org/bryancole/raypier/get/"
     )

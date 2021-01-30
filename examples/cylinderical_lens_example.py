@@ -1,19 +1,19 @@
 
 
-from raytrace.lenses import GeneralLens, PlanoConvexLens
-from raytrace.faces import CylindericalFace, PlanarFace, SphericalFace
-from raytrace.materials import OpticalMaterial
-from raytrace.shapes import CircleShape
-from raytrace.tracer import RayTraceModel
-from raytrace.gausslet_sources import CollimatedGaussletSource
-from raytrace.fields import EFieldPlane
-from raytrace.probes import GaussletCapturePlane
-from raytrace.intensity_image import IntensityImageView
-from raytrace.intensity_surface import IntensitySurface
+from raypier.lenses import GeneralLens, PlanoConvexLens
+from raypier.faces import CylindericalFace, PlanarFace, SphericalFace
+from raypier.materials import OpticalMaterial
+from raypier.shapes import CircleShape
+from raypier.tracer import RayTraceModel
+from raypier.gausslet_sources import CollimatedGaussletSource
+from raypier.fields import EFieldPlane
+from raypier.probes import GaussletCapturePlane
+from raypier.intensity_image import IntensityImageView
+from raypier.intensity_surface import IntensitySurface
 
-from raytrace.cfaces import ShapedSphericalFace, CircularFace
-from raytrace.cshapes import CircleShape as CircleShape_
-from raytrace.ctracer import FaceList
+from raypier.cfaces import ShapedSphericalFace, CircularFace
+from raypier.cshapes import CircleShape as CircleShape_
+from raypier.ctracer import FaceList
 
 shape = CircleShape(radius=7.5)
 

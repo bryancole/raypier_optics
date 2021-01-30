@@ -1,9 +1,9 @@
 
 ===============
-raytrace.tracer
+raypier.tracer
 ===============
 
 Core python classes for tracing operations.
 
-.. automodule:: raytrace.tracer
+.. automodule:: raypier.tracer
 	:members:

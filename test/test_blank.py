@@ -1,4 +1,4 @@
-from raytrace.tracer import RayTraceModel
+from raypier.tracer import RayTraceModel
 
 model = RayTraceModel()
 

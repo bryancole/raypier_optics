@@ -1,12 +1,12 @@
 
-from raytrace.aspherics import Thorlabs355440_B, Thorlabs355440, Thorlabs352440
-from raytrace.tracer import RayTraceModel
-from raytrace.sources import ConfocalRaySource
-from raytrace.mirrors import PlanarDispersiveWindow, PlanarWindow
+from raypier.aspherics import Thorlabs355440_B, Thorlabs355440, Thorlabs352440
+from raypier.tracer import RayTraceModel
+from raypier.sources import ConfocalRaySource
+from raypier.mirrors import PlanarDispersiveWindow, PlanarWindow
 
-from raytrace.dispersion import NamedDispersionCurve
+from raypier.dispersion import NamedDispersionCurve
 
-from raytrace.find_focus import find_ray_focus
+from raypier.find_focus import find_ray_focus
 
 import numpy
 import time

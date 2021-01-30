@@ -1,8 +1,8 @@
 
 ===================
-raytrace.cmaterials
+raypier.cmaterials
 ===================
 
 
-.. automodule:: raytrace.cmaterials
+.. automodule:: raypier.cmaterials
 	:members:
