@@ -4,5 +4,5 @@ raypier.cmaterials
 ===================
 
 
-.. automodule:: raypier.cmaterials
+.. automodule:: raypier.core.cmaterials
 	:members:

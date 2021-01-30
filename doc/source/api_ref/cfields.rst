@@ -5,5 +5,5 @@ raypier.cfields
 
 Core C-level algorimths for computing the electric field from a set of traced rays.
 
-.. automodule:: raypier.cfields
+.. automodule:: raypier.core.cfields
 	:members:
