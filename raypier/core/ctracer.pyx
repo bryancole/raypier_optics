@@ -70,41 +70,6 @@ gausslet_dtype = np.dtype([
                     ])
 
 
-############################################
-### C type declarations for internal use ###
-############################################
-
-cdef struct vector_t:
-    double x,y,z
-    
-    
-cdef struct orientation_t:
-    vector_t normal, tangent
-    
-    
-cdef struct complex_t:
-    double real
-    double imag
-
-    
-# cdef packed struct ray_t:
-#     #vectors
-#     vector_t origin, direction, normals, E_vector
-#     #complex attribs
-#     complex_t refractive_index, E1_amp, E2_amp
-#     #simple attribs
-#     double length
-#     #reference ids to related objects
-#     unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
-#     
-#     ##objects
-#     #object face, end_face, child_refl, child_trans
-    
-cdef struct transform_t:
-    double m00, m01, m02, m10, m11, m12, m20, m21, m22
-    double tx, ty, tz
-
-
 ##############################
 ### Vector maths functions ###
 ##############################

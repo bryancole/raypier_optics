@@ -88,6 +88,6 @@ visualisation of mirror/lens systems. Good support for off-axis aspheric \
 surfaces is a priority",
     license = "GPL3",
     keywords = "science engineering optics ray-tracing physcics",
-    url = "python-raypier@googlegroups.com",
-    #download_url="http://bitbucket.org/bryancole/raypier/get/"
+    url = "python-raytrace@googlegroups.com",
+    download_url="https://github.com/bryancole/raypier_optics"
     )
