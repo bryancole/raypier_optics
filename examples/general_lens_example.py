@@ -2,20 +2,16 @@
 
 
 
-from raypier.shapes import CircleShape, RectangleShape
-from raypier.faces import SphericalFace, PlanarFace
+from raypier.api import CircleShape, RectangleShape
+from raypier.api import SphericalFace, PlanarFace
 
-from raypier.materials import OpticalMaterial
-from raypier.lenses import GeneralLens
-from raypier.tracer import RayTraceModel
-from raypier.sources import HexagonalRayFieldSource
+from raypier.api import OpticalMaterial
+from raypier.api import GeneralLens
+from raypier.api import RayTraceModel
+from raypier.api import HexagonalRayFieldSource
 
 
-#s1 = CircleShape(radius=20.0) ^ RectangleShape(width=5.,height=3.)
-s1 = RectangleShape(width=30,height=25)# ^ CircleShape(radius=3.0)
-
-# s1 = RectangleShape(width=30,height=20) | RectangleShape(width=20,height=30) | CircleShape(radius=5.0, centre=(-10,-10)) |\
-#         CircleShape(radius=5.0, centre=(10,-10)) | CircleShape(radius=5.0, centre=(10,10)) | CircleShape(radius=5.0, centre=(-10,10))
+s1 = RectangleShape(width=30,height=25) ^ CircleShape(radius=3.0)
 
 f1 = SphericalFace(z_height=8.0, curvature=50.0)
 m1 = OpticalMaterial(from_database=False, refractive_index=1.5)

@@ -6,14 +6,10 @@ A simple example
 """
 import sys
 sys.path.append('..')
-import pyximport
-pyximport.install()
 
 from raypier.sources import ConfocalRaySource
 from raypier.tracer import RayTraceModel
 from raypier.lenses import PlanoConvexLens
-
-import numpy
 
 
 source = ConfocalRaySource(focus=(0,0,0),
@@ -36,18 +32,5 @@ l1 = PlanoConvexLens(diameter=25.4,
 model = RayTraceModel(optics=[l1,],
                     sources=[source,])
  
-#model.trace_detail_async()
-#import time
-#start = time.clock()
-#model.trace_all()
-#end = time.clock()
-#print "traced in", end - start                   
-
-#import timeit
-#t = timeit.Timer("model.update = True","from __main__ import model")
-#ret = t.timeit(10)
-#print "time:", ret
-
-
 
 model.configure_traits()

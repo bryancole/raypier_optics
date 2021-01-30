@@ -384,6 +384,7 @@ class RayTraceModel(HasQueue):
         all_faces = list(self.all_faces)
         decomp_faces = [f for f in all_faces if f.material.is_decomp_material()]
         wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
+        rays.wavelengths = wavelengths
         for face in all_faces:
             face.material.wavelengths = wavelengths
             face.max_length = max_length

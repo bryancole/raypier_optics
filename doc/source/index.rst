@@ -12,8 +12,12 @@ Contents:
    :maxdepth: 2
    
    introduction
+   general_optics
+   gaussian_beamlet_propagation
    cython_branch_info
    creating_new_optics
+   
+   Examples <examples/index>
    
    API Reference <api_ref/index>
 

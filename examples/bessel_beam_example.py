@@ -1,15 +1,9 @@
 
-
-from raypier.lenses import GeneralLens
-from raypier.faces import AxiconFace, PlanarFace
-from raypier.materials import OpticalMaterial
-from raypier.shapes import CircleShape
-from raypier.tracer import RayTraceModel
-from raypier.gausslet_sources import CollimatedGaussletSource
-from raypier.fields import EFieldPlane
-from raypier.probes import GaussletCapturePlane
+from raypier.api import GeneralLens, AxiconFace, PlanarFace, OpticalMaterial, CircleShape,\
+            RayTraceModel, CollimatedGaussletSource, EFieldPlane, GaussletCapturePlane, IntensitySurface
+            
 from raypier.intensity_image import IntensityImageView
-from raypier.intensity_surface import IntensitySurface
+
 
 shape = CircleShape(radius=2.0)
 
