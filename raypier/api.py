@@ -21,4 +21,6 @@ from .fields import EFieldPlane
 
 from .probes import RayCapturePlace, GaussletCapturePlane
 
+from .apertures import CircularAperture, RectangularAperture
+
 from .intensity_surface import IntensitySurface

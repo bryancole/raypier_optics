@@ -1,10 +1,6 @@
 
 
-from raypier.apertures import CircularAperture
-
-from raypier.tracer import RayTraceModel
-
-from raypier.sources import ConfocalRayFieldSource
+from raypier.api import CircularAperture, ConfocalRayFieldSource, RayTraceModel
 
 
 src = ConfocalRayFieldSource(centre=(0,0,0),
