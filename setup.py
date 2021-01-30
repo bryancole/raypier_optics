@@ -59,10 +59,13 @@ ext_modules = cythonize("raypier/core/*.pyx",
 for module in ext_modules:
     module.extra_compile_args.append('-fopenmp')
     module.extra_link_args.append('-fopenmp')
+    
+with open("README.rst", 'r', encoding="utf-8") as fh:
+    long_description = fh.read()
 
 setup(
     name="raypier",
-    version="0.1dev",
+    version="0.1.1dev",
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
@@ -83,11 +86,25 @@ setup(
 
     author = "Bryan Cole",
     author_email = "bryancole.cam@gmail.com",
-    description = "A optical ray-tracing package, for design, optimisation and \
-visualisation of mirror/lens systems. Good support for off-axis aspheric \
-surfaces is a priority",
+    description = """A optical ray-tracing package, for design, optimisation and \
+visualisation of mirror/lens systems.""",
+    long_description = long_description,
     license = "GPL3",
     keywords = "science engineering optics ray-tracing physcics",
-    url = "python-raytrace@googlegroups.com",
-    download_url="https://github.com/bryancole/raypier_optics"
+    classifiers=["Development Status :: 4 - Beta",
+                 "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+                 "Natural Language :: English",
+                 "Programming Language :: Cython",
+                 "Programming Language :: Python :: 3.7",
+                 "Programming Language :: Python :: Implementation :: CPython",
+                 "Topic :: Scientific/Engineering :: Physics",
+                 "Topic :: Scientific/Engineering :: Visualization"
+                 ],
+    url = "https://groups.google.com/u/1/g/python-raytrace",
+    project_urls = {
+        "Homepage" : "https://groups.google.com/u/1/g/python-raytrace",
+        "Source" : "https://github.com/bryancole/raypier_optics.git",
+        "Issues" : "https://github.com/bryancole/raypier_optics/issues"
+        },
+    python_requires=">=3.6"
     )
