@@ -8,7 +8,7 @@ sys.path.append('..')
 from raypier.sources import ParallelRaySource
 from raypier.tracer import RayTraceModel
 from raypier.prisms import Extrusion
-from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.core.cmaterials import PECMaterial, OpaqueMaterial
 from raypier.results import Ratio
 
 #mass copy from other file, this is not all needed:
@@ -23,8 +23,8 @@ from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 from itertools import chain, islice, tee
 from raypier.bases import Optic, Traceable
-from raypier.cfaces import PolygonFace, ExtrudedPlanarFace
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import PolygonFace, ExtrudedPlanarFace
+from raypier.core.ctracer import FaceList
 ##
 
 

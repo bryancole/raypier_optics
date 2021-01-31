@@ -1557,7 +1557,7 @@ cdef class Face(object):
         if isinstance(material, InterfaceMaterial):
             self.material = material
         else:
-            from raypier.cmaterials import PECMaterial
+            from .cmaterials import PECMaterial
             self.material = PECMaterial()
         self.invert_normal = int(kwds.get('invert_normal', 0))
         

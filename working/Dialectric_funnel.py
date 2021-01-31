@@ -8,7 +8,7 @@ sys.path.append('..')
 from raypier.sources import RectRaySource
 from raypier.tracer import RayTraceModel
 from raypier.dielectrictroughs import LDLF
-from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.core.cmaterials import PECMaterial, OpaqueMaterial
 from raypier.results import Ratio, RayPaths
 from raypier.render_utils import trace_pretty
 import numpy

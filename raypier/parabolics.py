@@ -5,8 +5,8 @@ from tvtk.api import tvtk
 
 from raypier.bases import NumEditor, Traceable
 from raypier.mirrors import BaseMirror
-from raypier.cfaces import OffAxisParabolicFace
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import OffAxisParabolicFace
+from raypier.core.ctracer import FaceList
 
 from raypier.vtk_algorithms import EmptyGridSource
 

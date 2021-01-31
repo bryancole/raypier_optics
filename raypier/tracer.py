@@ -41,14 +41,14 @@ import yaml
 from contextlib import contextmanager
 from itertools import chain, islice, count
 from raypier.sources import BaseRaySource
-from raypier.ctracer import Face, RayCollection
+from raypier.core.ctracer import Face, RayCollection
 from raypier.constraints import BaseConstraint
 from raypier.has_queue import HasQueue, on_trait_change
 from raypier.bases import Traceable, Probe, Result
 from raypier.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
         
-from raypier import ctracer
+from raypier.core import ctracer
 from raypier.qt_future_call import FutureCall
 
 counter = count()

@@ -8,10 +8,10 @@ faulthandler.enable()
 
 import sys
 # sys.path.append('..')
-from raypier.cmaterials import FullDielectricMaterial, Convert_to_SP, \
+from raypier.core.cmaterials import FullDielectricMaterial, Convert_to_SP, \
     TransparentMaterial, WaveplateMaterial, CoatedDispersiveMaterial, \
     BaseDispersionCurve, SingleLayerCoatedMaterial
-from raypier.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
+from raypier.core.ctracer import Ray, RayCollection, norm, dotprod, subvv, cross
 from raypier.dispersion import NondispersiveCurve
 import unittest
 from math import sqrt

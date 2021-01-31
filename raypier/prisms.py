@@ -31,8 +31,8 @@ from itertools import chain, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raypier.bases import Optic, Traceable
-from raypier.cfaces import PolygonFace, ExtrudedPlanarFace
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import PolygonFace, ExtrudedPlanarFace
+from raypier.core.ctracer import FaceList
 
 
 def pairwise(itr):

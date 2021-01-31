@@ -8,10 +8,10 @@ from numpy import fft
 from scipy.interpolate import RectBivariateSpline
 
 from raypier.utils import normaliseVector
-from raypier.ctracer import ray_dtype, GaussletCollection, FaceList
+from raypier.core.ctracer import ray_dtype, GaussletCollection, FaceList
 from raypier.bases import Traceable
-from raypier.cmaterials import ResampleGaussletMaterial
-from raypier.cfaces import CircularFace
+from raypier.core.cmaterials import ResampleGaussletMaterial
+from raypier.core.cfaces import CircularFace
 from raypier.fields import eval_Efield_from_gausslets
 
 from traits.api import Range, Float, Array, Property, Instance, observe, Str

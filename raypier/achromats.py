@@ -12,9 +12,9 @@ from raypier.bases import NumEditor, Traceable
 from raypier.lenses import BaseLens
 from raypier.dispersion import BaseDispersionCurve, NamedDispersionCurve, \
         NondispersiveCurve
-from raypier.cmaterials import CoatedDispersiveMaterial
-from raypier.cfaces import SphericalFace
-from raypier.ctracer import FaceList
+from raypier.core.cmaterials import CoatedDispersiveMaterial
+from raypier.core.cfaces import SphericalFace
+from raypier.core.ctracer import FaceList
 from raypier.vtk_algorithms import EmptyGridSource
 
 from tvtk.api import tvtk

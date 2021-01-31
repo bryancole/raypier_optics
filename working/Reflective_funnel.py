@@ -8,7 +8,7 @@ sys.path.append('..')
 from raypier.sources import ParallelRaySource, RectRaySource
 from raypier.tracer import RayTraceModel
 from raypier.prisms import Sheet
-from raypier.cmaterials import PECMaterial, OpaqueMaterial, TransparentMaterial
+from raypier.core.cmaterials import PECMaterial, OpaqueMaterial, TransparentMaterial
 from raypier.results import Ratio
 
 import numpy

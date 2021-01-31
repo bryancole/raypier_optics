@@ -30,7 +30,7 @@ from traitsui.api import View, Item, Tabbed, VGroup, Include, \
 
 from tvtk.api import tvtk
 
-from raypier.ctracer import RayCollection, GaussletCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
+from raypier.core.ctracer import RayCollection, GaussletCollection, Ray, ray_dtype, GAUSSLET_, PARABASAL_
 from raypier.utils import normaliseVector, Range, TupleVector, Tuple, \
             UnitTupleVector, UnitVectorTrait
 from raypier.bases import RaypierObject, NumEditor, BaseRayCollection

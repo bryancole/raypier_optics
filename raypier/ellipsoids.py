@@ -30,8 +30,8 @@ from raypier.bases import Traceable, normaliseVector, NumEditor,\
             VectorEditor, transformPoints, transformNormals
 #from raypier.sources import RayCollection
 from raypier.mirrors import BaseMirror
-from raypier.cfaces import EllipsoidalFace
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import EllipsoidalFace
+from raypier.core.ctracer import FaceList
 
 from raypier.vtk_algorithms import EmptyGridSource
 

@@ -6,7 +6,7 @@ Created on 23 Nov 2018
 import pyximport
 pyximport.install()
 
-from raypier.cmaterials import BaseDispersionCurve
+from raypier.core.cmaterials import BaseDispersionCurve
 
 import sqlite3
 import pkg_resources

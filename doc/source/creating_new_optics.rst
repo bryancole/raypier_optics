@@ -7,7 +7,7 @@ Cython version installed (as of writing, v0.12.1 was the latest).
 Creating a new Face
 -------------------
 
-Subclasses of raypier.ctracer.Face perform the mechanics of the ray-tracing operation.
+Subclasses of raypier.core.ctracer.Face perform the mechanics of the ray-tracing operation.
 Most existing subclasses are defined in cfaces.pyx. To define a new face object,
 two "C" methods need to be defined:
 

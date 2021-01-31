@@ -8,14 +8,14 @@ from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 
-from raypier.cmaterials import OpaqueMaterial
+from raypier.core.cmaterials import OpaqueMaterial
 
 from raypier.bases import Traceable
 from raypier.prisms import Extrusion
 from raypier.splines import Extruded_interpolant
-from raypier.cfaces import PolygonFace, ExtrudedPlanarFace
+from raypier.core.cfaces import PolygonFace, ExtrudedPlanarFace
 
-from raypier.ctracer import FaceList
+from raypier.core.ctracer import FaceList
 import numpy as np 
 
 class LDLF(Extrusion):

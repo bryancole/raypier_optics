@@ -5,8 +5,8 @@ import numpy
 from raypier.sources import ConfocalRayFieldSource
 from raypier.mirrors import PlanarWindow
 from raypier.tracer import RayTraceModel
-from raypier.ctracer import cross
-from raypier.cmaterials import Convert_to_SP
+from raypier.core.ctracer import cross
+from raypier.core.cmaterials import Convert_to_SP
 
 
 class TestConfocalPhase(unittest.TestCase):

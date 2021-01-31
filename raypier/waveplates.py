@@ -5,9 +5,9 @@ from traits.api import Float, on_trait_change, Range, Instance
 from traitsui.api import View, VGroup, Item
 
 from raypier.bases import Optic, Traceable, NumEditor
-from raypier.cfaces import CircularFace
-from raypier.ctracer import FaceList
-from raypier.cmaterials import WaveplateMaterial
+from raypier.core.cfaces import CircularFace
+from raypier.core.ctracer import FaceList
+from raypier.core.cmaterials import WaveplateMaterial
             
 import numpy
 from tvtk.api import tvtk

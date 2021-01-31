@@ -6,7 +6,7 @@ from raypier.splines import Extruded_bezier
 from raypier.beamstop import RectTarget
 from raypier.sources import RectRaySource
 from raypier.tracer import RayTraceModel
-from raypier.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
+from raypier.core.cmaterials import OpaqueMaterial, PECMaterial,DielectricMaterial
 from raypier.results import RayPaths
 import numpy as np
 

@@ -8,7 +8,7 @@ sys.path.append('..')
 from raypier.sources import ParallelRaySource
 from raypier.tracer import RayTraceModel
 from raypier.prisms import Rhomboid
-from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.core.cmaterials import PECMaterial, OpaqueMaterial
 
 import numpy
 

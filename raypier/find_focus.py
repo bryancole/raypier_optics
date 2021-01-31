@@ -4,7 +4,7 @@ Utility module
 
 from numpy.linalg import solve
 import numpy as np
-from raypier.ctracer import RayCollection, GaussletCollection
+from raypier.core.ctracer import RayCollection, GaussletCollection
 
 
 def find_ray_focus(ray_collection):

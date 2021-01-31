@@ -13,7 +13,7 @@ from raypier.sources import ConfocalRaySource
 from raypier.tracer import RayTraceModel
 from raypier.mirrors import PECMirror
 
-from raypier.cmaterials import PECMaterial
+from raypier.core.cmaterials import PECMaterial
 
 import numpy
 

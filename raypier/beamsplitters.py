@@ -5,9 +5,9 @@ from traitsui.api import View, VGroup, Item
 
 from raypier.bases import Traceable
 from raypier.prisms import Extrusion
-from raypier.cfaces import ExtrudedPlanarFace
-from raypier.ctracer import FaceList
-from raypier.cmaterials import FullDielectricMaterial, \
+from raypier.core.cfaces import ExtrudedPlanarFace
+from raypier.core.ctracer import FaceList
+from raypier.core.cmaterials import FullDielectricMaterial, \
             LinearPolarisingMaterial
             
 import numpy

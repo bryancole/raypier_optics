@@ -9,10 +9,10 @@ import numpy
 
 from raypier.bases import NumEditor, Traceable
 
-from raypier.cmaterials import CoatedDispersiveMaterial, PECMaterial
+from raypier.core.cmaterials import CoatedDispersiveMaterial, PECMaterial
 from raypier.shapes import BaseShape
 from raypier.lenses import BaseLens
-from raypier.ctracer import FaceList
+from raypier.core.ctracer import FaceList
 from . import faces
 from .materials import OpticalMaterial, air
 

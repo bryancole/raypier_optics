@@ -7,7 +7,7 @@ from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
 from tvtk.api import tvtk
 
 from raypier.sources import BaseRaySource, UnitTupleVector, UnitVectorTrait
-from raypier.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
+from raypier.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
 from raypier.tracer import normaliseVector
 from raypier.editors import NumEditor
 from raypier.gausslets import decompose_angle

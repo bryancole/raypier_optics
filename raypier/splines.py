@@ -29,8 +29,8 @@ from itertools import chain, islice, tee
 
 
 from raypier.bases import Optic, Traceable
-from raypier.cfaces import PolygonFace, ExtrudedBezierFace, ExtrudedPlanarFace
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import PolygonFace, ExtrudedBezierFace, ExtrudedPlanarFace
+from raypier.core.ctracer import FaceList
 
 import numpy as np
 from scipy.interpolate import splprep, splev

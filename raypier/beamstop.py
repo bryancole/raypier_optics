@@ -1,5 +1,5 @@
 from raypier.mirrors import PECMirror, RectMirror
-from raypier.cmaterials import OpaqueMaterial
+from raypier.core.cmaterials import OpaqueMaterial
 from tvtk.api import tvtk
 
 

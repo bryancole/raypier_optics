@@ -26,8 +26,8 @@ import time
 
 from raypier.bases import Probe, Traceable, NumEditor, Vector, BaseRayCollection
 from raypier.sources import RayCollection, GaussletCollection
-from raypier.ctracer import FaceList, select_ray_intersections, select_gausslet_intersections#detect_segment, detect_gausslet
-from raypier.cfaces import RectangularFace
+from raypier.core.ctracer import FaceList, select_ray_intersections, select_gausslet_intersections#detect_segment, detect_gausslet
+from raypier.core.cfaces import RectangularFace
 
 from raypier.utils import normaliseVector
 

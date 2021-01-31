@@ -7,7 +7,7 @@ pyximport.install()
 from raypier.sources import SingleRaySource
 from raypier.diffraction_gratings import RectangularGrating
 from raypier.tracer import RayTraceModel
-from raypier.ctracer import cross
+from raypier.core.ctracer import cross
 
 import numpy
 

@@ -15,12 +15,13 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from traits.etsconfig.api import ETSConfig
-ETSConfig.toolkit = 'qt4' #was 'wx'
+import warnings
 
-import sys
+try:
+    from traits.etsconfig.api import ETSConfig
+    target = 'qt4' #was 'wx'
+    ETSConfig.toolkit = target
+except ImportError: 
+    ### If ETS is not present, we don't want to fail immediately, in case the user only want's to use raypier.core.
+    warnings.warn(f"Couldn't set ETS toolkit backend to {target}.")
 
-from .core import ctracer, cfaces, cmaterials, cshapes, cfields
-__all__ = [ctracer, cfaces, cmaterials, cshapes, cfields]
-for md in __all__:
-    sys.modules[f"raypier.{md.__name__.split('.')[-1]}"] = md

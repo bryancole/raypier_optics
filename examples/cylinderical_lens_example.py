@@ -11,9 +11,9 @@ from raypier.probes import GaussletCapturePlane
 from raypier.intensity_image import IntensityImageView
 from raypier.intensity_surface import IntensitySurface
 
-from raypier.cfaces import ShapedSphericalFace, CircularFace
-from raypier.cshapes import CircleShape as CircleShape_
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import ShapedSphericalFace, CircularFace
+from raypier.core.cshapes import CircleShape as CircleShape_
+from raypier.core.ctracer import FaceList
 
 shape = CircleShape(radius=7.5)
 

@@ -40,7 +40,7 @@ data = """
   direction: !!python/tuple [0.0, 0.0, 1.0]
   display: shaded
   elevation: 0.0
-  material: !!python/object:raypier.cmaterials.DielectricMaterial {}
+  material: !!python/object:raypier.core.cmaterials.DielectricMaterial {}
   n_inside: !!python/complex '1.5'
   n_outside: !!python/complex '1.0'
   name: Solid Retroreflector

@@ -11,7 +11,7 @@ from traitsui.api import View, Item, DropEditor
 from raypier.bases import Result, Traceable
 from raypier.sources import BaseRaySource
 #from raypier.tracer import RayTraceModel
-from raypier.ctracer import Face
+from raypier.core.ctracer import Face
 from raypier.dispersion import FusedSilica
 
 from traitsui.editors.drop_editor import DropEditor

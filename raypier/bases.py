@@ -38,8 +38,8 @@ from raypier.constraints import BaseConstraint
 from raypier.has_queue import HasQueue, on_trait_change
 from raypier.utils import normaliseVector, transformNormals, transformPoints,\
         transformVectors, dotprod
-from raypier import ctracer, cmaterials
-from raypier.ctracer import RayCollection, GaussletCollection
+from raypier.core import ctracer, cmaterials
+from raypier.core.ctracer import RayCollection, GaussletCollection
 from .shapes import BaseShape
 from raypier.vtk_algorithms import EmptyGridSource
 from .editors import NumEditor, IntEditor, ComplexEditor, ROField, VectorEditor

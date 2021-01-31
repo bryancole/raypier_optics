@@ -8,7 +8,7 @@ sys.path.append('..')
 from raypier.sources import ParallelRaySource
 from raypier.tracer import RayTraceModel
 from raypier.prisms import LDLF
-from raypier.cmaterials import PECMaterial, OpaqueMaterial
+from raypier.core.cmaterials import PECMaterial, OpaqueMaterial
 from raypier.constraints import BaseConstraint
 from traits.api import Instance, on_trait_change, Tuple, Float
 import numpy

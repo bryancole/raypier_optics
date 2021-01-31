@@ -4,9 +4,9 @@ import unittest
 from raypier.sources import HexagonalRayFieldSource
 from raypier.fields import evaluate_neighbours, project_to_sphere,\
         evaluate_modes
-from raypier.cfields import evaluate_modes as evaluate_modes_c
+from raypier.core.cfields import evaluate_modes as evaluate_modes_c
         
-#from raypier.cfields import inv_area_of_ellipse
+#from raypier.core.cfields import inv_area_of_ellipse
 
 import numpy
 

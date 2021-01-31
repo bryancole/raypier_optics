@@ -31,10 +31,10 @@ from itertools import chain, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raypier.bases import Optic, Traceable, NumEditor, RaypierObject
-from raypier.cfaces import ElipticalPlaneFace, CircularFace
-from raypier.ctracer import FaceList
+from raypier.core.cfaces import ElipticalPlaneFace, CircularFace
+from raypier.core.ctracer import FaceList
 from raypier.mirrors import BaseMirror
-from raypier.cmaterials import PECMaterial, FullDielectricMaterial
+from raypier.core.cmaterials import PECMaterial, FullDielectricMaterial
 
 
 class HollowRetroreflector(BaseMirror):

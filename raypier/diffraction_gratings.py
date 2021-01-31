@@ -7,7 +7,7 @@ from traits.api import Float, Int, on_trait_change
 
 from traitsui.api import View, Item, VGroup
 
-from raypier.cmaterials import DiffractionGratingMaterial
+from raypier.core.cmaterials import DiffractionGratingMaterial
 
 from raypier.bases import Traceable, normaliseVector, NumEditor,\
      ComplexEditor, VectorEditor, Optic

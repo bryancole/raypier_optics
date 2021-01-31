@@ -27,9 +27,9 @@ from raypier.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals,\
     ShapedOptic
     
-from raypier.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
-from raypier.ctracer import FaceList
-from raypier.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial, SingleLayerCoatedMaterial
+from raypier.core.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
+from raypier.core.ctracer import FaceList
+from raypier.core.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial, SingleLayerCoatedMaterial
 from raypier.vtk_algorithms import EmptyGridSource
 from raypier.shapes import CircleShape, BaseShape
 

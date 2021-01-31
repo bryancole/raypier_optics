@@ -1,8 +1,8 @@
 
 from .bases import Traceable, NumEditor
-from .cmaterials import CircularApertureMaterial, RectangularApertureMaterial
-from .cfaces import CircularFace, RectangularFace
-from .ctracer import FaceList
+from .core.cmaterials import CircularApertureMaterial, RectangularApertureMaterial
+from .core.cfaces import CircularFace, RectangularFace
+from .core.ctracer import FaceList
 
 from traits.api import Float, on_trait_change, Instance, Property, Str, Bool, Constant
 from traitsui.api import View, Item, VGroup
