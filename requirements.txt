@@ -1,2 +1,6 @@
 numpy>=1.19
 cython>=0.29
+vtk>=9.0
+traits>=6.0
+mayavi>=4.7
+traitsui>=7.0
