@@ -42,6 +42,7 @@ from contextlib import contextmanager
 from itertools import chain, islice, count
 from raypier.sources import BaseRaySource
 from raypier.core.ctracer import Face, RayCollection
+from raypier.core.tracer import trace_rays
 from raypier.constraints import BaseConstraint
 from raypier.has_queue import HasQueue, on_trait_change
 from raypier.bases import Traceable, Probe, Result
@@ -360,49 +361,29 @@ class RayTraceModel(HasQueue):
         all synchronisation between optics and their faces
         """
         face_sets = [o.faces for o in self.optics]
-        all_faces = list(itertools.chain(*(fs.faces for fs in face_sets)))
-        for i, f in enumerate(all_faces):
-            f.idx = i
-            f.count = 0 #reset intersection count
-            f.update()
         for fs in face_sets:
             fs.sync_transforms()
             
-        self.all_faces = all_faces
         self.face_sets = face_sets
         
     def trace_ray_source(self, ray_source, optics):
         """trace a ray source asequentially, using the ctracer framework"""
         max_length = ray_source.max_ray_len
         rays = ray_source.input_rays #FIXME
-        rays.reset_length(max_length)
-        traced_rays = []
-        trace_func = ctracer.trace_segment if isinstance(rays, RayCollection) else ctracer.trace_gausslet
-        limit = self.recursion_limit
-        count = 0
-        face_sets = list(self.face_sets)
-        all_faces = list(self.all_faces)
-        decomp_faces = [f for f in all_faces if f.material.is_decomp_material()]
-        wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
-        rays.wavelengths = wavelengths
-        for face in all_faces:
-            face.material.wavelengths = wavelengths
-            face.max_length = max_length
+        face_lists = self.face_sets
+        rays.wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
         try:
-            while rays.n_rays>0 and count<limit:
-                #print "count", count
-                traced_rays.append(rays)
-                rays = trace_func(rays, face_sets, all_faces, 
-                                             max_length=max_length,
-                                             decomp_faces=decomp_faces)
-                count += 1
+            traced_rays, all_faces = trace_rays(rays, face_lists, 
+                                                recursion_limit=self.recursion_limit, 
+                                                max_length=max_length)
+            self.all_faces = all_faces
             ray_source.traced_rays = traced_rays
         finally:
             ray_source.data_source.modified()
         
     def trace_sequence(self, input_rays, faces_sequence):
         """
-        Perform a sequential ray-trace.
+        Perform a sequential ray-trace. *** THIS IS BROKEN ***
         
         @param input_rays: a RayCollection instance
         @param optics_sequence: a list of Face instances or lists of Faces

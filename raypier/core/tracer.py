@@ -44,3 +44,4 @@ def trace_rays(input_rays, face_lists, recursion_limit=100, max_length=100.0):
         count += 1
     
     return traced_rays, all_faces 
+
