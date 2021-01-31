@@ -31,7 +31,7 @@ class TestWaveplate(unittest.TestCase):
             self.assertEqual(wp.retardance, val)
 
     def test_input_ray(self):
-        ray = self.src.InputRays[0]
+        ray = self.src.input_rays[0]
         print(ray.power, ray.ellipticity, ray.E_vector, ray.E1_amp, ray.E2_amp)
         self.assertEqual(ray.ellipticity, 0.0)
 
@@ -43,8 +43,8 @@ class TestWaveplate(unittest.TestCase):
         print(wp.x_axis)
         self.model.trace_all()
 
-        ray_in = self.src.InputRays[0]
-        ray_out = self.src.TracedRays[-1][0]
+        ray_in = self.src.input_rays[0]
+        ray_out = self.src.traced_rays[-1][0]
 
         ray_in.project_E(1,1,0)
         ray_out.project_E(1,1,0)
@@ -61,8 +61,8 @@ class TestWaveplate(unittest.TestCase):
         print(wp.x_axis)
         self.model.trace_all()
 
-        ray_in = self.src.InputRays[0]
-        ray_out = self.src.TracedRays[-1][0]
+        ray_in = self.src.input_rays[0]
+        ray_out = self.src.traced_rays[-1][0]
 
         ray_in.project_E(1,1,0)
         ray_out.project_E(1,1,0)
@@ -78,8 +78,8 @@ class TestWaveplate(unittest.TestCase):
             wp.rotation = rot
             self.model.trace_all()
 
-            ray_in = self.src.InputRays[0]
-            ray_out = self.src.TracedRays[-1][0]
+            ray_in = self.src.input_rays[0]
+            ray_out = self.src.traced_rays[-1][0]
 
             self.assertAlmostEqual(ray_in.ellipticity, ray_out.ellipticity)
 
@@ -111,18 +111,18 @@ class TestWaveplateBackreflection(unittest.TestCase):
             E = (E1_vector*ray.E1_amp + E2_vector*ray.E2_amp)
             return E
 
-        ray_in = src.InputRays[0]
+        ray_in = src.input_rays[0]
 
         #print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
 
-        self.assertEqual(len(src.TracedRays), 4)
+        self.assertEqual(len(src.traced_rays), 4)
 
         for i in range(4):
-            ray = src.TracedRays[i][0]
+            ray = src.traced_rays[i][0]
             print(i, "::", ray.E_left, ray.E_right, ray.E_vector, ray.E1_amp, ray.E2_amp)
             print("\t", get_major_axis(ray))
 
-        ray_out = src.TracedRays[-1][0]
+        ray_out = src.traced_rays[-1][0]
         self.assertAlmostEqual(numpy.dot(get_major_axis(ray_out),
                                     get_major_axis(ray_in)), 0.0)
 
@@ -159,14 +159,14 @@ class TestWaveplateBackreflection(unittest.TestCase):
             E = (E1_vector*ray.E1_amp + E2_vector*ray.E2_amp)
             return E.real
 
-        ray_in = src.InputRays[0]
+        ray_in = src.input_rays[0]
 
         #print ray_in.E_vector, ray_in.E1_amp, ray_in.E2_amp
 
-        self.assertEqual(len(src.TracedRays), 3)
+        self.assertEqual(len(src.traced_rays), 3)
 
-        for i in range(len(src.TracedRays)):
-            ray = src.TracedRays[i][0]
+        for i in range(len(src.traced_rays)):
+            ray = src.traced_rays[i][0]
             print(i, "::", get_major_axis(ray), ray.E_left, ray.E_right, ray.ellipticity, ray.E_vector)
 
 if __name__ == "__main__":

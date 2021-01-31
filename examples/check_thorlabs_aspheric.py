@@ -54,7 +54,7 @@ for x in x1:
     #window.centre = (-x + 0.5, 0.0, 0.0)
     source.theta = 6.0 * numpy.arctan2(2.,x)/0.2
     model.trace_all()
-    last_rays = source.TracedRays[-1]
+    last_rays = source.traced_rays[-1]
     focus = find_ray_focus(last_rays)
     x_offset = focus[0]
     x2.append( x_offset - lens.CT )

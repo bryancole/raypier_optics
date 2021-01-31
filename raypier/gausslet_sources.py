@@ -57,13 +57,13 @@ class BaseGaussletSource(BaseRaySource):
                               display_grp)
                        )
     
-    def _TracedRays_changed(self):
+    def _traced_rays_changed(self):
         self.data_source.modified()
         self.para_data_source.modified()
         self.normals_source.modified()
         self._mtime = time.monotonic()
         
-    def _InputRays_changed(self):
+    def _input_rays_changed(self):
         self.update=True
         
     def _opacity_changed(self):
@@ -94,8 +94,8 @@ class BaseGaussletSource(BaseRaySource):
             if not self.show_normals:
                 return
             output = source.poly_data_output
-            points = numpy.vstack( list( get_origins(self.TracedRays[1:]) ) )
-            normals = numpy.vstack( list( get_normals(self.TracedRays[1:]) ) )
+            points = numpy.vstack( list( get_origins(self.traced_rays[1:]) ) )
+            normals = numpy.vstack( list( get_normals(self.traced_rays[1:]) ) )
             output.points = points
             output.point_data.normals = normals
             #print("calc normals GLYPH")
@@ -115,7 +115,7 @@ class BaseGaussletSource(BaseRaySource):
             output = source.poly_data_output
             pointArrayList = []
             mask = self.ray_mask
-            for rays in self.TracedRays:
+            for rays in self.traced_rays:
                 vis = mask.get(rays, [])
                 if len(vis) != len(rays):
                     vis = itertools.repeat(True)
@@ -191,7 +191,7 @@ class SingleGaussletSource(BaseGaussletSource):
     
     beam_waist = Float(1.0)
     
-    InputRays = Property(Instance(GaussletCollection), 
+    input_rays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, E2_amp, beam_waist")
     
     params_grp = VGroup(
@@ -210,7 +210,7 @@ class SingleGaussletSource(BaseGaussletSource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         max_axis = numpy.abs(direction).argmax()
@@ -255,7 +255,7 @@ class TopHatGaussletSource(SingleGaussletSource):
     sample_spacing = Float(10.0) #in microns
     max_angle = Float(10.0)
     
-    InputRays = Property(Instance(GaussletCollection), 
+    input_rays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, beam_waist, wavelength, "
                          "max_ray_len, E_vector, sample_spacing, max_angle")
     
@@ -279,7 +279,7 @@ class TopHatGaussletSource(SingleGaussletSource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         try:
             origin = numpy.array(self.origin)
             direction = numpy.array(self.direction)
@@ -317,7 +317,7 @@ class CollimatedGaussletSource(SingleGaussletSource):
     resolution = Float(10.0, editor=NumEditor)
     blending = Float(1.0)
     
-    InputRays = Property(Instance(GaussletCollection), 
+    input_rays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, "
                                     "E2_amp, radius, resolution, wavelength, beam_waist, blending")
     
@@ -329,7 +329,7 @@ class CollimatedGaussletSource(SingleGaussletSource):
                        label="Parameters")
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         self.wavelength_list = [self.wavelength]
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)

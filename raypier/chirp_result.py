@@ -61,7 +61,7 @@ class ChirpResult(TargetResult):
     
     def _calc_result(self, redraw=True):
         all_wavelengths = np.asarray(self.source.wavelength_list)
-        traced_rays = self.source.TracedRays
+        traced_rays = self.source.traced_rays
         target_face = self.target
         glass_length = self.glass_path
         glass_dispersion = self._fs

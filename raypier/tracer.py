@@ -374,7 +374,7 @@ class RayTraceModel(HasQueue):
     def trace_ray_source(self, ray_source, optics):
         """trace a ray source asequentially, using the ctracer framework"""
         max_length = ray_source.max_ray_len
-        rays = ray_source.InputRays #FIXME
+        rays = ray_source.input_rays #FIXME
         rays.reset_length(max_length)
         traced_rays = []
         trace_func = ctracer.trace_segment if isinstance(rays, RayCollection) else ctracer.trace_gausslet
@@ -396,7 +396,7 @@ class RayTraceModel(HasQueue):
                                              max_length=max_length,
                                              decomp_faces=decomp_faces)
                 count += 1
-            ray_source.TracedRays = traced_rays
+            ray_source.traced_rays = traced_rays
         finally:
             ray_source.data_source.modified()
         

@@ -18,7 +18,7 @@ class TestProjectToSphere(unittest.TestCase):
                                       spacing=2,
                                       radius=10.0)
         
-        rays = src.InputRays.copy_as_array()
+        rays = src.input_rays.copy_as_array()
         phase = rays['phase'] #will be zeros
         wavelengths= src.wavelength_list
         
@@ -37,7 +37,7 @@ class TestEvalNeighbours(unittest.TestCase):
                                       spacing=4,
                                       radius=10.0)
         
-        rays_in = src.InputRays.copy_as_array()
+        rays_in = src.input_rays.copy_as_array()
         nb_idx = src.neighbours
 
         self.assertEquals(len(rays_in), 19)
@@ -59,7 +59,7 @@ class TestEvalModes(unittest.TestCase):
                                       spacing=4,
                                       radius=10.0)
         
-        rays_in = src.InputRays.copy_as_array()
+        rays_in = src.input_rays.copy_as_array()
         nb_idx = src.neighbours
 
         self.assertEquals(len(rays_in), 19)

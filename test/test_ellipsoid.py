@@ -20,6 +20,6 @@ model = RayTraceModel(optics=[e,],
 
 #model.update = True
 #
-#print source.TracedRays[0]
+#print source.traced_rays[0]
 
 model.configure_traits()

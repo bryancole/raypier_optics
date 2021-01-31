@@ -70,7 +70,7 @@ model = RayTraceModel(optics=[l1,],
 
 model.trace_all()
 
-final_rays = source.TracedRays[-1]
+final_rays = source.traced_rays[-1]
 
 focus = find_ray_focus(final_rays)
 print("Effective focal length:", (focus[1]-l1.centre[1]))

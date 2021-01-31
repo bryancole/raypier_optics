@@ -103,7 +103,7 @@ class BaseCapturePlane(Probe):
         if any(src._mtime > mtime for src in src_list):
             all_rays = []
             for src in src_list:
-                all_rays.extend(src.TracedRays)
+                all_rays.extend(src.traced_rays)
             self._all_rays = all_rays
     
     @observe("centre, orientation, width, height, _all_rays")

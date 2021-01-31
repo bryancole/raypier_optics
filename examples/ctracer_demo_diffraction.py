@@ -27,7 +27,7 @@ grating = RectangularGrating(length=25.4,
                              order=1
                              )
 
-rays = source.InputRays
+rays = source.input_rays
 
 model = RayTraceModel(optics=[grating],
                     sources=[source,])

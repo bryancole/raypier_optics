@@ -53,7 +53,7 @@ model = RayTraceModel(sources=[source],
                       optics=[test], results = [raypaths], recursion_limit=10)
 
 #test.invert_normal = True
-hits = model.sources[0].TracedRays
+hits = model.sources[0].traced_rays
 res = model.results[0].result
 model.configure_traits()
 

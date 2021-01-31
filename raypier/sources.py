@@ -60,10 +60,10 @@ class BaseRaySource(BaseBase):
     
     wavelength_list = List() #List of wavelengths (floats) given in microns
     
-    InputRays = Property(Instance(BaseRayCollection), depends_on="max_ray_len")
-    TracedRays = List(BaseRayCollection, transient=True)
+    input_rays = Property(Instance(BaseRayCollection), depends_on="max_ray_len")
+    traced_rays = List(BaseRayCollection, transient=True)
     
-    InputDetailRays = Property(Instance(BaseRayCollection), depends_on="InputRays")
+    InputDetailRays = Property(Instance(BaseRayCollection), depends_on="input_rays")
     TracedDetailRays = List(BaseRayCollection, transient=True)
 
     detail_resolution = Int(32)
@@ -78,7 +78,7 @@ class BaseRaySource(BaseBase):
     show_normals = Bool(False)
     opacity = Range(0.0,1.0,1.0)
     
-    ### A dict which maps each RayCollection instance in the TracedRays
+    ### A dict which maps each RayCollection instance in the traced_rays
     ### list to a list/array of bools of the same length as the RayCollection
     ### This bool array indicates if a ray should be hidden in the display
     ray_mask = Dict()
@@ -125,7 +125,7 @@ class BaseRaySource(BaseBase):
         """returns a list of list of Face objects, those encountered
         on the route to the target face"""
         #find the first RayCollection which contains the target face
-        for rays in self.TracedRays[1:]:
+        for rays in self.traced_rays[1:]:
             faces = list(rays.face)
             if face in faces:
                 break
@@ -139,7 +139,7 @@ class BaseRaySource(BaseBase):
         parent = rays.parent
         ids = rays.parent_ids[face==rays.face]
         while True:
-            if parent == self.TracedRays[0]:
+            if parent == self.traced_rays[0]:
                 break
             faces = list(numpy.unique1d(parent.face[ids]))
             seq.append(faces)
@@ -158,7 +158,7 @@ class BaseRaySource(BaseBase):
         #keys is copy and pasted from the dtype of a ray object
         keys = ['origin','direction','normal','E_vector','refractive_index','E1_amp','E2_amp','length','wavelength','parent_idx','end_face_idx']
         #start at the last ray collection and work backwards
-        temp = list(self.TracedRays)    #otherwise its a TraitListObject
+        temp = list(self.traced_rays)    #otherwise its a TraitListObject
         raycollections = []             #make data a list of lists of lists
         for raycollection in temp:
             tmp = []
@@ -199,7 +199,7 @@ class BaseRaySource(BaseBase):
                     to analyse
                     
         @returns: the average angle from the mean ray, in degrees"""
-        rays = self.TracedRays[idx]
+        rays = self.traced_rays[idx]
         ave_dir = normaliseVector(rays.direction.mean(axis=0))
         dotprod = (ave_dir[numpy.newaxis,:] * rays.direction).sum(axis=1)
         angles = numpy.arccos(dotpod)*180 / numpy.pi
@@ -210,18 +210,18 @@ class BaseRaySource(BaseBase):
             from raypier.step_export import make_rays_both as make_rays
         else:
             from raypier.step_export import make_rays_wires as make_rays
-        return make_rays(self.TracedRays, self.scale_factor), "red"
+        return make_rays(self.traced_rays, self.scale_factor), "red"
     
-    def _TracedRays_changed(self):
+    def _traced_rays_changed(self):
         self.data_source.modified()
         self.normals_source.modified()
         self._mtime = time.monotonic()
         print("SET MTIME")
         
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         return None
     
-    def _InputRays_changed(self):
+    def _input_rays_changed(self):
         self.update=True
         
     def _scale_factor_changed(self, scale):
@@ -258,8 +258,8 @@ class BaseRaySource(BaseBase):
             if not self.show_normals:
                 return
             output = source.poly_data_output
-            points = numpy.vstack([p.origin for p in self.TracedRays[1:]])
-            normals = numpy.vstack([p.normal for p in self.TracedRays[1:]])
+            points = numpy.vstack([p.origin for p in self.traced_rays[1:]])
+            normals = numpy.vstack([p.normal for p in self.traced_rays[1:]])
             output.points = points
             output.point_data.normals = normals
             #print("calc normals GLYPH")
@@ -283,8 +283,8 @@ class BaseRaySource(BaseBase):
             output = source.poly_data_output
             pointArrayList = []
             mask = self.ray_mask
-            gausslet = isinstance(self.InputRays, GaussletCollection)
-            for rays in self.TracedRays:
+            gausslet = isinstance(self.input_rays, GaussletCollection)
+            for rays in self.traced_rays:
                 vis = mask.get(rays, [])
                 if len(vis) != len(rays):
                     vis = itertools.repeat(True)
@@ -360,7 +360,7 @@ class SingleRaySource(BaseRaySource):
     
     view_ray_ids = numpy.arange(1)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, E2_amp")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
@@ -385,7 +385,7 @@ class SingleRaySource(BaseRaySource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         max_axis = numpy.abs(direction).argmax()
@@ -430,7 +430,7 @@ class BroadbandRaySource(SingleRaySource):
     
     view_ray_ids = numpy.arange(200)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, number, wavelength_start, "
                          "wavelength_end, uniform_deltaf, max_ray_len, E_vector")
     
@@ -464,7 +464,7 @@ class BroadbandRaySource(SingleRaySource):
         self.wavelength_list = list(wavelengths)
         
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number
@@ -495,7 +495,7 @@ class ParallelRaySource(SingleRaySource):
     
     view_ray_ids = numpy.arange(20)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, number, rings, radius, max_ray_len, E_vector")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
@@ -517,7 +517,7 @@ class ParallelRaySource(SingleRaySource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         count = self.number
@@ -570,7 +570,7 @@ class RectRaySource(BaseRaySource):
     
     view_ray_ids = numpy.arange(20)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, number, length, width, theta, max_ray_len")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
@@ -594,7 +594,7 @@ class RectRaySource(BaseRaySource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         from .utils import z_rotation
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
@@ -659,7 +659,7 @@ class GaussianBeamRaySource(SingleRaySource):
     number = Range(2,64,16)
     working_distance = Float(0.0) #the distance from the beam waist to the source location
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, number, beam_waist, wavelength, "
                          "max_ray_len, E_vector, working_distance")
     
@@ -683,7 +683,7 @@ class GaussianBeamRaySource(SingleRaySource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         try:
             origin = numpy.array(self.origin)
             direction = numpy.array(self.direction)
@@ -749,7 +749,7 @@ class ConfocalRaySource(SingleRaySource):
     
     #view_ray_ids = numpy.arange(20)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="focus, direction, number, rings, theta, working_dist, max_ray_len")
     
     geom_grp = VGroup(Group(Item('focus', show_label=False,resizable=True), 
@@ -785,7 +785,7 @@ class ConfocalRaySource(SingleRaySource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         rev = self.reverse #to determine converging or diverging  
         focus = numpy.array(self.focus)
         direction = numpy.array(self.direction)
@@ -877,7 +877,7 @@ class ConfocalRaySource(SingleRaySource):
 class AdHocSource(BaseRaySource):
     '''create a source by specifying the input rays yourself''' 
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, number, rings, radius, max_ray_len")
 
     def __init__(self,*args,**kwargs):
@@ -885,7 +885,7 @@ class AdHocSource(BaseRaySource):
         super(AdHocSource,self).__init__(*args,**kwargs)
 
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         #i actually don't understand traits well at all.  this whole class is a hack.
         return self.rays
     
@@ -906,7 +906,7 @@ class RayFieldSource(SingleRaySource):
             if not self.show_mesh:
                 return
             output = source.poly_data_output
-            rays = self.InputRays
+            rays = self.input_rays
             points = rays.origin
             neighbours = rays.neighbours
             fz = frozenset
@@ -956,7 +956,7 @@ class HexagonalRayFieldSource(RayFieldSource):
     resolution = Float(10.0, editor=NumEditor)
     gauss_width = Float(2.0, editor=NumEditor)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, resolution, wavelength, gauss_width, radius, max_ray_len, E_vector")
     
     geom_grp = VGroup(Group(Item('origin', show_label=False,resizable=True), 
@@ -978,7 +978,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         origin = numpy.array(self.origin)
         direction = numpy.array(self.direction)
         radius = self.radius
@@ -1062,7 +1062,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
     
     numerical_aperture = Float(0.12)
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, angle, resolution, "
                                     "working_dist, max_ray_len, E_vector, wavelength, "
                                     "E1_amp, E2_amp, numerical_aperture")
@@ -1087,7 +1087,7 @@ class ConfocalRayFieldSource(HexagonalRayFieldSource):
         self.mesh_source.modified()
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         try:
             origin = numpy.array(self.origin)
             direction = numpy.array(self.direction)
@@ -1180,7 +1180,7 @@ class SingleGaussletSource(SingleRaySource):
     beam_waist = Float(100.0) #in microns
     working_distance = Float(0.0) #the distance from the beam waist to the source location
     
-    InputRays = Property(Instance(RayCollection), 
+    input_rays = Property(Instance(RayCollection), 
                          depends_on="origin, direction, beam_waist, wavelength, "
                          "max_ray_len, E_vector, working_distance")
     
@@ -1203,7 +1203,7 @@ class SingleGaussletSource(SingleRaySource):
         self.update=True
     
     @cached_property
-    def _get_InputRays(self):
+    def _get_input_rays(self):
         try:
             origin = numpy.array(self.origin)
             direction = numpy.array(self.direction)

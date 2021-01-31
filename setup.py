@@ -103,6 +103,7 @@ visualisation of mirror/lens systems.""",
     url = "https://groups.google.com/u/1/g/python-raytrace",
     project_urls = {
         "Homepage" : "https://groups.google.com/u/1/g/python-raytrace",
+        "Documentation" : "https://raypier-optics.readthedocs.io/en/latest/index.html",
         "Source" : "https://github.com/bryancole/raypier_optics.git",
         "Issues" : "https://github.com/bryancole/raypier_optics/issues"
         },

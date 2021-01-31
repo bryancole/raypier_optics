@@ -22,7 +22,7 @@ src = ConfocalRayFieldSource(direction=(0,0,1),
                               angle=5.0,
                               wavelength=1.0)
 
-src.InputRays
+src.input_rays
 
 probe = EFieldPlane(source=src,
                     centre=(0,0,70),

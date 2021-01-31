@@ -18,4 +18,4 @@ model = RayTraceModel(sources=[source],
 
 model.configure_traits()
 #model.update = True
-#print source.TracedRays
+#print source.traced_rays

@@ -52,7 +52,7 @@ class TargetResult(Result):
             return
         if self.source is None:
             return
-        if self.source.TracedRays:
+        if self.source.traced_rays:
             try:
                 self._calc_result()
             except:
@@ -78,11 +78,11 @@ class MeanOpticalPathLength(TargetResult):
             return
         if self.source is None:
             return
-        if self.source.TracedRays:
+        if self.source.traced_rays:
             self._calc_result()
     
     def _calc_result(self):
-        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
+        all_rays = [r.copy_as_array() for r in reversed(self.source.traced_rays)]
         idx = self.target.idx
         last = all_rays[0]
         selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
@@ -167,7 +167,7 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
     
     def _calc_result(self):
         all_wavelengths = numpy.asarray(self.source.wavelength_list)
-        traced_rays = self.source.TracedRays
+        traced_rays = self.source.traced_rays
         target_face = self.target
         glass_length = self.glass_path
         glass_dispersion = self._fs
@@ -208,7 +208,7 @@ class Divergence(TargetResult):
                        )
     
     def _calc_result(self):
-        all_rays = [r.copy_as_array() for r in reversed(self.source.TracedRays)]
+        all_rays = [r.copy_as_array() for r in reversed(self.source.traced_rays)]
         idx = self.target.idx
         last = all_rays[0]
         selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
@@ -336,7 +336,7 @@ class Ratio(Result):
         #maybe a dictionary or something would be better?
         for source in self._tracer.sources:
             #a list of RayCollection instances
-            raysList = source.TracedRays
+            raysList = source.traced_rays
         
             nom_count = nom_count + get_total_intersections(raysList, nom)
             denom_count = denom_count + get_total_intersections(raysList, denom)
@@ -369,8 +369,8 @@ class IncidentPower(Ratio):
         #maybe a dictionary or something would be better?
         for source in self._tracer.sources:
             #a list of RayCollection instances
-            raysList = source.TracedRays
-            input = source.TracedRays[0]
+            raysList = source.traced_rays
+            input = source.traced_rays[0]
             E1_amp = input.E1_amp
             E2_amp = input.E2_amp
             n = input.refractive_index.real

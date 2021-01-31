@@ -19,7 +19,7 @@ class TestConfocalPhase(unittest.TestCase):
                                      direction=(0,0,1),
                                      wavelength=100.0
                                      )
-        rays = src.InputRays.copy_as_array()
+        rays = src.input_rays.copy_as_array()
         
         vec_to_focus = rays['origin'] - numpy.array([[0,0,src.working_dist]])
         
@@ -47,13 +47,13 @@ class TestConfocalPhase(unittest.TestCase):
                               sources=[src])
         model.trace_all()
         
-        for rays in src.TracedRays:
+        for rays in src.traced_rays:
             E = rays.E_vector
             H = numpy.cross(rays.direction, E)
             F = E * rays.E1_amp[:,None] + H * rays.E2_amp[:,None]
             print(F.imag)
         
-        rays = src.TracedRays
+        rays = src.traced_rays
         
         ray1 = rays[0][0]
         ray2 = rays[1][0]

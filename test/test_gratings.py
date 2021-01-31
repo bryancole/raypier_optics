@@ -25,7 +25,7 @@ class TestGratingEquation(unittest.TestCase):
         model = RayTraceModel(sources=[source,],
                               optics=[grating,])
         model.trace_all()
-        traced_rays = list(source.TracedRays)
+        traced_rays = list(source.traced_rays)
         self.assertEqual(len(traced_rays),2)
         
         out = traced_rays[-1]
@@ -55,7 +55,7 @@ class TestGratingEquation(unittest.TestCase):
         model = RayTraceModel(sources=[source,],
                               optics=[grating,])
         model.trace_all()
-        traced_rays = list(source.TracedRays)
+        traced_rays = list(source.traced_rays)
         self.assertEqual(len(traced_rays),2)
         
         out = traced_rays[-1]

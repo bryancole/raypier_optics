@@ -367,7 +367,7 @@ class EFieldPlane(Probe):
             ray_list = [detector.captured,]
         else:
             idx = self.gen_idx
-            ray_list = [src.TracedRays[idx] for src in src_list if src.TracedRays]
+            ray_list = [src.traced_rays[idx] for src in src_list if src.traced_rays]
         
         n_list = []
         for ct, rays in enumerate(ray_list):
@@ -432,7 +432,7 @@ class EFieldPlane(Probe):
         detector = self.detector
         if detector is None:
             src = self.source
-            rays = src.TracedRays[idx]
+            rays = src.traced_rays[idx]
         else:
             rays = detector.captured
         self.centre = tuple(a+b for a,b in zip(find_ray_focus(rays), offset))

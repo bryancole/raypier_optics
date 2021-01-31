@@ -16,7 +16,7 @@ src = SingleGaussletSource(direction=(0,0,1),
                               radius=1000.0,
                               wavelength=100.0)
 
-src.InputRays
+src.input_rays
 
 probe = EFieldPlane(source=src,
                     centre=(0,0,50),
