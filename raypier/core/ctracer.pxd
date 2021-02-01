@@ -188,8 +188,8 @@ cdef class InterfaceMaterial(object):
 
 
 cdef class Distortion:
-    cdef vector_t z_offset_and_gradient_c(self, double x, double y)
-    cdef double z_offset_c(self, double x, double y)
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y) nogil
+    cdef double z_offset_c(self, double x, double y) nogil
     
     
 cdef class Shape:

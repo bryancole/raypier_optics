@@ -1726,20 +1726,20 @@ cdef class DistortionFace(ShapedFace):
     cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             ShapedFace face=self.base_face
-            double a, z_shift=0.0, tolerance, a1, a2
-            vector_t dxdyz, pt1, pt2, d, n, o, q1, q2
+            double z_shift=0.0, tolerance, a1, a2
+            vector_t dxdyz, pt1, d, n, o, q1, q2
             int i
             
         tolerance = 1e-6
         
-        a = face.intersect_c(p1,p2,0) #Don't check the shape yet
-        if a>1.0 or a<self.tolerance: #If no intersection, then, no intersection
+        a2 = face.intersect_c(p1,p2,0) #Don't check the shape yet
+        if a2>1.0 or a2<self.tolerance: #If no intersection, then, no intersection
             return -1
         
         #starting estimate of intersection
         d = subvv_(p2,p1)
         
-        pt1 = addvv_(p1, multvs_(d,a))
+        pt1 = addvv_(p1, multvs_(d,a2))
         
         n = face.compute_normal_c(pt1)
         dxdyz = <Distortion>self.distortion.z_offset_and_gradient_c(pt1.x, pt1.y)
@@ -1756,6 +1756,8 @@ cdef class DistortionFace(ShapedFace):
         
         for i in range(20):
             pt1 = addvv_(p1, multvs_(d,a1))
+            if fabs(a1 - a2) < tolerance:
+                break
             z_shift = <Distortion>self.distortion.z_offset_c(pt1.x, pt1.y)
             
             q1 = p1
@@ -1764,10 +1766,10 @@ cdef class DistortionFace(ShapedFace):
             q2.z -= z_shift
             a2 = face.intersect_c(q1, q2, 0)
             
-            pt2 = addvv_(q1, multvs_(d,a2)) #this point on base
-            n = face.compute_normal_c(pt2)
-            dxdyz = <Distortion>self.distortion.z_offset_and_gradient_c(pt2.x, pt2.y)
-            pt2.z += dxdyz.z #move to distorted face
+            pt1 = addvv_(q1, multvs_(d,a2)) #this point on base
+            n = face.compute_normal_c(pt1)
+            dxdyz = <Distortion>self.distortion.z_offset_and_gradient_c(pt1.x, pt1.y)
+            pt1.z += dxdyz.z #move to distorted face
             
             n.x /= n.z
             n.y /= n.z
@@ -1778,18 +1780,31 @@ cdef class DistortionFace(ShapedFace):
             ### Better estimate for a
             a2 = a1
             a1 = -dotprod_(o,n)/dotprod_(d,n)
-            if fabs(a1 - a2) < tolerance:
-                break
+            
+            
+        if not self.shape.point_inside_c(pt1.x, pt1.y):
+            return -1.0
             
         return a1
             
     cdef vector_t compute_normal_c(self, vector_t p):
         cdef:
-            double r, beta
-        return p
+            vector_t n, p1, dxdyz
+
+        dxdyz = self.distortion.z_offset_and_gradient_c(p.x, p.y)
+        p1 = p
+        p1.z -= dxdyz.z
+        n = self.base_face.computer_normal_c(p1)
+        n.x /= n.z
+        n.y /= n.z
+        n.x += dxdyz.x
+        n.y += dxdyz.y
+        return norm_(n)
             
     cdef double eval_z_c(self, double x, double y) nogil:
         cdef:
-            double R = 0.0
-        return R
+            double z
+        z = self.base_face.eval_z_c(x,y)
+        z += self.distortion.z_offset_c(x,y)
+        return z
     

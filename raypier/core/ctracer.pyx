@@ -1548,7 +1548,7 @@ cdef class Distortion:
     """A abstract base class to represents distortions on a face, a z-offset 
     as a function of (x,y).
     """
-    cdef vector_t z_offset_and_gradient_c(self, double x, double y):
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y) nogil:
         """The z-axis surface sag is returned as the z-component 
         of the output vector. The x- and y-components of the surface
         gradient are placed in the x- and y- components of vector.
@@ -1562,7 +1562,7 @@ cdef class Distortion:
         p.z=0.0
         return p
     
-    cdef double z_offset_c(self, double x, double y):
+    cdef double z_offset_c(self, double x, double y) nogil:
         return 0.0
     
     def z_offset_and_gradient(self, double x, double y):
