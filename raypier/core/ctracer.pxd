@@ -185,6 +185,11 @@ cdef class InterfaceMaterial(object):
     cdef void eval_decomposed_rays_c(self, GaussletCollection child_rays)
 
     cdef on_set_wavelengths(self)
+
+
+cdef class Distortion:
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y)
+    cdef double z_offset_c(self, double x, double y)
     
     
 cdef class Shape:

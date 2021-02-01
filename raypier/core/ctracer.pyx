@@ -1544,6 +1544,37 @@ cdef class Shape:
         return self.point_inside_c(x,y) 
     
     
+cdef class Distortion:
+    """A abstract base class to represents distortions on a face, a z-offset 
+    as a function of (x,y).
+    """
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y):
+        """The z-axis surface sag is returned as the z-component 
+        of the output vector. The x- and y-components of the surface
+        gradient are placed in the x- and y- components of vector.
+        I.e. the returned vector is
+            (dz(x,y)/dx, dz(x,y)/dy, z(x,y))
+        """
+        cdef:
+            vector_t p
+        p.x=0.0
+        p.y=0.0
+        p.z=0.0
+        return p
+    
+    cdef double z_offset_c(self, double x, double y):
+        return 0.0
+    
+    def z_offset_and_gradient(self, double x, double y):
+        cdef:
+            vector_t v
+        v = self.z_offset_and_gradient_c(x,y)
+        return (v.x, v.y, v.z)
+    
+    def z_offset(self, double x, double y):
+        return self.z_offset_c(x,y)
+    
+    
 cdef class Face(object):
     
     params = []
