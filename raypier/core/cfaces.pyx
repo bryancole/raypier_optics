@@ -1718,31 +1718,40 @@ cdef class DistortionFace(ShapedFace):
         public ShapedFace base_face
         public Distortion distortion
         
-    def __cinit__(self, ShapedFace face, Distortion distortion, **kwds):
+    def __cinit__(self, **kwds):
+        face = kwds.get("base_face")
         self.base_face = face
-        self.distortion = distortion
+        self.distortion = kwds.get("distortion")
         self.shape = kwds.get('shape', face.shape)
         
     cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             ShapedFace face=self.base_face
-            double z_shift=0.0, tolerance, a1, a2
+            double z_shift=0.0, tolerance, a1, a2, h=sep_(p2,p1)
             vector_t dxdyz, pt1, d, n, o, q1, q2
             int i
+            Distortion dist=self.distortion
+            Shape shape = self.shape
             
         tolerance = 1e-6
         
         a2 = face.intersect_c(p1,p2,0) #Don't check the shape yet
-        if a2>1.0 or a2<self.tolerance: #If no intersection, then, no intersection
+        if a2>h or a2<self.tolerance: #If no intersection, then, no intersection
+            print("NO intersection", a2, p1.z, p2.z)
             return -1
         
+        print("start estimate:", a2)
         #starting estimate of intersection
         d = subvv_(p2,p1)
         
-        pt1 = addvv_(p1, multvs_(d,a2))
+        pt1 = addvv_(p1, multvs_(d,a2/h))
         
         n = face.compute_normal_c(pt1)
-        dxdyz = <Distortion>self.distortion.z_offset_and_gradient_c(pt1.x, pt1.y)
+        print("base normal:", n.x, n.y, n.z)
+        print("pt1:", pt1.x, pt1.y, pt1.z)
+        dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
+        print("dx:", dxdyz.x, "dy:", dxdyz.y, "z:", dxdyz.z)
+        
         pt1.z += dxdyz.z
         
         n.x /= n.z
@@ -1752,13 +1761,14 @@ cdef class DistortionFace(ShapedFace):
         
         o=subvv_(p1, pt1)
         ### Better estimate for a
-        a1 = -dotprod_(o,n)/dotprod_(d,n)
-        
+        a1 = -h*dotprod_(o,n)/dotprod_(d,n)
+        print("better estimate", a1)
         for i in range(20):
-            pt1 = addvv_(p1, multvs_(d,a1))
+            pt1 = addvv_(p1, multvs_(d,a1/h))
+            print("a_error:", a1-a2, i)
             if fabs(a1 - a2) < tolerance:
                 break
-            z_shift = <Distortion>self.distortion.z_offset_c(pt1.x, pt1.y)
+            z_shift = dist.z_offset_c(pt1.x, pt1.y)
             
             q1 = p1
             q2 = p2
@@ -1766,9 +1776,9 @@ cdef class DistortionFace(ShapedFace):
             q2.z -= z_shift
             a2 = face.intersect_c(q1, q2, 0)
             
-            pt1 = addvv_(q1, multvs_(d,a2)) #this point on base
+            pt1 = addvv_(q1, multvs_(d,a2/h)) #this point on base
             n = face.compute_normal_c(pt1)
-            dxdyz = <Distortion>self.distortion.z_offset_and_gradient_c(pt1.x, pt1.y)
+            dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
             pt1.z += dxdyz.z #move to distorted face
             
             n.x /= n.z
@@ -1779,12 +1789,12 @@ cdef class DistortionFace(ShapedFace):
             o=subvv_(p1, pt1)
             ### Better estimate for a
             a2 = a1
-            a1 = -dotprod_(o,n)/dotprod_(d,n)
+            a1 = -h*dotprod_(o,n)/dotprod_(d,n)
             
             
-        if not self.shape.point_inside_c(pt1.x, pt1.y):
+        if not shape.point_inside_c(pt1.x, pt1.y):
             return -1.0
-            
+        print("Final a1:", a1)
         return a1
             
     cdef vector_t compute_normal_c(self, vector_t p):
@@ -1794,11 +1804,11 @@ cdef class DistortionFace(ShapedFace):
         dxdyz = self.distortion.z_offset_and_gradient_c(p.x, p.y)
         p1 = p
         p1.z -= dxdyz.z
-        n = self.base_face.computer_normal_c(p1)
+        n = self.base_face.compute_normal_c(p1)
         n.x /= n.z
         n.y /= n.z
-        n.x += dxdyz.x
-        n.y += dxdyz.y
+        n.x -= dxdyz.x
+        n.y -= dxdyz.y
         return norm_(n)
             
     cdef double eval_z_c(self, double x, double y) nogil:

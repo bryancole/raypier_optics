@@ -1565,14 +1565,33 @@ cdef class Distortion:
     cdef double z_offset_c(self, double x, double y) nogil:
         return 0.0
     
-    def z_offset_and_gradient(self, double x, double y):
+    def z_offset_and_gradient(self, double[:] x, double[:] y):
         cdef:
             vector_t v
-        v = self.z_offset_and_gradient_c(x,y)
-        return (v.x, v.y, v.z)
+            size_t i, n=len(x)
+            double[:,:] out = np.empty((n, 3), 'd')
+            
+        if len(y) != n:
+            raise ValueError("Both x and y must have the same length")
+            
+        for i in range(n):
+            v = self.z_offset_and_gradient_c(x[i],y[i])
+            out[i,0] = v.x
+            out[i,1] = v.y
+            out[i,2] = v.z
+        return np.asarray(out)
     
-    def z_offset(self, double x, double y):
-        return self.z_offset_c(x,y)
+    def z_offset(self, double[:] x, double[:] y):
+        cdef:
+            size_t i, n=len(x)
+            double[:,:] out = np.empty((n,), 'd')
+            
+        if len(y) != n:
+            raise ValueError("Both x and y must have the same length")
+            
+        for i in range(n):
+            out[i] = self.z_offset_c(x[i],y[i])
+        return np.asarray(out)
     
     
 cdef class Face(object):

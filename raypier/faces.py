@@ -5,7 +5,10 @@ Traited wrappers for cfaces objects
 
 
 from .core.cfaces import ShapedPlanarFace, ShapedSphericalFace, ConicRevolutionFace, AsphericFace as AsphericFace_,\
-            ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_
+            ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_, DistortionFace as DistortionFace_
+            
+from .core.ctracer import Distortion
+            
 from .shapes import BaseShape
 from .editors import NumEditor
 
@@ -16,13 +19,10 @@ from traitsui.api import View, VGroup, Item, VGrid
 class BaseFace(HasStrictTraits):
     updated = Event()
     
-    ###All faces have a z-offset
-    z_height = Float(0.0)
-    
     ###Indicates if this face should be included in the ray-tracing. If not, it's purely cosmetic
     trace = Bool(True)
     
-    ###If mirror is True, this face is reflactive (i.e. doesn't use material info to transmit rays
+    ###If mirror is True, this face is reflective (i.e. doesn't use material info to transmit rays
     mirror = Bool(False)
     
     ###I'm not 100% sure if we need this.
@@ -30,10 +30,6 @@ class BaseFace(HasStrictTraits):
     
     ###Override this in subclasses with the specific face type required.
     cface = Instance(ShapedFace)
-    
-    def _z_height_changed(self, znew):
-        self.cface.z_height = znew
-        self.updated=True
         
     def _invert_changed(self, vnew):
         self.cface.invert_normals = int(vnew)
@@ -45,12 +41,18 @@ class BaseFace(HasStrictTraits):
     
 
 class PlanarFace(BaseFace):
+    z_height = Float(0.0)
+    
     cface = Instance(ShapedPlanarFace, (), )
     
     traits_view = View(VGroup(Item("z_height", editor=NumEditor, tooltip="surface height in mm")))
     
     def __repr__(self):
         return f"<Planar Face: z={self.z_height}>"
+    
+    def _z_height_changed(self, znew):
+        self.cface.z_height = znew
+        self.updated=True
         
         
 class SphericalFace(PlanarFace):
@@ -71,7 +73,7 @@ class SphericalFace(PlanarFace):
         self.updated=True
         
         
-class AxiconFace(BaseFace):
+class AxiconFace(PlanarFace):
     gradient = Float(0.1)
     
     cface = Instance(AxiconFace_, ())
@@ -150,4 +152,27 @@ class AsphericFace(ConicFace):
         setattr(self.cface, evt.name, evt.new)
         self.updated = True
         
+    
+class DistortionFace(BaseFace):
+    base_face = Instance(BaseFace)
+    distortion = Instance(Distortion)
+    
+    cface = Instance(DistortionFace_, ())
+    
+    traits_view = View(
+                    VGroup(Item("base_face", style="custom"),
+                           #Item("distortion", style="custom")
+                           )
+                    )
+    
+    def _cface_default(self):
+        return DistortionFace_(base_face=self.base_face.cface, 
+                               distortion=self.distortion)
+    
+    @observe("base_face, distortion")
+    def on_params_changed(self, evt):
+        self.cface.base_face = self.base_face.cface
+        self.cface.distortion = self.distortion
+        self.updated = True
+    
     
