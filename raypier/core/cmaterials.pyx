@@ -1,4 +1,3 @@
-from fontTools.cffLib import width
 cimport cython
 
 cdef extern from "math.h":
@@ -56,7 +55,8 @@ cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     E2_vector = norm_(cross_(ray.direction, ray.E_vector))
     E1_vector = norm_(cross_(E2_vector, ray.direction))
     normal = norm_(normal)
-        
+    #print("E_in:", E1_amp.real, E1_amp.imag, E2_amp.real, E2_amp.imag)
+    #print("E_vector:", E1_vector.x, E1_vector.y, E1_vector.z, E2_vector.x, E2_vector.y, E2_vector.z)
     S_vector = cross_(ray.direction, normal)
     if fabs(S_vector.x)<SP_TOL and fabs(S_vector.y)<SP_TOL and fabs(S_vector.z)<SP_TOL:
         return ray
@@ -279,6 +279,77 @@ cdef class PECMaterial(InterfaceMaterial):
         sp_ray.parent_idx = idx
         sp_ray.ray_type_id |= REFL_RAY
         new_rays.add_ray_c(sp_ray)
+        
+        
+cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
+    cdef:
+        ### power reflectivity, from 0. to 1.
+        public double _reflectivity
+        
+    def __cinit__(self, **kwds):
+        self.reflectivity = kwds.get("reflectivity", 0.5)
+        
+    property reflectivity:
+        def __get__(self):
+            return self._reflectivity
+        
+        def __set__(self, val):
+            if val<0.0 or val>1.0:
+                raise ValueError(f"Reflectivity must be in range 0.0 to 1.0 ({val} given).")
+        
+    cdef void eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected, normal
+            vector_t tangent, tg2, in_direction
+            ray_t sp_ray, sp_ray2
+            double cosTheta, R, T
+            complex_t P
+            
+        normal = norm_(orient.normal)
+        in_direction = norm_(in_ray.direction)
+        sp_ray = sp_ray2 = convert_to_sp(in_ray[0], normal)
+        cosTheta = dotprod_(normal, in_direction)            
+        cosThetaNormal = multvs_(normal, cosTheta)
+        
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        sp_ray2.accumulated_path = sp_ray.accumulated_path
+        
+        R = sqrt(self._reflectivity)
+        T = sqrt(1-self._reflectivity)
+        
+        #Reflected ray
+        reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
+        sp_ray.origin = point
+        sp_ray.normal = normal
+        sp_ray.direction = reflected
+        sp_ray.length = INF
+        sp_ray.E1_amp *= R
+        sp_ray.E2_amp *= R
+        sp_ray.parent_idx = idx
+        sp_ray.ray_type_id |= REFL_RAY
+        new_rays.add_ray_c(sp_ray)
+            
+        #Transmitted ray
+        sp_ray2.origin = point
+        sp_ray2.normal = normal
+        sp_ray2.direction = in_direction
+        sp_ray2.length = INF
+        sp_ray2.E1_amp *= T
+        sp_ray2.E2_amp *= T
+        sp_ray2.parent_idx = idx
+        sp_ray2.ray_type_id &= ~REFL_RAY
+        new_rays.add_ray_c(sp_ray2)
         
         
 cdef class LinearPolarisingMaterial(InterfaceMaterial):
@@ -640,6 +711,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             
         normal = norm_(orient.normal)
         in_direction = norm_(in_ray.direction)
+        #print "in fields:", in_ray[0].E1_amp.real, in_ray[0].E1_amp.imag, in_ray[0].E2_amp.real, in_ray[0].E2_amp.imag
         sp_ray = convert_to_sp(in_ray[0], normal)
         sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
         E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
@@ -688,7 +760,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         R_s *= E1_amp
         R_p *= E2_amp
         
-        #print "P_in:", P_in
+        #print "P_in:", P_in, n1.real, E1_amp.real, E1_amp.imag, E2_amp.real, E2_amp.imag
         #print "P_R:", (cabs(R_s)**2 + cabs(R_p)**2)
         
         if ( n1.real*(cabs(R_s)**2 + cabs(R_p)**2)/P_in ) > self.reflection_threshold:

@@ -5,7 +5,7 @@ from .shapes import CircleShape, RectangleShape
 from .general_optic import GeneralLens
 
 from .faces import PlanarFace, SphericalFace, CylindericalFace, AsphericFace, ConicFace, \
-        AxiconFace
+        AxiconFace, DistortionFace
         
 from .materials import OpticalMaterial, air
         
@@ -24,3 +24,5 @@ from .probes import RayCapturePlace, GaussletCapturePlane
 from .apertures import CircularAperture, RectangularAperture
 
 from .intensity_surface import IntensitySurface
+
+from .beamsplitters import UnpolarisingBeamsplitterCube, PolarisingBeamsplitterCube

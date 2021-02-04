@@ -375,6 +375,7 @@ class CollimatedGaussletSource(SingleGaussletSource):
         
         E1_amp = self.E1_amp
         E2_amp = self.E2_amp
+        #print("E_vals", E1_amp, E2_amp)
         P1 = (E1_amp * E1_amp.conjugate()).real
         P2 = (E2_amp * E1_amp.conjugate()).real
         

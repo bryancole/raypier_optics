@@ -1753,6 +1753,7 @@ cdef class FaceList(object):
             double dist
         
         dist = face.intersect_c(p1, p2, 0)
+        #print("p1:", p1.x, p1.y, p1.z, "p2:", p2.x, p2.y, p2.z, "rlen:", ray.length, "dist:", dist)
         if face.tolerance < dist < ray.length:
             ray.length = dist
             return 0
@@ -2022,35 +2023,33 @@ cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face f
         unsigned int i,j
         para_t *para_ray
         gausslet_t gausslet
-        vector_t ray_end, point
-        orientation_t orient
+        vector_t ray_end, point[6]
+        orientation_t orient[6]
         InterfaceMaterial material = (<InterfaceMaterial>(face.material))
         
+    for j in range(6):
+        para_ray = g_in.para + j
+        ray_end = addvv_(para_ray.origin, 
+                        multvs_(para_ray.direction, 
+                                max_length))
+        if face_set.intersect_para_c(para_ray, ray_end, face):
+            return
+        point[j] = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))
+        orient[j] = face_set.compute_orientation_c(face, point[j])
+    
     for i in range(base_rays.n_rays):
         gausslet.base_ray = base_rays.rays[i]
-        
         for j in range(6):
-            para_ray = g_in.para + j
-            ray_end = addvv_(para_ray.origin, 
-                            multvs_(para_ray.direction, 
-                                    max_length))
-            if face_set.intersect_para_c(para_ray, ray_end, face):
-                break
-            
-            point = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))
-            orient = face_set.compute_orientation_c(face, point)
-            
+            para_ray = g_in.para + j            
             gausslet.para[j] = material.eval_parabasal_ray_c(base_rays.rays + i,
                                                             para_ray.direction, #incoming ray direction
-                                                            point, #position of intercept
-                                                            orient,
+                                                            point[j], #position of intercept
+                                                            orient[j],
                                                             gausslet.base_ray.ray_type_id, #indicates if it's a transmitted or reflected ray 
                                                             )
-        if j>=5:
-            new_gausslets.add_gausslet_c(gausslet)
+        new_gausslets.add_gausslet_c(gausslet)
             
             
-
 
 def transform(Transform t, p):
     cdef vector_t p1, p2
