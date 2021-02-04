@@ -12,11 +12,13 @@ from .core.ctracer import Distortion
 from .shapes import BaseShape
 from .editors import NumEditor
 
-from traits.api import HasStrictTraits, Instance, Float, Bool, observe, Event
+from traits.api import HasStrictTraits, Instance, Float, Bool, observe, Event, Property
 from traitsui.api import View, VGroup, Item, VGrid
 
 
 class BaseFace(HasStrictTraits):
+    z_height = Float(0.0)
+    
     updated = Event()
     
     ###Indicates if this face should be included in the ray-tracing. If not, it's purely cosmetic
@@ -41,8 +43,6 @@ class BaseFace(HasStrictTraits):
     
 
 class PlanarFace(BaseFace):
-    z_height = Float(0.0)
-    
     cface = Instance(ShapedPlanarFace, (), )
     
     traits_view = View(VGroup(Item("z_height", editor=NumEditor, tooltip="surface height in mm")))
@@ -154,6 +154,7 @@ class AsphericFace(ConicFace):
         
     
 class DistortionFace(BaseFace):
+    z_height = Property()
     base_face = Instance(BaseFace)
     distortion = Instance(Distortion)
     
@@ -164,6 +165,9 @@ class DistortionFace(BaseFace):
                            #Item("distortion", style="custom")
                            )
                     )
+    
+    def _get_z_height(self):
+        return self.base_face.z_height
     
     def _cface_default(self):
         return DistortionFace_(base_face=self.base_face.cface, 

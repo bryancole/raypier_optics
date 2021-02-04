@@ -1717,12 +1717,14 @@ cdef class DistortionFace(ShapedFace):
     cdef:
         public ShapedFace base_face
         public Distortion distortion
+        public double accuracy
         
     def __cinit__(self, **kwds):
         face = kwds.get("base_face")
         self.base_face = face
         self.distortion = kwds.get("distortion")
         self.shape = kwds.get('shape', face.shape)
+        self.accuracy = kwds.get("accuracy", 1e-6)
         
     cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
@@ -1733,39 +1735,42 @@ cdef class DistortionFace(ShapedFace):
             Distortion dist=self.distortion
             Shape shape = self.shape
             
-        tolerance = 1e-6
+        tolerance = self.accuracy
         
         a2 = face.intersect_c(p1,p2,0) #Don't check the shape yet
         if a2>h or a2<self.tolerance: #If no intersection, then, no intersection
-            print("NO intersection", a2, p1.z, p2.z)
-            return -1
+            #print("NO intersection", a2, p1.z, p2.z)
+            return -1.0
         
-        print("start estimate:", a2)
+        #print("start estimate:", a2)
         #starting estimate of intersection
         d = subvv_(p2,p1)
-        
         pt1 = addvv_(p1, multvs_(d,a2/h))
+        dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
         
         n = face.compute_normal_c(pt1)
-        print("base normal:", n.x, n.y, n.z)
-        print("pt1:", pt1.x, pt1.y, pt1.z)
-        dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
-        print("dx:", dxdyz.x, "dy:", dxdyz.y, "z:", dxdyz.z)
+        #print("base normal:", n.x, n.y, n.z)
+        #print("pt1:", pt1.x, pt1.y, pt1.z)
+        #print("dx:", dxdyz.x, "dy:", dxdyz.y, "z:", dxdyz.z)
         
         pt1.z += dxdyz.z
         
         n.x /= n.z
         n.y /= n.z
-        n.x += dxdyz.x
-        n.y += dxdyz.y
+        n.x -= dxdyz.x
+        n.y -= dxdyz.y
         
         o=subvv_(p1, pt1)
         ### Better estimate for a
         a1 = -h*dotprod_(o,n)/dotprod_(d,n)
-        print("better estimate", a1)
+        #print("better estimate", a1)
+        if a1 < fabs(dxdyz.z):
+            #print("self-intersection. bailing.")
+            return -1.0
+        
         for i in range(20):
             pt1 = addvv_(p1, multvs_(d,a1/h))
-            print("a_error:", a1-a2, i)
+            #print("a_error:", a1-a2, i)
             if fabs(a1 - a2) < tolerance:
                 break
             z_shift = dist.z_offset_c(pt1.x, pt1.y)
@@ -1783,18 +1788,17 @@ cdef class DistortionFace(ShapedFace):
             
             n.x /= n.z
             n.y /= n.z
-            n.x += dxdyz.x
-            n.y += dxdyz.y
+            n.x -= dxdyz.x
+            n.y -= dxdyz.y
             
             o=subvv_(p1, pt1)
             ### Better estimate for a
             a2 = a1
             a1 = -h*dotprod_(o,n)/dotprod_(d,n)
             
-            
         if not shape.point_inside_c(pt1.x, pt1.y):
             return -1.0
-        print("Final a1:", a1)
+        #print("Final a1:", a1)
         return a1
             
     cdef vector_t compute_normal_c(self, vector_t p):

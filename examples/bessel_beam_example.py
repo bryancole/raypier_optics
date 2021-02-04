@@ -16,8 +16,8 @@ axicon = GeneralLens(name = "My Axicon",
                      centre = (0,0,0),
                      direction=(0,0,1),
                      shape=shape, 
-                     surfaces=[face2, 
-                               face1], 
+                     surfaces=[face1, 
+                               face2], 
                      materials=[mat])
 
 src = CollimatedGaussletSource(origin=(0.001,0,-5.0),

@@ -6,6 +6,7 @@ from traitsui.api import View, Item, VGroup, Group, ListEditor
 
 from tvtk.api import tvtk
 import numpy
+from operator import attrgetter
 
 from raypier.bases import NumEditor, Traceable
 
@@ -188,11 +189,13 @@ class GeneralLens(BaseLens):
         return fl
     
     def config_cfaces(self):
-        surfaces = self.surfaces
+        surfaces = sorted(self.surfaces, key=attrgetter("z_height"))
         cfaces = []
         mats = [air,] + self.materials + [air,]
         if len(mats) < len(surfaces) + 1:
             mats += [air,] * (len(surfaces)-len(mats) + 1)
+        ###FIXME: need to iterate in order of z_height to get the
+        ###the materials on the correct sides.
         for i, face in enumerate(surfaces):
             if face.trace:
                 cface = face.cface
@@ -202,8 +205,8 @@ class GeneralLens(BaseLens):
                     cface.material = PECMaterial()
                 else:
                     mat = CoatedDispersiveMaterial()
-                    mat.dispersion_outside = mats[i].dispersion_curve
-                    mat.dispersion_inside = mats[i+1].dispersion_curve
+                    mat.dispersion_inside = mats[i].dispersion_curve
+                    mat.dispersion_outside = mats[i+1].dispersion_curve
                     if i in {0, len(surfaces)-1}:
                         mat.dispersion_coating = self.coating_material.dispersion_curve
                         mat.coating_thickness = self.coating_thickness
