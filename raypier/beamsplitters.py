@@ -39,6 +39,7 @@ class BaseBeamsplitterCube(Extrusion):
 
 class PolarisingBeamsplitterCube(BaseBeamsplitterCube):
     abstract=False
+    name = "Polarising Cube Beamsplitter"
     
     def make_faces(self):
         h = self.size/2
@@ -61,6 +62,7 @@ class PolarisingBeamsplitterCube(BaseBeamsplitterCube):
     
 class UnpolarisingBeamsplitterCube(PolarisingBeamsplitterCube):
     abstract=False
+    name = "Non_Polarising_Cube_Beamsplitter"
     
     reflectivity = Float(0.5)
     
@@ -73,12 +75,12 @@ class UnpolarisingBeamsplitterCube(PolarisingBeamsplitterCube):
                        )
     
     def _material_default(self):
-        print("n_inside", self.n_inside, "n_outside", self.n_outside)
+        #print("n_inside", self.n_inside, "n_outside", self.n_outside)
         m = FullDielectricMaterial(n_inside = self.n_inside,
                                     n_outside = self.n_outside)
 #         m = SingleLayerCoatedMaterial(n_inside = self.n_inside,
 #                                     n_outside = self.n_outside)
-        print("thresholds:", m.reflection_threshold, m.transmission_threshold)
+        #print("thresholds:", m.reflection_threshold, m.transmission_threshold)
         return m
     
     def make_faces(self):
@@ -96,6 +98,7 @@ class UnpolarisingBeamsplitterCube(PolarisingBeamsplitterCube):
     
     @observe("reflectivity")
     def on_refl_changed(self, evt):
-        self.faces[-1].material.reflectivity = self.reflectivity
+        refl = self.reflectivity
+        self.faces.faces[-1].material.reflectivity = refl
         
     

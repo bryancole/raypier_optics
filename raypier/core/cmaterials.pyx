@@ -296,6 +296,7 @@ cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
         def __set__(self, val):
             if val<0.0 or val>1.0:
                 raise ValueError(f"Reflectivity must be in range 0.0 to 1.0 ({val} given).")
+            self._reflectivity = val
         
     cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -748,7 +749,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         #incoming power
         P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
                          E2_amp.real**2 + E2_amp.imag**2)
-        
+        #print "P_in:", P_in, n1.real, E1_amp.real, E1_amp.imag, E2_amp.real, E2_amp.imag
         if P_in==0.0:
             return
         #print "P Incoming:", P_in
@@ -760,7 +761,6 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         R_s *= E1_amp
         R_p *= E2_amp
         
-        #print "P_in:", P_in, n1.real, E1_amp.real, E1_amp.imag, E2_amp.real, E2_amp.imag
         #print "P_R:", (cabs(R_s)**2 + cabs(R_p)**2)
         
         if ( n1.real*(cabs(R_s)**2 + cabs(R_p)**2)/P_in ) > self.reflection_threshold:
