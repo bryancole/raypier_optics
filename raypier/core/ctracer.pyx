@@ -1589,7 +1589,7 @@ cdef class Distortion:
     def z_offset(self, double[:] x, double[:] y):
         cdef:
             size_t i, n=len(x)
-            double[:,:] out = np.empty((n,), 'd')
+            double[:] out = np.empty((n,), 'd')
             
         if len(y) != n:
             raise ValueError("Both x and y must have the same length")

@@ -7,7 +7,7 @@ Traited wrappers for cfaces objects
 from .core.cfaces import ShapedPlanarFace, ShapedSphericalFace, ConicRevolutionFace, AsphericFace as AsphericFace_,\
             ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_, DistortionFace as DistortionFace_
             
-from .core.ctracer import Distortion
+from .distortions import BaseDistortion
             
 from .shapes import BaseShape
 from .editors import NumEditor
@@ -156,13 +156,13 @@ class AsphericFace(ConicFace):
 class DistortionFace(BaseFace):
     z_height = Property()
     base_face = Instance(BaseFace)
-    distortion = Instance(Distortion)
+    distortion = Instance(BaseDistortion, ())
     
-    cface = Instance(DistortionFace_, ())
+    cface = Instance(DistortionFace_)
     
     traits_view = View(
                     VGroup(Item("base_face", style="custom"),
-                           #Item("distortion", style="custom")
+                           Item("distortion", style="custom")
                            )
                     )
     
@@ -171,12 +171,19 @@ class DistortionFace(BaseFace):
     
     def _cface_default(self):
         return DistortionFace_(base_face=self.base_face.cface, 
-                               distortion=self.distortion)
+                               distortion=self.distortion.c_distortion)
     
-    @observe("base_face, distortion")
-    def on_params_changed(self, evt):
+    @observe("base_face")
+    def on_base_face_changed(self, evt):
         self.cface.base_face = self.base_face.cface
-        self.cface.distortion = self.distortion
+        self.updated = True
+        
+    @observe("distortion")
+    def on_distortion_obj_changed(self, evt):
+        self.cface.distortion = self.distortion.c_distortion
         self.updated = True
     
+    @observe("distortion.updated")
+    def on_distortion_changed(self, evt):
+        self.updated = True
     

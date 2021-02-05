@@ -8,7 +8,7 @@ from raypier.faces import DistortionFace, PlanarFace, SphericalFace
 
 from raypier.general_optic import GeneralLens
 from raypier.materials import OpticalMaterial
-from raypier.core.cdistortions import SimpleTestZernikeJ7
+from raypier.distortions import SimpleTestZernikeJ7
 from raypier.gausslet_sources import CollimatedGaussletSource
 
 
@@ -18,7 +18,7 @@ shape = CircleShape(radius=10.0)
 f1 = SphericalFace(z_height=0.0, curvature=-25.0)
 f2 = PlanarFace(z_height=5.0)
 
-dist = SimpleTestZernikeJ7(unit_radius=10.0, amplitude=0.1)
+dist = SimpleTestZernikeJ7(unit_radius=10.0, amplitude=1.0)
 
 f1 = DistortionFace(base_face=f1, distortion=dist)
 
