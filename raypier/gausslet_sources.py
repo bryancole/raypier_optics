@@ -80,13 +80,13 @@ class BaseGaussletSource(BaseRaySource):
         
         def get_origins(gc_list):
             for gc in gc_list:
-                yield gc.origin.reshape(-1,3)
+                yield gc.base_rays.origin.reshape(-1,3)
                 if self.show_paras:
                     yield gc.para_origin.reshape(-1,3)
                 
         def get_normals(gc_list):
             for gc in gc_list:
-                yield gc.normal.reshape(-1,3)
+                yield gc.base_rays.normal.reshape(-1,3)
                 if self.show_paras:
                     yield gc.para_normal.reshape(-1,3)
                 
