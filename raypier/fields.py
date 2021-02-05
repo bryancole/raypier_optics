@@ -186,6 +186,9 @@ class EFieldPlane(Probe):
             else:
                 self.E_field += E.reshape(self.size, self.size, 3)
                 
+        if not n_list:
+            return
+                
         self.refractive_index = numpy.concatenate(n_list).mean()
         
         self._attrib.modified()

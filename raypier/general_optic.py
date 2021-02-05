@@ -1,6 +1,6 @@
 
 from traits.api import Float, Instance, \
-        List, observe, Tuple, Str
+        List, observe, Tuple, Str, ComparisonMode
 
 from traitsui.api import View, Item, VGroup, Group, ListEditor
 
@@ -29,9 +29,9 @@ class GeneralLens(BaseLens):
     name = Str("General Lens")
     shape = Instance(BaseShape)
     
-    surfaces = List(faces.BaseFace)
+    surfaces = List(faces.BaseFace, comparison_mode=ComparisonMode.identity)
     
-    materials = List(OpticalMaterial)
+    materials = List(OpticalMaterial, comparison_mode=ComparisonMode.identity)
     
     _grid = Instance(tvtk.PlaneSource, ())
     _clip = Instance(tvtk.ClipPolyData, ())
