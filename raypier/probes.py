@@ -62,13 +62,12 @@ class BaseCapturePlane(Probe):
     
     @observe("centre, orientation, width, height")
     def config_pipeline(self, evt):
-        centre = self.centre
         hwidth = self.width/2.
         hheight = self.height/2.
         plane = self.plane_src
-        plane.origin = (centre[0]-hwidth, centre[1]-hheight,0.0)
-        plane.point1 = (centre[0]+hwidth, centre[1]-hheight,0.0)
-        plane.point2 = (centre[0]-hwidth, centre[1]+hheight,0.0)
+        plane.origin = (-hwidth, -hheight,0.0)
+        plane.point1 = (hwidth, -hheight,0.0)
+        plane.point2 = (-hwidth, +hheight,0.0)
         plane.modified()
         
         face = self.face_list.faces[0]
