@@ -119,8 +119,13 @@ cdef class ParabasalRay:
 cdef class Gausslet:
     cdef gausslet_t gausslet
     
+    
+cdef class RayArrayView:
+    cdef void set_ray_c(self, unsigned long i, ray_t ray)
+    cdef ray_t get_ray_c(self, unsigned long i)
+    
 
-cdef class RayCollection:
+cdef class RayCollection(RayArrayView):
     cdef: 
         ray_t *rays
         readonly unsigned long n_rays, max_size
@@ -149,6 +154,10 @@ cdef class GaussletCollection:
     cdef void extend_c(self, GaussletCollection gc)
     cdef void reset_length_c(self, double max_length)
     
+    
+cdef class GaussletBaseRayView(RayArrayView):
+    cdef:
+        GaussletCollection owner
     
 
 cdef class RayCollectionIterator:
