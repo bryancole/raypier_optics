@@ -51,7 +51,10 @@ class BaseCapturePlane(Probe):
     vtkproperty = Instance(tvtk.Property, (), {'opacity': 1.0, 'color': (0.1,0.1,0.1),
                                                'representation': 'wireframe'})
     _mtime = Float(0.0)
+    
+    ### A list of lists of rays. One list per source.
     _all_rays = List()
+    
     
     traits_view = View(VGroup(
                        Traceable.uigroup,
@@ -102,7 +105,7 @@ class BaseCapturePlane(Probe):
         if any(src._mtime > mtime for src in src_list):
             all_rays = []
             for src in src_list:
-                all_rays.extend(src.traced_rays)
+                all_rays.append(src.traced_rays)
             self._all_rays = all_rays
     
     @observe("centre, orientation, width, height, _all_rays")
@@ -113,21 +116,21 @@ class BaseCapturePlane(Probe):
         raise NotImplementedError()
         
         
-class RayCapturePlace(BaseCapturePlane):
+class RayCapturePlane(BaseCapturePlane):
     def _evaluate(self):
         all_rays = self._all_rays
         if not all_rays:
             return
         fl = self.face_list
         fl.sync_transforms()
-        captured = select_ray_intersections(fl, list(all_rays))
+        captured = [select_ray_intersections(fl, list(rc_list)) for rc_list in all_rays]
         self._mtime = time.monotonic()
         self.captured = captured
         
         
 class GaussletCapturePlane(BaseCapturePlane):
     name = Str("Gausslet Capture Plane")
-    captured = Instance(GaussletCollection)
+    captured = List(Instance(GaussletCollection))
     
     def _evaluate(self):
         all_rays = self._all_rays
@@ -135,7 +138,7 @@ class GaussletCapturePlane(BaseCapturePlane):
             return
         fl = self.face_list
         fl.sync_transforms()
-        captured = select_gausslet_intersections(fl, list(all_rays))
+        captured = [select_gausslet_intersections(fl, list(gc_list)) for gc_list in all_rays]
         self._mtime = time.monotonic()
         self.captured = captured
             

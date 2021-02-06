@@ -19,10 +19,12 @@ from .tracer import RayTraceModel
 
 from .fields import EFieldPlane
 
-from .probes import RayCapturePlace, GaussletCapturePlane
+from .probes import RayCapturePlane, GaussletCapturePlane
 
 from .apertures import CircularAperture, RectangularAperture
 
 from .intensity_surface import IntensitySurface
 
 from .beamsplitters import UnpolarisingBeamsplitterCube, PolarisingBeamsplitterCube
+
+from .core.ctracer import ray_dtype, gausslet_dtype, RayCollection, GaussletCollection

@@ -47,3 +47,49 @@ RayCollection objects have substantially the same attributes/properties as the R
 returns a numpy array containing the values for all rays in the collection. 
 
 RayCollection objects are iterable (yielding single Rays) and subscriptable. 
+
+Creating RayCollections
+-----------------------
+
+If you need to create a RayCollection with a large number of rays (say, if you are writing your own Source class), the easiest 
+method is to create a numpy array with the equivalent numpy dtype::
+
+    >>> from raypier.api import ray_dtype, RayCollection
+    >>> print(ray_dtype)
+    [('origin', '<f8', (3,)), 
+     ('direction', '<f8', (3,)), 
+     ('normal', '<f8', (3,)), 
+     ('E_vector', '<f8', (3,)), 
+     ('refractive_index', '<c16'), 
+     ('E1_amp', '<c16'), 
+     ('E2_amp', '<c16'), 
+     ('length', '<f8'), 
+     ('phase', '<f8'), 
+     ('accumulated_path', '<f8'), 
+     ('wavelength_idx', '<u4'), 
+     ('parent_idx', '<u4'), 
+     ('end_face_idx', '<u4'), 
+     ('ray_type_id', '<u4')]
+     
+Once you've created a numpy array with this dtype, you populate its fields as required. You can then create a RayCollection 
+instance from this array using :py:meth:`RayCollection.from_array' classmethod. E.g.::
+
+    >>> import numpy
+    >>> my_rays = numpy.zeros(500, ray_dtype)
+    >>> my_rays['direction'] = numpy.array([[0,1,1]],'d')
+    <... assign other members as necessary ...>
+    >>> rc = RayCollection.from_array(my_rays)
+
+Note, data is always copied to and from RayCollections. The reason why we don't use memory views is that RayCollections have a
+dynamic size and can grow in size by re-allocation of their memory. Numpy array, by contrast are static in size.
+
+Likewise, we can convert a RayCollection to a numpy array using its :py:meth:`RayCollection.copy_as_array` method.::
+
+    >>> arr = rc.copy_as_array()
+    
+    
+   
+    
+    
+
+

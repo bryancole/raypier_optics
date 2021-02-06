@@ -16,6 +16,7 @@ Contents:
    ray_collections
    ray_sources
    general_optics
+   misc_optics
    gaussian_beamlet_propagation
    creating_new_optics
    

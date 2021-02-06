@@ -147,7 +147,7 @@ class EFieldPlane(Probe):
                 return
             if mtime > detector._mtime:
                 return
-            ray_list = [detector.captured,]
+            ray_list = detector.captured
         else:
             idx = self.gen_idx
             ray_list = [src.traced_rays[idx] for src in src_list if src.traced_rays]
