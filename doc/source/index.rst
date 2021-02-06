@@ -18,6 +18,7 @@ Contents:
    general_optics
    misc_optics
    gaussian_beamlet_propagation
+   distortions
    creating_new_optics
    
    Examples <examples/index>

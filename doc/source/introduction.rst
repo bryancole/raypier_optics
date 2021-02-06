@@ -54,15 +54,15 @@ The Components of a Raypier Model
 
 The RayTraceModel object is a container for the following components:
 
-* Optics - these represent your optical elements like lenses, mirrors polarisers etc.
+* **Optics** - these represent your optical elements like lenses, mirrors polarisers etc.
 
-* Sources - these generate the input rays for the model. The sources also hold the traced rays output of the tracing operation
+* **Sources** - these generate the input rays for the model. The sources also hold the traced rays output of the tracing operation
 
-* Probes - These are objects which select or sample the tracing operation result. Probes have a 3D position and orientation. 
+* **Probes** - These are objects which select or sample the tracing operation result. Probes have a 3D position and orientation. 
 
-* Results - Results represent calculated quantities to be evaluated after each trace. Results do not have a 3D position.
+* **Results** - Results represent calculated quantities to be evaluated after each trace. Results do not have a 3D position.
 
-* Constraints - Constraints are auxillary objects used to co-ordinate the parameters of a model for more convenient manipulation.
+* **Constraints** - Constraints are auxillary objects used to co-ordinate the parameters of a model for more convenient manipulation.
 
 
 While all of the above objects are optional, you probably want at least one source object in your model (otherwise, the result

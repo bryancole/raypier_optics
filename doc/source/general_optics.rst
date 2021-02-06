@@ -50,7 +50,7 @@ will have two surfaces, a doublet will have 3. In fact, any number of surfaces c
 I wanted to call the *surfaces* list of the GeneralLens "faces" but faces is already over-used as an 
 attribute name.
 
-There are 6 core face types supported by the General Optic framework:
+There are 7 core face types supported by the General Optic framework:
 
 * Planar
 * Spherical

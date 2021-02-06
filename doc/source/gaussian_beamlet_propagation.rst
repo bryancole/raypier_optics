@@ -28,4 +28,20 @@ range of directions. Such an angle decomposition is sometimes known as a "Gabor 
 Raypier Gausslet Implementation
 ===============================
 
-Raypier support Gausslet tracing through a GaussletCollection data-structure.  
+Raypier support Gausslet tracing through a GaussletCollection data-structure. Gausslets are an extension of the Ray data structure.
+In fact, the dtype for a Gausslet object looks like::
+
+    para_dtype = [('origin', '<f8', (3,)), ('direction', '<f8', (3,)), ('normal', '<f8', (3,)), ('length', '<f8')]
+
+    gausslet_dtype = [('base_ray', ray_dtype), ('para_rays', para_dtype, (6,))]
+    
+I.e. we define a dtype for the parabasal rays which contains only the geometric information (origin, direction, length etc.) 
+and omits any E-field polarisation or amplitude information. The gausslet is then composed of one `base_ray` (with 
+regular ray_dtype) and 6 parabasal rays (with para_dtype).
+
+Gausslets have their own set of predefined source-objects, found in :py:mod:`raypier.gausslet_sources`. 
+
+Evaluating the E-field
+======================
+
+The nice thing about Gausslet ray-tracing is that you can evaluate the E-field at any point in your model. 
