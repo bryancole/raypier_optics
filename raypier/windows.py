@@ -5,11 +5,11 @@ from traitsui.api import Item, View, VGroup
 
 from tvtk.api import tvtk
 
-from .cfaces import CircularFace(Face)
-from .cmaterials import DielectricMaterial, CoatedDispersiveMaterial
+from .core.cfaces import CircularFace
+from .core.cmaterials import CoatedDispersiveMaterial
 from .dispersion import NamedDispersionCurve, NondispersiveCurve
 from .bases import Optic, Traceable, NumEditor
-from .ctracer import FaceList
+from .core.ctracer import FaceList
 
 
 class CircularWindow(Optic):
@@ -49,11 +49,11 @@ class CircularWindow(Optic):
     def _faces_default(self):
         fl = FaceList(owner=self)
         fl.faces = [CircularFace(owner=self, diameter=self.diameter,
-                                 offset = self.offset, self.z_plane=0.0,
+                                 offset = self.offset, z_plane=0.0,
                                 material = self.material), 
                     CircularFace(owner=self, diameter=self.diameter,
                                 material=self.material, offset=self.offset,
-                                z_height=self.thickness)]
+                                z_plane=self.thickness)]
         return fl
     
     
