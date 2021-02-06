@@ -4,9 +4,9 @@ The General Optic Framework
 The General Optic framework provides the most flexible means of defining optical components. The GeneralLens class
 is an optic which is composed of:
 
-* A shape (from raypier.shapes)
-* A list of surfaces (from raypier.faces)
-* A list of materials (from raypier.materials)
+* A shape (from :py:mod:`raypier.shapes`)
+* A list of surfaces (from :py:mod:`raypier.faces`)
+* A list of materials (from :py:mod:`raypier.materials`)
 
 These are high-level objects which aim to streamline the process of configuring a custom optical element. The general optic
 framework is appropriate for optical elements which fit the "planar" model of a outline defined in the XY-plane with a 
@@ -22,9 +22,9 @@ coordinate system. The optic can have any position and orientation in the global
 
 There are two shape primitives, at the time of writing:
 
- * RectangleShape
+ * :py:class:`RectangleShape`
  
- * CircleShape
+ * :py:class:`CircleShape`
  
 There are two more I have yet to implement, being PolygonShape and EllipseShape.
 
@@ -47,7 +47,7 @@ Surfaces
 The surfaces represent the geometry of the faces of the GeneralLens. While a simple singlet lens 
 will have two surfaces, a doublet will have 3. In fact, any number of surfaces can be added.
  
-I wanted to call the _surfaces_ list of the GeneralLens "faces" but faces is already overused as an 
+I wanted to call the *surfaces* list of the GeneralLens "faces" but faces is already over-used as an 
 attribute name.
 
 There are 6 core face types supported by the General Optic framework:
@@ -58,10 +58,15 @@ There are 6 core face types supported by the General Optic framework:
 * Conic (a conic surface of revolution)
 * Aspheric
 * Axicon
+* Distortion
 
 These all have a "mirror" boolean trait. If this is true, the face is considered 100% reflective.
 Otherwise, the reflection and transmission characteristics will be derived from the dielectric 
 material coefficients on either side of the surface.
+
+The DistortionFace object is a special type of Face that wraps another "base face" with some sort 
+of geometric distortion function (for example, a Zernike polynomial function). The range of available
+distortion functions can be found in the :py:mod:`raypier.distortions` module.
 
 Materials
 .........

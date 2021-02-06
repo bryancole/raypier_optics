@@ -27,12 +27,14 @@ shape = CircleShape(radius=10.0)
 f1 = PlanarFace(mirror=True)
 f2 = SphericalFace(curvature=2000.0, mirror=True)
 
-m1 = GeneralLens(shape=shape,
+m1 = GeneralLens(name="Mirror 1",
+                 shape=shape,
                  surfaces=[f1],
                  centre=(0,20,0),
                  direction=(0,-1,0))
 
-m2 = GeneralLens(shape=shape,
+m2 = GeneralLens(name="Mirror 2",
+                 shape=shape,
                  surfaces=[f2],
                  centre=(20,0,0),
                  direction=(-1,0,0))

@@ -69,13 +69,4 @@ While all of the above objects are optional, you probably want at least one sour
 will be rather uninteresting). 
 
 
-Exploring the GUI
-=================
-
-Raypier is based on the Traits/TraitsUI framework. The Traits library provides a notification framework and improved type-declaration.
-TraitsUI is a GUI framework that extends Traits to make developing custom GUIs fast and easy. The UI for *any* traited object
-can be invoked with a call to my_object.configure_traits(). Typically, I recommend you define your base optical model in a 
-script where an instance of RayTraceModel is created, then launch ui GUI with a call to the model's configure_traits() method. Lets see 
-this in action::
-
 	

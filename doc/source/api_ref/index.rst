@@ -5,9 +5,9 @@ API Reference
 
 .. toctree::
 
-	ctracer
-	cmaterials
-	cfaces
-	cfields
 	
-	tracer
+	faces
+	shapes
+	materials
+	
+	core <core/index>

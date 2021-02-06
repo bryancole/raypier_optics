@@ -9,12 +9,14 @@ Welcome to Raypier's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    
    introduction
+   exploring_the_gui
+   ray_collections
+   ray_sources
    general_optics
    gaussian_beamlet_propagation
-   cython_branch_info
    creating_new_optics
    
    Examples <examples/index>

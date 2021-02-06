@@ -384,6 +384,7 @@ Traceable.uigroup = VGroup(
                           show_border=True,
                           label="Direction"
                           ),
+                   label="Geometry"
                     )
 
 

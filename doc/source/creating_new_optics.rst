@@ -36,12 +36,15 @@ and has .x and .y and .z members. Outside the comfort of python/numpy, vector
 algebra is significantly less pleasant. The ctracer module defines a number of
 inline functions to (partially) simplify working with vector_t's. For vector 
 arithmatic, you can use:
- - addvv_(vector_t a, vector_t b) #add two vectors
- - addvs_(vector_t a, double b) #adds a vector and a scalar
- - multvv_(vector_t a, vector_t b) #multiplies two vectors
- - multvs_(vector_t a, double b) #multiplies a vector and a scalar
+
+* addvv_(vector_t a, vector_t b) #add two vectors
+* addvs_(vector_t a, double b) #adds a vector and a scalar
+* multvv_(vector_t a, vector_t b) #multiplies two vectors
+* multvs_(vector_t a, double b) #multiplies a vector and a scalar
+
  etc. 
- Similar function are defined for subtraction and element-wise division. The
+
+Similar function are defined for subtraction and element-wise division. The
 'vv' function denote operations on two vectors, 'vs' denotes operations on a
 vector and a scalar. The trailing underscore is a convention I'm adopting to
 indicate that the method is a 'C'-method (i.e. not python callable).
@@ -133,7 +136,7 @@ materials, or share them.
 Custom Interface Materials
 --------------------------
 
-InterfaceMaterial subclasses provide a cdef method 
+InterfaceMaterial subclasses provide a cdef method:: 
 
   cdef eval_child_ray_c(self, ray_t *old_ray, 
                             unsigned int ray_idx, 
