@@ -24,6 +24,7 @@ The main tracing functionality is provided by three new (compiled) modules:
  
  
 .. module:: ctracer
+
 ..moduleauthor:: Bryan Cole <bryancole.cam@googlemail.com>
 
  
@@ -42,4 +43,6 @@ The main tracing functionality is provided by three new (compiled) modules:
   
 .. module:: cfaces
 
-  This module contains the concrete implementation of Face classes
+  This module contains the concrete implementation of Face classes.
+  
+  

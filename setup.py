@@ -77,9 +77,10 @@ setup(
     install_requires = ["numpy >= 1.1",
         #"VTK",
         #"wxPython", #maybe can avoid an explicit dependancy on wx
-        "Traits >= 3.0",
-        "Mayavi >= 3.0", #TVTK is distributed as part of Mayavi
-        "TraitsUI >= 3.0"
+        "numpy >= 1.19", 
+        "traits >= 3.0",
+        "mayavi >= 3.0", #TVTK is distributed as part of Mayavi
+        "traitsui >= 3.0"
         ],
 
     package_data = {}, #none, yet
