@@ -18,7 +18,7 @@ Raypier is a non-sequential ray-tracing framework for modelling optical systems.
   
 There are still a few "big" features missing:
 
-#. Any form of useful documentation :(
+#. The documentation is not comprehensive (yet).
 
   
 Requirements

@@ -25,7 +25,7 @@ add in components from the GUI / Menu.
 
 A minimal empty model looks like::
 
-  from raypier.tracer import RayTraceModel
+  from raypier.api import RayTraceModel
   model = RayTraceModel()
   model.configure_traits()
 
@@ -68,5 +68,71 @@ The RayTraceModel object is a container for the following components:
 While all of the above objects are optional, you probably want at least one source object in your model (otherwise, the result
 will be rather uninteresting). 
 
+Basic Usage
+===========
 
-	
+I recommend writing models as a script, then calling :py:meth:`RayTraceModel.configure_traits()` on the model to view the model in the GUI.
+
+The basic method of model construction is to create instances of all the optical components you need, create one or more source-objects,
+and whatever probes, result or constraint objects, then give them all to an instance of RayTraceModel. For example::
+
+    from raypier.api import RayTraceModel, GeneralLens, ParallelRaySource, SphericalFace, CircleShape, OpticalMaterial
+
+    ### Build a couple of lenses ###
+    shape = CircleShape(radius=12.5)
+    f1 = SphericalFace(curvature=-50.0, z_height=0.0)
+    f2 = SphericalFace(curvature=50.0, z_height=5.0)
+    m = OpticalMaterial(glass_name="N-BK7")
+    lens1 = GeneralLens(centre=(0,0,0),
+                        direction=(0,0,1),
+                        shape=shape,
+                        surfaces=[f1,f2],
+                        materials=[m])
+    lens2 = GeneralLens(centre=(0,0,100.0),
+                        direction=(0,0,1),
+                        shape=shape,
+                        surfaces=[f1,f2],
+                        materials=[m])
+    
+    ### Add a source ###
+    src = ParallelRaySource(origin=(0,0,-50.0),
+                            direction=(0,0,1),
+                            rings=5,
+                            show_normals=False,
+                            display="wires",
+                            opacity=0.1)
+    
+    model = RayTraceModel(optics=[lens1,lens2],
+                            sources=[src])
+    
+    ###Now open the GUI###
+    model.configure_traits()
+    
+Here's our model:
+   
+.. image:: images/getting_started.png
+
+If we set `show_normals=True` on the source object, the rendering show the norma-vectors at each surface intersection. This is
+a useful sanity check to be sure your model is behaving physically.
+
+.. image:: images/getting_started2.png
+    
+Retracing of the model occurs whenever any parameter changes. You can explicitly force a re-trace using the :py:meth:`RayTraceModel.trace_all`
+method. I.e.::
+
+    model.trace_all()
+    
+You can access the results of the trace as the :py:attr:`RayCollection.traced_rays` list on the source object. E.g.::
+
+    for rays in src.traced_rays:
+        one_ray = rays[0]
+        print(one_ray.origin, one_ray.accumulated_path)
+        
+Sometimes, having the model re-trace on every change isn't what you want (for example, if you're doing a batch calculation,
+or running an optimisation). You can block re-tracing using the :py:meth:`hold_off` context manager. I.e.::
+
+    with model.hold_off():
+        lens1.shape.radius=10.0
+        src.origin=(0,0,-100.0)
+        
+The model should re-trace automatically on exiting the context-manager.
