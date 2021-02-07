@@ -11,13 +11,16 @@ from tvtk.pyface.scene_editor import SceneEditor
 from raypier.results import Result
 from raypier.fields import EFieldPlane
 from raypier.vtk_algorithms import NumpyImageSource
+from .core.unwrap2d import unwrap2d
+
+import numpy
 
 
 class IntensitySurface(Result):
     name = "Field Plane Surface View"
     field_probe = Instance(EFieldPlane)
     
-    display = Enum("Intensity", "E_x", "E_y", "E_z")
+    display = Enum("Intensity", "E_x", "E_y", "E_z", "Phase_x", "Phase_y", "Phase_z")
     
     intensity_data = Array()
     
@@ -125,11 +128,17 @@ class IntensitySurface(Result):
     def calc_intensity(self, e_field):
         E = e_field
         mode = self.display
+        select = {"x":0, "y":1, "z":2}
         if mode=="Intensity":
             U = (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
-        else:
-            idx = {"E_x":0, "E_y":1, "E_z":2}[mode]
+        elif mode.startswith("E"):
+            idx = select[mode[-1]]
             U = E[:,:,idx].real
+        elif mode.startswith("Phase"):
+            idx = select[mode[-1]]
+            e = E[:,:,idx]
+            U = numpy.arctan2(e.imag, e.real)
+            U, res = unwrap2d(U, anchor=(U.shape[0]//2,U.shape[1]//2))
         self.intensity_data = U
         return U
     

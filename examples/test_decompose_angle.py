@@ -2,7 +2,8 @@
 
 from raypier.gausslet_sources import SingleGaussletSource, CollimatedGaussletSource
 from raypier.gausslets import AngleDecompositionPlane
-from raypier.lenses import PlanoConvexLens, GeneralLens
+from raypier.lenses import PlanoConvexLens
+from raypier.general_optic import GeneralLens
 from raypier.achromats import EdmundOptic45806
 from raypier.shapes import CircleShape
 from raypier.faces import SphericalFace
