@@ -8,7 +8,7 @@ from scipy.interpolate import RectBivariateSpline
 from .ctracer import ray_dtype, GaussletCollection
 from .utils import normaliseVector
 from .fields import eval_Efield_from_gausslets
-
+from .unwrap2d import unwrap2d
 
 
 root_pi = numpy.sqrt(numpy.pi)
@@ -158,7 +158,7 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     return rays, data_out
 
 
-def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=0.0):
+def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None):
     """
     Spatially decompose the input Gausslets into a new set of Gausslets defined over a circular area of the 
     given radius. The output ray density is given by the resolution parameter.
@@ -185,7 +185,7 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
                  The number of rays generated between the decomposition plane centre and radius edge
                  
     curvature : float, optional
-                The approximate curvature of the wavefront (=1/radius-of-curvature)
+                The approximate radius-of-curvature of the wavefront. I.e. distance to focus. None=Inf.
                 
     Returns
     -------
@@ -196,6 +196,11 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     
     spacing = radius / resolution
     wavelengths = input_rays.wavelengths
+    
+    if len(numpy.unique(wavelengths)) > 1:
+        raise ValueError("Can't decompose wavefront with more than one wavelength present.")
+    
+    wavelength = wavelengths[0]
     
     origin = numpy.asarray(origin)
     direction = normaliseVector(numpy.asarray(direction))
@@ -208,17 +213,57 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     x_ = y_ = numpy.linspace(-_radius,_radius, resolution*2)
     
     x,y = numpy.meshgrid(x_, y_)
-    x.shape=(-1,)
-    y.shape=(-1,)
     
-    origins = origin[None,:] + x[:,None]*axis1[None,:] + y[:,None]*axis2[None,:]
+    origins = origin[None,:] + x.reshape(-1,)[:,None]*axis1[None,:] + y.reshape(-1)[:,None]*axis2[None,:]
     
     E_field = eval_Efield_from_gausslets(input_rays, origins, wavelengths)
     
-    #phase1 = 
-    ###Figure out the phase at each sample-point
-    phase = unwrap_phase_hex(E_field, origins, curvature)
+    ### Project onto local axes to get orthogonal polarisations and choose the one with the most power
+    E1_amp = (E_field*axis1[None,:]).sum(axis=1)
+    E2_amp = (E_field*axis2[None,:]).sum(axis=1)
     
-    dx, dy = eval_phase_gradient(phase, x,y)
+    P1 = (E1_amp.real**2 + E1_amp.imag**2).sum()
+    P2 = (E2_amp.real**2 + E2_amp.imag**2).sum()
+    
+    if P1 > P2:
+        ### Always in the range -pi to +pi
+        phase = numpy.arctan2(E1_amp.imag, E1_amp.real)
+    else:
+        phase = numpy.arctan2(E2_amp.imag, E2_amp.real)
+        
+    nx = len(x_)
+    ny = len(y_)
+    phase.shape = (nx, ny)
+    
+    if curvature is not None:
+        R = curvature/wavelength
+        sph = R - numpy.sqrt(R*R - x*x - y*y) - numpy.pi
+        phase = phase - sph
+        phase = phase%(2*numpy.pi)
+        phase = phase - numpy.pi
+    else:
+        sph = 0
+    
+    uphase = unwrap2d(phase, anchor=(nx//2, ny//2)) + sph
+    
+    wavefront = RectBivariateSpline(x_, y_, uphase*wavelength/(2*numpy.pi))
+    
+    ### Now make a hex-grid of new ray start-points
+    rx,ry = make_hexagonal_grid(radius, spacing=spacing)
+    
+    origins = origin[None,:] + rx[:,None]*axis1[None,:] + ry[:,None]*axis2[None,:]
+    
+    ### First derivatives give us the ray directions
+    dx = wavefront(rx,ry,dx=1, grid=False)
+    dy = wavefront(rx,ry,dy=1, grid=False)
+    
+    directions = direction - dx[:,None]*axis1[None,:] - dy[:,None]*axis2[None,:]
+    directions = normaliseVector(directions)
+    
+    ### Get second derivates, to get wavefront curvature
+    dx2 = wavefront(rx,ry,dx=2, grid=False)
+    dy2 = wavefront(rx,ry,dy=2, grid=False)
+    dxdy = wavefront(rx,ry,dx=1,dy=1, grid=False)
+    
     
     
