@@ -24,7 +24,7 @@ def find_ray_focus(ray_collection):
         direction = ray_collection.direction
     weights = E1.real**2 + E1.imag**2 + E2.real**2 + E2.imag**2
     weights /= weights.sum()
-    return find_focus(ray_collection.origin, ray_collection.direction, weights=weights)
+    return find_focus(origin, direction, weights=weights)
 
 
 def find_focus(ray_origins, ray_directions, weights=None):

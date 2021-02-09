@@ -34,7 +34,7 @@ class EFieldPlane(Probe):
     size = Int(30)
             
     exit_pupil_offset = Float(10.0) #in mm
-    blending = Float(1.0)
+    blending = Float(1.5)
     
     centre_on_focus_btn = Button()
     
@@ -220,7 +220,7 @@ class EFieldPlane(Probe):
             src = self.source
             rays = src.traced_rays[idx]
         else:
-            rays = detector.captured
+            rays = detector.captured[0]
         self.centre = tuple(a+b for a,b in zip(find_ray_focus(rays), offset))
     
     

@@ -4,6 +4,8 @@ import numpy
 
 from numpy import fft
 from scipy.interpolate import RectBivariateSpline
+from scipy.sparse.linalg import lsqr
+from scipy.sparse import coo_matrix
 
 from .ctracer import ray_dtype, GaussletCollection
 from .utils import normaliseVector
@@ -17,10 +19,13 @@ def next_power_of_two(n):
     return int(2**numpy.ceil(numpy.log2(n)))
 
 
-def make_hexagonal_grid(radius, spacing=1.0):
+def make_hexagonal_grid(radius, spacing=1.0, connectivity=False):
     """Creates a 2d hexagonal grid.
     Radius and spacing have the same units.
-    Returns - x,y: 1d arrays of the respective coordinate."""
+    Returns - x,y: 1d arrays of the respective coordinate.
+    if connectivity=True:
+        Returns - x, y, neighbours: where neighbours is an (N,6) array of indices giving the adjacent neighbours to each coordinate
+    """
     
     cosV = numpy.cos(numpy.pi*30/180.)
     sinV = numpy.sin(numpy.pi*30/180.)
@@ -31,6 +36,7 @@ def make_hexagonal_grid(radius, spacing=1.0):
     
     vi, vj = numpy.meshgrid(i,j)
     
+    ni, nj = vi.shape
     vi.shape = -1
     vj.shape = -1
     
@@ -39,7 +45,24 @@ def make_hexagonal_grid(radius, spacing=1.0):
     
     r2 = x**2 + y**2
     select = r2 < (radius**2)
-    return x[select], y[select]
+    
+    if connectivity:
+        labels = -numpy.ones((ni+2, nj+2), numpy.int)
+        labels[1:-1, 1:-1] = numpy.arange(ni*nj).reshape(ni,nj)
+        
+        centres = -numpy.ones((vi.size,), numpy.int)
+        neighbours = numpy.dstack([labels[2:,1:-1], labels[:-2,1:-1],
+                                   labels[1:-1,2:], labels[1:-1,:-2],
+                                   labels[2:,:-2], labels[:-2,2:]])
+        neighbours.shape = (-1,6)
+        
+        sel = centres
+        centres[select] = numpy.arange(select.sum())
+        nb = centres[numpy.compress(select, neighbours, axis=0)]
+        
+        return x[select], y[select], nb
+    else:
+        return x[select], y[select]
 
 
 def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle, wavelength, 
@@ -249,7 +272,7 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     wavefront = RectBivariateSpline(x_, y_, uphase*wavelength/(2*numpy.pi))
     
     ### Now make a hex-grid of new ray start-points
-    rx,ry = make_hexagonal_grid(radius, spacing=spacing)
+    rx,ry, nb = make_hexagonal_grid(radius, spacing=spacing, connectivity=True)
     
     origins = origin[None,:] + rx[:,None]*axis1[None,:] + ry[:,None]*axis2[None,:]
     
@@ -260,10 +283,13 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     directions = direction - dx[:,None]*axis1[None,:] - dy[:,None]*axis2[None,:]
     directions = normaliseVector(directions)
     
-    ### Get second derivates, to get wavefront curvature
+    ### Get second derivatives, to get wavefront curvature
     dx2 = wavefront(rx,ry,dx=2, grid=False)
     dy2 = wavefront(rx,ry,dy=2, grid=False)
     dxdy = wavefront(rx,ry,dx=1,dy=1, grid=False)
     
-    
+    ###Convert to A,B,C coefficients
+    ### Then
+    ### Need to figure out the cross-coupling between each adjacent mode.
+    ### Bugger, that's an arse.
     
