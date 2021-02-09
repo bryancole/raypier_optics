@@ -161,14 +161,13 @@ class EFieldPlane(Probe):
             yside = self.height/2
             px = numpy.linspace(-side,side,size)
             py = numpy.linspace(-yside, yside, size)
-            points = numpy.dstack(numpy.meshgrid(px,py,0)).reshape(-1,3)
-            ###What a chore
-            trns = self.transform
-            pts_in = tvtk.Points()
-            pts_out = tvtk.Points()
-            pts_in.from_array(points)
-            trns.transform_points(pts_in, pts_out)
-            points2 = pts_out.to_array().astype('d')
+            
+            centre = numpy.asarray(self.centre)
+            axis2 = numpy.cross(self.direction, self.x_axis)
+            axis1 = numpy.cross(axis2, self.direction)
+            
+            points = centre[None,None,:] + px[:,None,None]*axis2 + py[None,:,None]*axis1
+            points2 = points.reshape(-1,3)
             
             if isinstance(rays, GaussletCollection):
                 n_list.append(rays.base_rays.refractive_index.real)
