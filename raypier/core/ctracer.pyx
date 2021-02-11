@@ -1312,6 +1312,50 @@ cdef class GaussletCollection:
         rc.n_rays = size
         return rc
     
+    property lagrange_invariant:
+        def __get__(self):
+            cdef:
+                int i,j
+                unsigned long k, N = self.n_rays
+                np_.ndarray out = np.empty((N,), dtype='d' )
+                double[:] _out = out
+                double v=0
+                gausslet_t g
+                ray_t r
+                para_t p
+                vector_t[6] h
+                vector_t[6] u
+                vector_t axis1, axis2, o
+                double[:] wavelen = self.wavelengths
+                
+                
+            for k in range(N):
+                g = self.rays[k]
+                r = g.base_ray
+                axis1 = norm_(r.E_vector)
+                axis2 = cross_(axis1, r.direction)
+                
+                for i in range(6):
+                    p = g.para[i]
+                    o = subvv_(p.origin, r.origin)
+                    h[i].x = dotprod_(o, axis1)
+                    h[i].y = dotprod_(o, axis2)
+                    h[i].z = 0.0
+                    u[i].x = dotprod_(p.direction, axis1)
+                    u[i].y = dotprod_(p.direction, axis2)
+                    u[i].z = 0.0
+                    
+                v = 0
+                v += (dotprod_(h[0],u[5]) - dotprod_(h[5],u[0]))**2
+                v += (dotprod_(h[1],u[2]) - dotprod_(h[2],u[1]))**2
+                v += (dotprod_(h[3],u[4]) - dotprod_(h[4],u[3]))**2
+                v += (dotprod_(h[1],u[4]) - dotprod_(h[4],u[1]))**2
+                v += (dotprod_(h[0],u[3]) - dotprod_(h[3],u[0]))**2
+                v += (dotprod_(h[2],u[5]) - dotprod_(h[5],u[2]))**2
+                
+                _out[k] = 1000*sqrt(v/6)/ wavelen[r.wavelength_idx]
+            return out
+    
     def config_parabasal_rays(self, double[:] wavelength_list, double radius, double working_dist):
         """
         Initialise the parabasal rays for a symmetric (i.e. circular) modes, 

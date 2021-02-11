@@ -18,6 +18,38 @@ root_pi = numpy.sqrt(numpy.pi)
 def next_power_of_two(n):
     return int(2**numpy.ceil(numpy.log2(n)))
 
+def lagrange_invariant(gausslet):
+    base_ray = gausslet.base_ray
+    origin = numpy.asarray(base_ray.origin)
+    direction = numpy.asarray(base_ray.direction)
+    axis1 = numpy.asarray(base_ray.E_vector)
+    axis2 = numpy.cross(axis1, direction)
+    
+    paras = gausslet.parabasal_rays
+    
+    def get_origin(porigin):
+        return numpy.asarray(porigin) - origin
+    
+    def get_direction(pdir):
+        return numpy.asarray(pdir)# - direction
+    
+    h1 = [(get_origin(p.origin)*axis1).sum() for p in paras]
+    h2 = [(get_origin(p.origin)*axis2).sum() for p in paras]
+    u1 = [(get_direction(p.direction)*axis1).sum() for p in paras]
+    u2 = [(get_direction(p.direction)*axis2).sum() for p in paras]
+    
+    def HU(i,j):
+        return (h1[i]*u1[j] + h2[i]*u2[j]) - ( h1[j]*u1[i] + h2[j]*u2[i] )
+    
+    #out = [HU(0,3), HU(1,2), HU(0,5), HU(1,4), HU(3,4), HU(2,5)]
+    out = [HU(0,5), HU(1,2), HU(3,4), HU(1,4), HU(0,3), HU(2,5)]
+#     out = numpy.zeros((6,6),'d')
+#     for i in range(6):
+#         for j in range(6):
+#             out[i,j] = 
+            
+    return out
+
 
 def make_hexagonal_grid(radius, spacing=1.0, connectivity=False):
     """Creates a 2d hexagonal grid.
