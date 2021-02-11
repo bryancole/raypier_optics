@@ -181,14 +181,15 @@ class EFieldPlane(Probe):
                                           exit_pupil_centre=self.centre)
             
             if ct==0:
-                self.E_field = E.reshape(self.size, self.size, 3)
+                E_field = E.reshape(self.size, self.size, 3)
             else:
-                self.E_field += E.reshape(self.size, self.size, 3)
+                E_field += E.reshape(self.size, self.size, 3)
                 
         if not n_list:
             return
                 
         self.refractive_index = numpy.concatenate(n_list).mean()
+        self.E_field = E_field
         
         self._attrib.modified()
         end = time.monotonic()

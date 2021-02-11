@@ -216,7 +216,7 @@ class GeneralLens(BaseLens):
                 cfaces.append(face.cface)
         self.faces.faces = cfaces
     
-    @observe("materials.items.dispersion_curve")
+    @observe("materials.items.dispersion_curve, coating_material.dispersion_curve, coating_thickness")
     def on_material_change(self, evt):
         self.config_cfaces()
         self.update = True
@@ -224,6 +224,7 @@ class GeneralLens(BaseLens):
     @observe("surfaces.items.updated, shape.updated")
     def on_surfaces_changed(self, evt):
         self.config_cfaces()
+        print("Face changed", evt)
         self.on_bounds_change(None)
         self.update = True
 

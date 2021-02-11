@@ -173,7 +173,7 @@ class DistortionFace(BaseFace):
         return DistortionFace_(base_face=self.base_face.cface, 
                                distortion=self.distortion.c_distortion)
     
-    @observe("base_face")
+    @observe("base_face.updated")
     def on_base_face_changed(self, evt):
         self.cface.base_face = self.base_face.cface
         self.updated = True
