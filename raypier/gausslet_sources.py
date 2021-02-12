@@ -315,7 +315,7 @@ class TopHatGaussletSource(SingleGaussletSource):
 class CollimatedGaussletSource(SingleGaussletSource):
     radius = Float(10.,editor=NumEditor)
     resolution = Float(10.0, editor=NumEditor)
-    blending = Float(1.0)
+    blending = Float(1.5)
     
     input_rays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, "
@@ -399,7 +399,7 @@ class CollimatedGaussletSource(SingleGaussletSource):
         wl = numpy.array(self.wavelength_list)
         rays.wavelengths = wl
         working_dist = 0.0
-        rays.config_parabasal_rays(wl*self.blending, spacing, working_dist)
+        rays.config_parabasal_rays(wl, spacing/self.blending, working_dist)
         return rays
         
         

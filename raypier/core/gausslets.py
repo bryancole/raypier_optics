@@ -291,7 +291,7 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     phase.shape = (nx, ny)
     
     if curvature is not None:
-        R = curvature/wavelength
+        R = 1000*curvature/wavelength
         sph = R - numpy.sqrt(R*R - x*x - y*y) - numpy.pi
         phase = phase - sph
         phase = phase%(2*numpy.pi)
@@ -301,7 +301,7 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     
     uphase = unwrap2d(phase, anchor=(nx//2, ny//2)) + sph
     
-    wavefront = RectBivariateSpline(x_, y_, uphase*wavelength/(2*numpy.pi))
+    wavefront = RectBivariateSpline(x_, y_, uphase*wavelength/(2000*numpy.pi))
     
     ### Now make a hex-grid of new ray start-points
     rx,ry, nb = make_hexagonal_grid(radius, spacing=spacing, connectivity=True)

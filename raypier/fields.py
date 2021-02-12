@@ -34,7 +34,7 @@ class EFieldPlane(Probe):
     size = Int(30)
             
     exit_pupil_offset = Float(10.0) #in mm
-    blending = Float(1.5)
+    blending = Float(1.0)
     
     centre_on_focus_btn = Button()
     

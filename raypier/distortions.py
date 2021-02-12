@@ -12,6 +12,10 @@ from .core import cdistortions, ctracer
 class BaseDistortion(HasTraits):
     updated = Event()
     c_distortion = Instance(ctracer.Distortion, ())
+    
+    
+class NullDistortion(BaseDistortion):
+    pass
 
 
 class SimpleTestZernikeJ7(BaseDistortion):

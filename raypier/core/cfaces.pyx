@@ -1811,6 +1811,7 @@ cdef class DistortionFace(ShapedFace):
         n = self.base_face.compute_normal_c(p1)
         n.x /= n.z
         n.y /= n.z
+        n.z = 1.0
         n.x -= dxdyz.x
         n.y -= dxdyz.y
         return norm_(n)
