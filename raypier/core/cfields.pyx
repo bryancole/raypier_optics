@@ -221,4 +221,30 @@ def evaluate_modes(double[:,:] x, double[:,:] y, double[:,:] dx, double[:,:] dy,
             evaluate_one_mode(out[i,:], x[i], y[i], dx[i], dy[i], blending, row_size)
         
     return np.asarray(out)
+
+
+def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy, 
+                        double[:] dx2, double[:] dy2, double[:] dxdy):
+    """
+    Compute the Gaussian mode curvature values A,B,C at each (rx,ry) point.
     
+    Inputs all have length N.
+    
+    Returns - (A, B, C, x', y', z')
+                A,B,C are 1d arrays with the curvature coefficients. 
+                x', y' and z' are (N,3) arrays giving the local basis vectors for the modes.
+    """
+    return ()
+    
+    
+def build_interaction_matrix(double[:] rx, double[:] ry,
+                             double[:] A, double[:] B, double[:] C, 
+                             double[:,:] x, double[:,:] y, double[:,:] z,
+                             double wavelength, double max_spacing):
+    """
+    Calculate the sparse matrix (COO format) to represent the complex amplitude of the field E_ij
+    at mode i due to the mode j. E_ij = 1 where i==j.
+    
+    The returned matrix is (N,3) shape, being in sparse IJV format, suitable to pass to scipy.sparse.coo_matrix(). 
+    """
+    return
