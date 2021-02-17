@@ -222,7 +222,8 @@ def evaluate_modes(double[:,:] x, double[:,:] y, double[:,:] dx, double[:,:] dy,
         
     return np.asarray(out)
 
-
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.
 def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy, 
                         double[:] dx2, double[:] dy2, double[:] dxdy):
     """
@@ -234,17 +235,95 @@ def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy,
                 A,B,C are 1d arrays with the curvature coefficients. 
                 x', y' and z' are (N,3) arrays giving the local basis vectors for the modes.
     """
-    return ()
+    cdef:
+        unsigned int N=len(rx), i
+        
+        np_.ndarray _A = np.empty((N), 'd')
+        np_.ndarray _B = np.empty((N), 'd')
+        np_.ndarray _C = np.empty((N), 'd')
+        np_.ndarray _x = np.empty((N,3), 'd')
+        np_.ndarray _y = np.empty((N,3), 'd')
+        np_.ndarray _z = np.empty((N,3), 'd')
+        
+        double[:] A=_A,B=_B,C=_C
+        double[:,:] x=_x,y=_y,z=_z
+        
+        vector_t a,b,c
+        
+    for i in range(N):
+        #z' vector
+        c.x = -dx[i]
+        c.y = -dy[i]
+        c.z = 1.0
+        c = norm_(c)
+        
+        b.x = 0.0
+        b.y = 0.0
+        b.z = 1.0
+        
+        a = cross_(b,c)
+        b = cross_(a,c)
+        
+        x[i,0] = a.x
+        x[i,1] = a.y
+        x[i,2] = a.z
+        y[i,0] = b.x
+        y[i,1] = b.y
+        y[i,2] = b.z
+        z[i,0] = c.x
+        z[i,1] = c.y
+        z[i,2] = c.z
+        
+        Fz = c.x*dx[i] + c.y*dy[i] + c.z
+        
+        ### This is d2F/dx^2
+        A[i] = -( a.x*a.x*dx2[i] + 2*a.x*a.y*dxdy[i] + a.y*a.y*dy2[i] )/Fz
+        ### This is d2F/dxdy
+        B[i] = -( a.x*b.x*dx2[i] + (a.x*b.y + b.x*a.y)*dxdy[i] + a.y*b.y*dy2[i])/Fz
+        ### This is d2F/dy^2
+        C[i] = -( b.x*b.x*dx2[i] + 2*b.x*b.y*dxdy[i] + b.y*b.y*dy2[i] )/Fz
+        
+    return (A, B, C, x, y, z)
     
-    
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.
 def build_interaction_matrix(double[:] rx, double[:] ry,
                              double[:] A, double[:] B, double[:] C, 
                              double[:,:] x, double[:,:] y, double[:,:] z,
-                             double wavelength, double max_spacing):
+                             double wavelength, double spacing, double max_spacing):
     """
     Calculate the sparse matrix (COO format) to represent the complex amplitude of the field E_ij
     at mode i due to the mode j. E_ij = 1 where i==j.
     
-    The returned matrix is (N,3) shape, being in sparse IJV format, suitable to pass to scipy.sparse.coo_matrix(). 
+    The returned tuple of arrays (data[:], (i[;],j[:]) is suitable to pass to scipy.sparse.coo_matrix(). 
     """
+    
+    cdef:
+        unsigned int M, N=len(rx), i, j, ct=0
+        vector_t a,b,c,o,p
+        complex double[:] data
+        int[:] xi, xj
+        
+    ##Estimate the size of the output array
+    M = 0
+        
+    for i in range(N):
+        ### Origin of i'th mode
+        o.x = rx[i]
+        o.y = ry[i]
+        o.z = 0.0
+        
+        for j in range(N):
+            p.x = rx[j]
+            p.y = rx[j]
+            p.z = 0.0
+            
+            if (o.x-p.x)**2 + (o.y-p.y)**2 <= max_spacing:
+                xi[ct] = i
+                xj[ct] = j
+                if i == j:
+                    data[ct] = 1.0
+                else:
+                    data[ct] = calc_mode_U(A, B, C, detG0, pt, E, H, direction, k, phase, inv_root_area)
+    
     return

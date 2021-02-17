@@ -320,6 +320,13 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     dy2 = wavefront(rx,ry,dy=2, grid=False)
     dxdy = wavefront(rx,ry,dx=1,dy=1, grid=False)
     
+    ### for direction, d:
+    ### d^z gives a unit vector in the xy plane, called D
+    ### D^d gives an orthogonal vector, called G
+    ### A point r on surface is represented as (r.D, r.G)
+    ### x' = (r-o).G, y' = (r-o).D, z' = (r-o).d
+    ### dz'/dx' = 0 by definition
+    
     ###Convert to A,B,C coefficients
     ### Then
     ### Need to figure out the cross-coupling between each adjacent mode.
