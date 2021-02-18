@@ -11,6 +11,7 @@ from .ctracer import ray_dtype, GaussletCollection
 from .utils import normaliseVector
 from .fields import eval_Efield_from_gausslets
 from .unwrap2d import unwrap2d
+from .cfields import calc_mode_curvature, build_interaction_matrix
 
 
 root_pi = numpy.sqrt(numpy.pi)
@@ -213,7 +214,7 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     return rays, data_out
 
 
-def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None):
+def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None, blending=1.0):
     """
     Spatially decompose the input Gausslets into a new set of Gausslets defined over a circular area of the 
     given radius. The output ray density is given by the resolution parameter.
@@ -306,14 +307,13 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     ### Now make a hex-grid of new ray start-points
     rx,ry, nb = make_hexagonal_grid(radius, spacing=spacing, connectivity=True)
     
+    N = len(rx)
+    
     origins = origin[None,:] + rx[:,None]*axis1[None,:] + ry[:,None]*axis2[None,:]
     
     ### First derivatives give us the ray directions
     dx = wavefront(rx,ry,dx=1, grid=False)
     dy = wavefront(rx,ry,dy=1, grid=False)
-    
-    directions = direction - dx[:,None]*axis1[None,:] - dy[:,None]*axis2[None,:]
-    directions = normaliseVector(directions)
     
     ### Get second derivatives, to get wavefront curvature
     dx2 = wavefront(rx,ry,dx=2, grid=False)
@@ -328,7 +328,23 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     ### dz'/dx' = 0 by definition
     
     ###Convert to A,B,C coefficients
-    ### Then
-    ### Need to figure out the cross-coupling between each adjacent mode.
-    ### Bugger, that's an arse.
+    A,B,C,x,y,z = calc_mode_curvature(rx, ry, dx, dy, dx2, dy2, dxdy)
+    
+    max_spacing = spacing *2
+    data, (xi, xj) = build_interaction_matrix(rx, ry, A, B,  C, 
+                                              x, y, z,
+                                              wavelength, spacing, 
+                                              max_spacing, blending)
+
+    M = coo_matrix( (data,(xi,xj)), shape=(N,N)) #I think M should be Hermitian
+    
+    E_in = eval_Efield_from_gausslets(input_rays, origins, wavelengths) #should be a (N,3) array of complex values
+    
+    E_out_x = lsqr(M, E_in[:,0])
+    E_out_y = lsqr(M, E_in[:,1])
+    E_out_z = lsqr(M, E_in[:,2])
+    
+    ray_data = numpy.zeros(N, dtype=ray_dtype)
+    
+    ### Now need to construct the GaussletCollection.
     

@@ -290,22 +290,57 @@ def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy,
 def build_interaction_matrix(double[:] rx, double[:] ry,
                              double[:] A, double[:] B, double[:] C, 
                              double[:,:] x, double[:,:] y, double[:,:] z,
-                             double wavelength, double spacing, double max_spacing):
+                             double wavelength, double spacing, 
+                             double max_spacing, double blending):
     """
     Calculate the sparse matrix (COO format) to represent the complex amplitude of the field E_ij
     at mode i due to the mode j. E_ij = 1 where i==j.
     
-    The returned tuple of arrays (data[:], (i[;],j[:]) is suitable to pass to scipy.sparse.coo_matrix(). 
+    We calculate this in the local coordinate system of the decomposition plane.
+    
+    
+    
+    Parameters
+    ----------
+    
+    rx - double[:] array of x-axis coordinates for the ray origins
+    ry - double[:] array of y-axis coordinates for the ray origins
+    A - double[:] wavefront curvature d2z'/dx'2 in ray-local basis
+    B - double[:] wavefront curvature d2z'/dx'dy' in ray-local basis
+    C - double[:] wavefront curvature d2z'/dy'2 in ray-local basis
+    x,y,z - double[:,3] arrays giving the basis vectors for each ray (z is ray direction vector)
+    wavelength - wavelength in microns
+    spacing - the spacing between adjacent rays, in mm
+    max_spacing - the maximum spacing between rays to calculate the cross-interaction. Controls the sparsity 
+                    of the final result
+    blending - adjusts the widths of each mode, relative to the spacing. width = spacing/blending
+    
+    Returns
+    -------
+    The returned tuple of arrays (data[:], (i[;],j[:]) is suitable to pass to scipy.sparse.coo_matrix().
     """
     
     cdef:
         unsigned int M, N=len(rx), i, j, ct=0
-        vector_t a,b,c,o,p
-        complex double[:] data
-        int[:] xi, xj
+        vector_t a,b,c,o,pt
+        double complex[:] data
+        unsigned int[:] xi, xj
+        double phase=0.0, k, inv_root_area, impart
+        double complex _A, _B, _C, detG0
         
     ##Estimate the size of the output array
-    M = 0
+    M = N*( 1 + int((7 * max_spacing * max_spacing)/(spacing*spacing)) ) 
+    
+    data = np.zeros(M, np.complex128)
+    xi = np.zeros(M, np.uint)
+    xj = np.zeros(M, np.uint)
+    
+    k = 2000.0*M_PI/wavelength
+    
+    impart = (blending*blending)/(k*spacing*spacing)
+    
+    ###normalisation factor 1/root(area). Yes, there really is a double square root.
+    inv_root_area = 1.0 #All modes have the same width
         
     for i in range(N):
         ### Origin of i'th mode
@@ -313,17 +348,40 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
         o.y = ry[i]
         o.z = 0.0
         
+        a.x = x[i,0]
+        a.y = x[i,1]
+        a.z = x[i,2]
+        b.x = y[i,0]
+        b.y = y[i,1]
+        b.z = y[i,2]
+        c.x = z[i,0]
+        c.y = z[i,1]
+        c.z = z[i,2]
+        
+        ### Real parts are curvature, imaginary parts are 1/e^2 widths
+        _A.real = A[i]
+        _B.real = B[i]
+        _C.real = C[i]
+        
+        _A.imag = impart
+        _B.imag = 0 #It's a symmetric mode
+        _C.imag = impart 
+        
+        detG0 = (_A*_C) #- (B*B)
+        
         for j in range(N):
-            p.x = rx[j]
-            p.y = rx[j]
-            p.z = 0.0
+            pt.x = rx[j]
+            pt.y = rx[j]
+            pt.z = 0.0
+            pt = subvv_(pt, o)
             
-            if (o.x-p.x)**2 + (o.y-p.y)**2 <= max_spacing:
+            if (pt.x*pt.x) + (pt.y*pt.y) <= (max_spacing*max_spacing):
                 xi[ct] = i
                 xj[ct] = j
                 if i == j:
                     data[ct] = 1.0
                 else:
-                    data[ct] = calc_mode_U(A, B, C, detG0, pt, E, H, direction, k, phase, inv_root_area)
+                    data[ct] = calc_mode_U(_A, _B, _C, detG0, pt, a, b, c, k, phase, inv_root_area)
+                ct += 1
     
-    return
+    return (np.asarray(data)[:ct], (np.asarray(xi)[:ct], np.asarray(xj)[:ct]))
