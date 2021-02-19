@@ -1,5 +1,5 @@
 Introduction to Raypier
-========================
+=======================
 
 Raypier is a non-sequential optical ray-tracing program. It is intended as a 
 design tools for modelling optical systems (cameras, imaging systems, telescopes etc.).

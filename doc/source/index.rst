@@ -13,6 +13,7 @@ Contents:
    
    introduction
    exploring_the_gui
+   jupyter_integration
    ray_collections
    ray_sources
    general_optics
