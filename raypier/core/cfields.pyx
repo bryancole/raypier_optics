@@ -283,7 +283,7 @@ def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy,
         ### This is d2F/dy^2
         C[i] = -( b.x*b.x*dx2[i] + 2*b.x*b.y*dxdy[i] + b.y*b.y*dy2[i] )/Fz
         
-    return (A, B, C, x, y, z)
+    return (_A, _B, _C, _x, _y, _z)
     
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
