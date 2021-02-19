@@ -2,7 +2,7 @@
 import numpy
 import itertools
 import time
-from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, observe, Bool
+from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, observe, Bool, Range
 from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
 from tvtk.api import tvtk
 
@@ -10,7 +10,7 @@ from raypier.sources import BaseRaySource, UnitTupleVector, UnitVectorTrait
 from raypier.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
 from raypier.tracer import normaliseVector
 from raypier.editors import NumEditor
-from raypier.gausslets import decompose_angle
+from raypier.gausslets import decompose_angle, make_hexagonal_grid
 
 
 class BaseGaussletSource(BaseRaySource):
@@ -189,7 +189,7 @@ class SingleGaussletSource(BaseGaussletSource):
     E1_amp = Complex(1.0+0.0j)
     E2_amp = Complex(0.0+0.0j)
     
-    beam_waist = Float(1.0)
+    beam_waist = Float(1.0) #radius, in microns
     
     input_rays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, E2_amp, beam_waist")
@@ -403,3 +403,83 @@ class CollimatedGaussletSource(SingleGaussletSource):
         return rays
         
         
+class GaussianPointSource(SingleGaussletSource):
+    """
+    Creates a low-F# point source with symmetric Gaussian profile.
+    """
+    abstract = False
+    
+    ### Number of angle steps along the radius
+    resolution = Range(0.0, None, 10.0)
+    working_dist = Float(100.0)
+    numerical_aperture = Float(0.2)
+    blending = Float(1.0)
+    #We already have beam_waist defined in SingleGaussletSource
+    
+    input_rays = Property(Instance(GaussletCollection), 
+                         depends_on="origin, direction, max_ray_len, E_vector, E1_amp, "
+                                    "E2_amp, numerical_aperture, resolution, wavelength, "
+                                    "beam_waist, blending, working_dist")
+    
+    params_grp = VGroup(
+                        Item("numerical_aperture", editor=NumEditor),
+                        Item("resolution", editor=NumEditor),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns", editor=NumEditor),
+                       Item('working_dist', editor=NumEditor),
+                       Item("blending", editor=NumEditor),
+                       label="Parameters")
+    
+    @cached_property
+    def _get_input_rays(self):
+        self.wavelength_list = [self.wavelength]
+        origin = numpy.array(self.origin)
+        direction = normaliseVector(numpy.array(self.direction))
+        
+        d2 = normaliseVector(numpy.cross(direction, self.E_vector))
+        d1 = numpy.cross(direction, d2)
+        
+        focal_radius = self.beam_waist/1000.0 #convert to mm
+        
+        n = 1.0 + 0.0j #refractive index of medium
+        k_abs = (2000.0*numpy.pi)/self.wavelength #k now in inverse-mm
+        k_radius = 2./focal_radius
+        k_max = self.numerical_aperture * k_abs
+        k_grid_spacing = k_max / self.resolution
+        
+        kx,ky = make_hexagonal_grid(k_max, spacing=k_grid_spacing)
+        
+        krsq = kx**2 + ky**2
+        kz = numpy.sqrt(k_abs**2 - krsq)
+        
+        waist_location = origin + self.working_dist*direction 
+        directions = (kx[:,None]*d1 + ky[:,None]*d2 + kz[:,None]*direction)/k_abs
+        directions = normaliseVector(directions)
+        
+        gauss = numpy.exp(-(krsq/(k_radius**2)))
+        E1_amp = gauss * self.E1_amp
+        E2_amp = gauss * self.E2_amp
+        
+        ray_data = numpy.zeros(gauss.shape[0], dtype=ray_dtype)
+            
+        E_vectors = numpy.cross(directions, d2[None,:])
+            
+        ray_data['origin'] = waist_location[None,:]
+        ray_data['direction'] = directions
+        ray_data['wavelength_idx'] = 0
+        ray_data['E_vector'] = E_vectors
+        ray_data['E1_amp'] = E1_amp
+        ray_data['E2_amp'] = E2_amp
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        ray_data['ray_type_id'] = (1<<1) #indicates Gausslets
+        
+        rays = GaussletCollection.from_rays(ray_data)
+        wl = numpy.array(self.wavelength_list)
+        rays.wavelengths = wl
+        working_dist = 0.0
+        gauss_radius = 2.*self.blending/(k_grid_spacing)
+        print("Gausslet radius:", gauss_radius)
+        rays.config_parabasal_rays(wl, gauss_radius, working_dist)
+        rays.project_to_plane(origin, direction)
+        return rays
+    

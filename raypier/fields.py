@@ -93,12 +93,12 @@ class EFieldPlane(Probe):
         self._mtime = 0.0
         self.on_change()
         
-    @on_trait_change("update")
     def on_change(self):
         try:
             self.evaluate(None)
         except:
             traceback.print_exc()
+        self.update=True
     
     def _actors_default(self):
         source = self._plane_src
@@ -166,7 +166,7 @@ class EFieldPlane(Probe):
             axis2 = numpy.cross(self.direction, self.x_axis)
             axis1 = numpy.cross(axis2, self.direction)
             
-            points = centre[None,None,:] + px[:,None,None]*axis2 + py[None,:,None]*axis1
+            points = centre[None,None,:] + px[None,:,None]*axis1 + py[:,None,None]*axis2
             points2 = points.reshape(-1,3)
             
             if isinstance(rays, GaussletCollection):

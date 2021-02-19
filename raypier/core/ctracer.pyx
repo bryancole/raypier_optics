@@ -1355,6 +1355,37 @@ cdef class GaussletCollection:
                 
                 _out[k] = 1000*sqrt(v/6)/ wavelen[r.wavelength_idx]
             return out
+        
+    def project_to_plane(self, origin, direction):
+        """
+        Project the rays in the collection onto the intersection with the given plane,
+        defined by an origin point on the plane and the plane normal vector.
+        """
+        cdef:
+            vector_t o,d
+            unsigned int i, j
+            gausslet_t *gc
+            ray_t *ray
+            para_t *para
+            double a
+            #double complex[:] wl = self.wavelengths
+            
+        o.x, o.y, o.z = origin
+        d.x, d.y, d.z = direction
+        d = norm_(d)
+        
+        for i in range(self.n_rays):
+            gc = &(self.rays[i])
+            ray = &(gc.base_ray)
+            a = dotprod_(subvv_(o, ray.origin),d) / dotprod_(ray.direction, d)
+            ray.origin = addvv_(ray.origin, multvs_(ray.direction,a))
+            ray.accumulated_path += ray.refractive_index.real * a
+            ### Handle absorption along ray
+            ### Am ignoring this for now. FIXME
+            for j in range(6):
+                para = &(gc.para[j])
+                a = dotprod_(subvv_(o, para.origin),d) / dotprod_(para.direction, d)
+                para.origin = addvv_(para.origin, multvs_(para.direction,a))
     
     def config_parabasal_rays(self, double[:] wavelength_list, double radius, double working_dist):
         """
