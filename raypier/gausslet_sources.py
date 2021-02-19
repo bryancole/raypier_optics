@@ -406,6 +406,17 @@ class CollimatedGaussletSource(SingleGaussletSource):
 class GaussianPointSource(SingleGaussletSource):
     """
     Creates a low-F# point source with symmetric Gaussian profile.
+    
+    Traits
+    ------
+    
+    resolution - the number of rays along the angular radius.
+    
+    working_dist - the distance in front of the origin plane at which the focus is found
+    
+    numerical_aperture - equal of the sin of the maximum ray angle
+    
+    blending - determines the mode overlap
     """
     abstract = False
     
@@ -416,10 +427,9 @@ class GaussianPointSource(SingleGaussletSource):
     blending = Float(1.0)
     #We already have beam_waist defined in SingleGaussletSource
     
-    input_rays = Property(Instance(GaussletCollection), 
-                         depends_on="origin, direction, max_ray_len, E_vector, E1_amp, "
-                                    "E2_amp, numerical_aperture, resolution, wavelength, "
-                                    "beam_waist, blending, working_dist")
+    ### Traits Properties seems to be broken. No good way to flush the cache so I'm doing it myself.
+    _input_rays = Instance(GaussletCollection)
+    input_rays = Property(Instance(GaussletCollection))
     
     params_grp = VGroup(
                         Item("numerical_aperture", editor=NumEditor),
@@ -429,8 +439,21 @@ class GaussianPointSource(SingleGaussletSource):
                        Item("blending", editor=NumEditor),
                        label="Parameters")
     
-    @cached_property
+    @observe("origin, direction, max_ray_len, E_vector, E1_amp, "\
+            "E2_amp, numerical_aperture, resolution, wavelength, "\
+            "beam_waist, blending, working_dist")
+    def _clear_input_rays(self, evt):
+        del self._input_rays
+        self.update = True
+    
     def _get_input_rays(self):
+        rays = self._input_rays
+        if rays is None:
+            rays = self.eval_input_rays()
+            self._input_rays = rays
+        return rays
+    
+    def eval_input_rays(self):
         self.wavelength_list = [self.wavelength]
         origin = numpy.array(self.origin)
         direction = normaliseVector(numpy.array(self.direction))
@@ -478,7 +501,6 @@ class GaussianPointSource(SingleGaussletSource):
         rays.wavelengths = wl
         working_dist = 0.0
         gauss_radius = 2.*self.blending/(k_grid_spacing)
-        print("Gausslet radius:", gauss_radius)
         rays.config_parabasal_rays(wl, gauss_radius, working_dist)
         rays.project_to_plane(origin, direction)
         return rays

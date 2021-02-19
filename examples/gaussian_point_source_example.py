@@ -33,7 +33,7 @@ p = EFieldPlane(detector=cap,
 
 img = IntensityImageView(field_probe=p)
 surf = IntensitySurface(field_probe=p)
-
+print("Build model")
 model = RayTraceModel(sources=[src], probes=[cap,p], results=[img,surf])
 model.configure_traits()
 
