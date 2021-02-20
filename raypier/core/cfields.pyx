@@ -324,7 +324,7 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
         unsigned int M, N=len(rx), i, j, ct=0
         vector_t a,b,c,o,pt
         double complex[:] data
-        unsigned int[:] xi, xj
+        unsigned long[:] xi, xj
         double phase=0.0, k, inv_root_area, impart
         double complex _A, _B, _C, detG0
         
