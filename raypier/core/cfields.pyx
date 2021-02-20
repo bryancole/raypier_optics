@@ -30,7 +30,8 @@ from cython.parallel import prange
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, cross_, RayCollection, complex_t
+                rotate_c, cross_, RayCollection, complex_t, \
+                GaussletCollection, gausslet_t, para_t
 
 from ctracer import ray_dtype
 cimport cython
@@ -261,7 +262,7 @@ def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy,
         b.y = 0.0
         b.z = 1.0
         
-        a = cross_(b,c)
+        a = norm_(cross_(b,c))
         b = cross_(a,c)
         
         x[i,0] = a.x
@@ -371,11 +372,11 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
         
         for j in range(N):
             pt.x = rx[j]
-            pt.y = rx[j]
+            pt.y = ry[j]
             pt.z = 0.0
             pt = subvv_(pt, o)
             
-            if (pt.x*pt.x) + (pt.y*pt.y) <= (max_spacing*max_spacing):
+            if ((pt.x*pt.x) + (pt.y*pt.y)) <= (max_spacing*max_spacing):
                 xi[ct] = i
                 xj[ct] = j
                 if i == j:
@@ -385,3 +386,34 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
                 ct += 1
     
     return (np.asarray(data)[:ct], (np.asarray(xi)[:ct], np.asarray(xj)[:ct]))
+
+
+def apply_mode_curvature(GaussletCollection gc, double[:] A, double[:] B, double[:] C):
+    """
+    Adds the given wavefront curvature coefficients (i.e. 2nd derivatives) to the 
+    given GaussletCollection object.
+    """
+    cdef:
+        unsigned int i,j
+        gausslet_t *g
+        para_t *para
+        ray_t *ray
+        vector_t x,y,z, shift, r
+        double px, py
+        
+    for i in range(gc.nrays):
+        g = &(gc.rays[i])
+        ray = &(g.base_ray)
+        z = ray.direction
+        x = ray.E_vector
+        y = cross_(x,z)
+        for j in range(6):
+            para = &(g.para[j])
+            r = subvv_(para.origin, ray.origin)
+            px = dotprod_(r, x)
+            py = dotprod_(r, y)
+            shift = multvs_(x, (-A[i]*px - B[i]*py))
+            shift = addvv_(shift, multvs_(y, (-C[i]*py - B[i]*px)) )
+            para.direction = norm_(addvv_(shift, para.direction))
+            ###Not finished
+    return 
