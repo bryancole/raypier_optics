@@ -263,7 +263,7 @@ def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy,
         b.z = 1.0
         
         a = norm_(cross_(b,c))
-        b = cross_(a,c)
+        b = cross_(c,a)
         
         x[i,0] = a.x
         x[i,1] = a.y
@@ -401,7 +401,7 @@ def apply_mode_curvature(GaussletCollection gc, double[:] A, double[:] B, double
         vector_t x,y,z, shift, r
         double px, py
         
-    for i in range(gc.nrays):
+    for i in range(gc.n_rays):
         g = &(gc.rays[i])
         ray = &(g.base_ray)
         z = ray.direction

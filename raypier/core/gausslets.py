@@ -11,7 +11,7 @@ from .ctracer import ray_dtype, GaussletCollection
 from .utils import normaliseVector
 from .fields import eval_Efield_from_gausslets
 from .unwrap2d import unwrap2d
-from .cfields import calc_mode_curvature, build_interaction_matrix
+from .cfields import calc_mode_curvature, build_interaction_matrix, apply_mode_curvature
 
 
 root_pi = numpy.sqrt(numpy.pi)
