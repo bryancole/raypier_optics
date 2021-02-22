@@ -289,10 +289,12 @@ def calc_mode_curvature(double[:] rx, double[:] ry, double[:] dx, double[:] dy,
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 def build_interaction_matrix(double[:] rx, double[:] ry,
+                             double[:] tx, double[:] ty,
                              double[:] A, double[:] B, double[:] C, 
                              double[:,:] x, double[:,:] y, double[:,:] z,
                              double wavelength, double spacing, 
-                             double max_spacing, double blending):
+                             double max_spacing, double blending,
+                             double test_spacing):
     """
     Calculate the sparse matrix (COO format) to represent the complex amplitude of the field E_ij
     at mode i due to the mode j. E_ij = 1 where i==j.
@@ -315,6 +317,7 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
     max_spacing - the maximum spacing between rays to calculate the cross-interaction. Controls the sparsity 
                     of the final result
     blending - adjusts the widths of each mode, relative to the spacing. width = spacing/blending
+    test_spacing - the spacing used by the test-points
     
     Returns
     -------
@@ -322,7 +325,7 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
     """
     
     cdef:
-        unsigned int M, N=len(rx), i, j, ct=0
+        unsigned int M, N=len(rx), L=len(tx), i, j, ct=0
         vector_t a,b,c,o,pt
         double complex[:] data
         unsigned long[:] xi, xj
@@ -330,7 +333,7 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
         double complex _A, _B, _C, detG0
         
     ##Estimate the size of the output array
-    M = N*( 1 + int((7 * max_spacing * max_spacing)/(spacing*spacing)) ) 
+    M = N*( 1 + int((7 * max_spacing * max_spacing)/(test_spacing*test_spacing)) ) 
     
     data = np.zeros(M, np.complex128)
     xi = np.zeros(M, np.uint)
@@ -338,7 +341,7 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
     
     k = 2000.0*M_PI/wavelength
     
-    impart = (blending*blending)/(k*spacing*spacing)
+    impart = 2*(blending*blending)/(k*spacing*spacing)
     
     ###normalisation factor 1/root(area). Yes, there really is a double square root.
     inv_root_area = 1.0 #All modes have the same width
@@ -370,9 +373,9 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
         
         detG0 = (_A*_C) #- (B*B)
         
-        for j in range(N):
-            pt.x = rx[j]
-            pt.y = ry[j]
+        for j in range(L):
+            pt.x = tx[j]
+            pt.y = ty[j]
             pt.z = 0.0
             pt = subvv_(pt, o)
             
