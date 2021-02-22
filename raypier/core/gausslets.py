@@ -4,7 +4,7 @@ import numpy
 
 from numpy import fft
 from scipy.interpolate import RectBivariateSpline
-from scipy.sparse.linalg import lsqr
+from scipy.sparse.linalg import lsqr, lsmr
 from scipy.sparse import coo_matrix
 
 from .ctracer import ray_dtype, GaussletCollection
@@ -214,7 +214,8 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     return rays, data_out
 
 
-def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None, blending=1.0):
+def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None, blending=1.0,
+                       interaction_range=3.1):
     """
     Spatially decompose the input Gausslets into a new set of Gausslets defined over a circular area of the 
     given radius. The output ray density is given by the resolution parameter.
@@ -249,7 +250,6 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     rays : GaussletCollection
             The out-going Gausslets
     """
-    
     spacing = radius / resolution
     wavelengths = input_rays.wavelengths
     
@@ -261,18 +261,18 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     origin = numpy.asarray(origin)
     direction = normaliseVector(numpy.asarray(direction))
     axis1 = normaliseVector(numpy.asarray(axis1))
-    axis2 = numpy.cross(axis1, direction)
+    axis2 = normaliseVector(numpy.cross(axis1, direction))
     axis1 = numpy.cross(axis2, direction)
     
     ###In this version, we will evaluate the field on a cartesian grid
-    _radius = radius * (1 + 1./resolution)
-    x_ = y_ = numpy.linspace(-_radius,_radius, resolution*2)
+    _radius = radius * (1 + 2./resolution)
+    x_ = y_ = numpy.linspace(-_radius,_radius, int((1.1*resolution)*2))
     
     x,y = numpy.meshgrid(x_, y_)
     
-    origins = origin[None,:] + x.reshape(-1,)[:,None]*axis1[None,:] + y.reshape(-1)[:,None]*axis2[None,:]
+    origins_in = origin[None,:] + x.reshape(-1,)[:,None]*axis1[None,:] + y.reshape(-1)[:,None]*axis2[None,:]
     
-    E_field = eval_Efield_from_gausslets(input_rays, origins, wavelengths)
+    E_field = eval_Efield_from_gausslets(input_rays, origins_in, wavelengths)
     
     ### Project onto local axes to get orthogonal polarisations and choose the one with the most power
     E1_amp = (E_field*axis1[None,:]).sum(axis=1)
@@ -286,23 +286,25 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
         phase = numpy.arctan2(E1_amp.imag, E1_amp.real)
     else:
         phase = numpy.arctan2(E2_amp.imag, E2_amp.real)
-        
+    
     nx = len(x_)
     ny = len(y_)
     phase.shape = (nx, ny)
     
     if curvature is not None:
-        R = 1000*curvature/wavelength
-        sph = R - numpy.sqrt(R*R - x*x - y*y) - numpy.pi
+        sphz = -(curvature - numpy.sqrt(curvature*curvature - x*x - y*y))
+        sph = sphz*2000.0*numpy.pi/wavelength - numpy.pi
         phase = phase - sph
         phase = phase%(2*numpy.pi)
         phase = phase - numpy.pi
     else:
         sph = 0
     
-    uphase = unwrap2d(phase, anchor=(nx//2, ny//2)) + sph
+    uphase, residuals = unwrap2d(phase, anchor=(nx//2, ny//2))
+    uphase2 = uphase + sph
     
-    wavefront = RectBivariateSpline(x_, y_, uphase*wavelength/(2000*numpy.pi))
+    ### Setting s=0 results in oscillatory behaviour near the edge along the x-idrection.
+    wavefront = RectBivariateSpline(x_, y_, -uphase2*wavelength/(2000*numpy.pi), kx=3, ky=3, s=0.001)
     
     ### Now make a hex-grid of new ray start-points
     rx,ry, nb = make_hexagonal_grid(radius, spacing=spacing, connectivity=True)
@@ -319,32 +321,53 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     dx2 = wavefront(rx,ry,dx=2, grid=False)
     dy2 = wavefront(rx,ry,dy=2, grid=False)
     dxdy = wavefront(rx,ry,dx=1,dy=1, grid=False)
-    
-    ### for direction, d:
-    ### d^z gives a unit vector in the xy plane, called D
-    ### D^d gives an orthogonal vector, called G
-    ### A point r on surface is represented as (r.D, r.G)
-    ### x' = (r-o).G, y' = (r-o).D, z' = (r-o).d
-    ### dz'/dx' = 0 by definition
+
     
     ###Convert to A,B,C coefficients
-    A,B,C,x,y,z = calc_mode_curvature(rx, ry, dx, dy, dx2, dy2, dxdy)
+    A,B,C,xl,yl,zl = calc_mode_curvature(rx, ry, dx, dy, dx2, dy2, dxdy)
     
-    max_spacing = spacing *2
+    max_spacing = spacing * interaction_range
+    
+    ### The A,B,C arguments 
     data, (xi, xj) = build_interaction_matrix(rx, ry, A, B,  C, 
-                                              x, y, z,
+                                              xl, yl, zl,
                                               wavelength, spacing, 
                                               max_spacing, blending)
-
-    M = coo_matrix( (data,(xi,xj)), shape=(N,N)) #I think M should be Hermitian
+    
+    M = coo_matrix( (data.conjugate(),(xi,xj)), shape=(N,N)) #I think M should be Hermitian
+    M = M.tocsc()
     
     E_in = eval_Efield_from_gausslets(input_rays, origins, wavelengths) #should be a (N,3) array of complex values
     
-    E_out_x = lsqr(M, E_in[:,0])
-    E_out_y = lsqr(M, E_in[:,1])
-    E_out_z = lsqr(M, E_in[:,2])
+    solve = lsmr
+    E_out_x = solve(M, E_in[:,0])[0]
+    E_out_y = solve(M, E_in[:,1])[0]
+    E_out_z = solve(M, E_in[:,2])[0]
+    
+    E_out = numpy.column_stack([E_out_x, E_out_y, E_out_z])
+    ### Now need to construct the GaussletCollection.
+    
+    directions = axis1[None,:]*zl[:,0,None] + axis2[None,:]*zl[:,1,None] + direction[None,:]*zl[:,2,None]
+    E_vectors = axis1[None,:]*xl[:,0,None] + axis2[None,:]*xl[:,1,None] + direction[None,:]*xl[:,2,None]
+    H_vectors = axis1[None,:]*yl[:,0,None] + axis2[None,:]*yl[:,1,None] + direction[None,:]*yl[:,2,None]
+    
+    scaling = numpy.sqrt(2*numpy.pi)*spacing/blending
+    
+    E1_amp = (E_out*E_vectors).sum(axis=-1) * scaling
+    E2_amp = (E_out*H_vectors).sum(axis=-1) * scaling
     
     ray_data = numpy.zeros(N, dtype=ray_dtype)
     
-    ### Now need to construct the GaussletCollection.
+    ray_data['origin'] = origins
+    ray_data['direction'] = directions
+    ray_data['E_vector'] = E_vectors
+    ray_data['refractive_index'] = 1.0
+    ray_data['E1_amp'] = E1_amp
+    ray_data['E2_amp'] = E2_amp
+    
+    gausslets = GaussletCollection.from_rays(ray_data)
+    gausslets.config_parabasal_rays(wavelengths, spacing/blending, 0.0)
+    apply_mode_curvature(gausslets, -A, -B, -C)
+    
+    return gausslets, E_field, uphase
     

@@ -379,10 +379,10 @@ def build_interaction_matrix(double[:] rx, double[:] ry,
             if ((pt.x*pt.x) + (pt.y*pt.y)) <= (max_spacing*max_spacing):
                 xi[ct] = i
                 xj[ct] = j
-                if i == j:
-                    data[ct] = 1.0
-                else:
-                    data[ct] = calc_mode_U(_A, _B, _C, detG0, pt, a, b, c, k, phase, inv_root_area)
+                #if i == j:
+                #    data[ct] = 1.0
+                #else:
+                data[ct] = calc_mode_U(_A, _B, _C, detG0, pt, a, b, c, k, phase, inv_root_area)
                 ct += 1
     
     return (np.asarray(data)[:ct], (np.asarray(xi)[:ct], np.asarray(xj)[:ct]))

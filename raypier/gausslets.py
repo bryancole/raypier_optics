@@ -3,6 +3,7 @@ Functions relating to the creation and manipulations of gausslets
 """
 
 import numpy
+import time
 
 from .core.utils import normaliseVector
 from .core.ctracer import FaceList
@@ -17,6 +18,7 @@ from traitsui.api import View, Group, Item
 
 from tvtk.api import tvtk
 from raypier.editors import NumEditor, IntEditor
+from raypier.core.gausslets import decompose_position
 
 
 
@@ -62,37 +64,54 @@ class PositionDecompositionPlane(BaseDecompositionPlane):
     ###Spacing of the output mode origins (and input sample points)
     spacing = Float(0.2) #in mm
     
-    ### Wavefront curvature estimate
+    ### Wavefront curvature estimate, as a radius from the focus to decomposition plane centre
     curvature = Float(0.0)
     
+    intaction_range = Float(2.1)
     
+    resolution = Float(10.0)
+    
+    blending = Float(1.5)
     
     ### Keep the sample points and sampled fields around 
     ### for debugging purposes
     _sample_points = Array()
+    _unwrapped_phase = Array()
     _E_field = Array()
     
+    traits_view = View(Group(
+                    Traceable.uigroup,
+                    Item("radius", editor=NumEditor),
+                    Item("resolution", editor=NumEditor),
+                    Item("curvature", editor=IntEditor),
+                    Item("blending", editor=NumEditor),
+                    Item("interaction_range", editor=NumEditor)
+                    ))
+    
     def evaluate_decomposed_rays(self, input_rays):
+        start_time = time.monotonic()
         radius = self.diameter/2.
-        spacing = self.spacing
         curvature = self.curvature
-        wavelengths = input_rays.wavelengths
+        resolution = self.resolution
+        blending = self.blending
+        interaction_range = self.intaction_range
         
         origin = numpy.asarray(self.centre)
         direction = normaliseVector(numpy.asarray(self.direction))
         axis1 = normaliseVector(numpy.asarray(self.x_axis))
-        axis2 = numpy.cross(axis1, direction)
         
-        x,y = make_hexagonal_grid(radius, spacing=spacing)
+        if curvature==0.0:
+            curvature=None
         
-        origins = origin[None,:] + x[:,None]*axis1[None,:] + y[:,None]*axis2[None,:]
+        gausslets, E_field, uphase = decompose_position(input_rays, origin, direction, axis1, radius, \
+                                                        resolution, curvature=curvature, blending=blending,
+                                                        interaction_range=interaction_range)
         
-        E_field = eval_Efield_from_gausslets(input_rays, origins, wavelengths)
-        
-        ###Figure out the phase at each sample-point
-        phase = unwrap_phase_hex(E_field, origins, curvature)
-        
-        dx, dy = eval_phase_gradient(phase, x,y)
+        self._unwrapped_phase = uphase
+        self._E_field = E_field
+        end_time = time.monotonic()
+        print(f"Decomposition in {end_time-start_time} seconds")
+        return gausslets
 
 
 class AngleDecompositionPlane(BaseDecompositionPlane):
