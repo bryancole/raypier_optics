@@ -217,6 +217,29 @@ def eval_Efield_from_rays(ray_collection, points, wavelengths,
     return E
 
 
+class EFieldSummation(object):
+    def __init__(self, gausslet_collection, wavelengths=None, blending=1.0 ):
+        if wavelengths is None:
+            wavelengths = numpy.asarray(gausslet_collection.wavelengths)
+        if wavelengths is None:
+            raise ValueError("No wavelengths supplied")
+        self.wavelengths = wavelengths
+        self.gc = gc = gausslet_collection.copy_as_array() 
+        rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
+        self.modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
+        self.base_rays = RayCollection.from_array(rays)
+        
+    def evaluate(self, points):
+        points = numpy.ascontiguousarray(points)
+        shape = points.shape
+        points.shape=(-1,3)
+        E = sum_gaussian_modes(self.base_rays, 
+                              self.modes, 
+                              self.wavelengths, points)
+        E.shape = shape
+        return E
+
+
 def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
                                blending=1.0, **kwds):
     gc = gausslet_collection.copy_as_array() 

@@ -1386,6 +1386,14 @@ cdef class GaussletCollection:
                 para = &(gc.para[j])
                 a = dotprod_(subvv_(o, para.origin),d) / dotprod_(para.direction, d)
                 para.origin = addvv_(para.origin, multvs_(para.direction,a))
+                
+    def scale_amplitude(self, double complex scale):
+        cdef:
+            unsigned long i=self.n_rays
+            
+        for i in range(self.n_rays):
+            self.rays[i].base_ray.E1_amp *= scale
+            self.rays[i].base_ray.E2_amp *= scale
     
     def config_parabasal_rays(self, double[:] wavelength_list, double radius, double working_dist):
         """

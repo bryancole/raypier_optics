@@ -7,6 +7,8 @@ from .general_optic import GeneralLens
 from .faces import PlanarFace, SphericalFace, CylindericalFace, AsphericFace, ConicFace, \
         AxiconFace, DistortionFace
         
+from .lenses import PlanoConvexLens, PlanoConicLens, AsphericLens, BiConicLens
+        
 from .materials import OpticalMaterial, air
         
 from .sources import ConfocalRaySource, ConfocalRayFieldSource, ParallelRaySource,\
@@ -14,6 +16,8 @@ from .sources import ConfocalRaySource, ConfocalRayFieldSource, ParallelRaySourc
         BroadbandRaySource
         
 from .gausslet_sources import CollimatedGaussletSource
+
+from .gausslets import AngleDecompositionPlane, PositionDecompositionPlane
 
 from .tracer import RayTraceModel
 

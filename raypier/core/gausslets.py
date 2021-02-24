@@ -9,7 +9,7 @@ from scipy.sparse import coo_matrix
 
 from .ctracer import ray_dtype, GaussletCollection
 from .utils import normaliseVector
-from .fields import eval_Efield_from_gausslets
+from .fields import eval_Efield_from_gausslets, EFieldSummation
 from .unwrap2d import unwrap2d
 from .cfields import calc_mode_curvature, build_interaction_matrix, apply_mode_curvature
 
@@ -214,8 +214,7 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     return rays, data_out
 
 
-def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None, blending=1.0,
-                       interaction_range=3.1):
+def decompose_position(input_rays, origin, direction, axis1, radius, resolution, curvature=None, blending=1.5):
     """
     Spatially decompose the input Gausslets into a new set of Gausslets defined over a circular area of the 
     given radius. The output ray density is given by the resolution parameter.
@@ -272,7 +271,8 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     
     origins_in = origin[None,:] + x.reshape(-1,)[:,None]*axis1[None,:] + y.reshape(-1)[:,None]*axis2[None,:]
     
-    E_field = eval_Efield_from_gausslets(input_rays, origins_in, wavelengths)
+    efield = EFieldSummation(input_rays)
+    E_field = efield.evaluate(origins_in)
     
     ### Project onto local axes to get orthogonal polarisations and choose the one with the most power
     E1_amp = (E_field*axis1[None,:]).sum(axis=1)
@@ -322,39 +322,17 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     dy2 = wavefront(rx,ry,dy=2, grid=False)
     dxdy = wavefront(rx,ry,dx=1,dy=1, grid=False)
 
-    
     ###Convert to A,B,C coefficients
     A,B,C,xl,yl,zl = calc_mode_curvature(rx, ry, dx, dy, dx2, dy2, dxdy)
     
-    max_spacing = spacing * interaction_range
-    
-    ### The A,B,C arguments 
-    data, (xi, xj) = build_interaction_matrix(rx, ry, A, B,  C, 
-                                              xl, yl, zl,
-                                              wavelength, spacing, 
-                                              max_spacing, blending)
-    
-    M = coo_matrix( (data.conjugate(),(xi,xj)), shape=(N,N)) #I think M should be Hermitian
-    M = M.tocsc()
-    
-    E_in = eval_Efield_from_gausslets(input_rays, origins, wavelengths) #should be a (N,3) array of complex values
-    
-    solve = lsmr
-    E_out_x = solve(M, E_in[:,0])[0]
-    E_out_y = solve(M, E_in[:,1])[0]
-    E_out_z = solve(M, E_in[:,2])[0]
-    
-    E_out = numpy.column_stack([E_out_x, E_out_y, E_out_z])
-    ### Now need to construct the GaussletCollection.
+    E_in = efield.evaluate(origins) #should be a (N,3) array of complex values
     
     directions = axis1[None,:]*zl[:,0,None] + axis2[None,:]*zl[:,1,None] + direction[None,:]*zl[:,2,None]
     E_vectors = axis1[None,:]*xl[:,0,None] + axis2[None,:]*xl[:,1,None] + direction[None,:]*xl[:,2,None]
     H_vectors = axis1[None,:]*yl[:,0,None] + axis2[None,:]*yl[:,1,None] + direction[None,:]*yl[:,2,None]
-    
-    scaling = numpy.sqrt(2*numpy.pi)*spacing/blending
-    
-    E1_amp = (E_out*E_vectors).sum(axis=-1) * scaling
-    E2_amp = (E_out*H_vectors).sum(axis=-1) * scaling
+        
+    E1_amp = (E_in*E_vectors).sum(axis=-1)
+    E2_amp = (E_in*H_vectors).sum(axis=-1)
     
     ray_data = numpy.zeros(N, dtype=ray_dtype)
     
@@ -368,6 +346,12 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     gausslets = GaussletCollection.from_rays(ray_data)
     gausslets.config_parabasal_rays(wavelengths, spacing/blending, 0.0)
     apply_mode_curvature(gausslets, -A, -B, -C)
+    
+    E_test = eval_Efield_from_gausslets(gausslets, origins, wavelengths)
+    
+    power_scaling = (E_in.real**2 + E_in.imag**2).sum() / (E_test.real**2 + E_test.imag**2).sum()
+    
+    gausslets.scale_amplitude(numpy.sqrt(power_scaling))
     
     return gausslets, E_field, uphase
     

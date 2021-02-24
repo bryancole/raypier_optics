@@ -40,7 +40,7 @@ class BaseDecompositionPlane(Traceable):
         return fl
         
     def _pipeline_default(self):
-        radius = self.diameter/2.
+        radius = self.radius
         circle = tvtk.ArcSource(use_normal_and_angle=True,
                                 center=[0.0,0.0,0.0],
                                 polar_vector=[0.0, radius, 0.0],
@@ -61,17 +61,14 @@ class PositionDecompositionPlane(BaseDecompositionPlane):
     abstract=False
     name = Str("Position Decomposition")
     
-    ###Spacing of the output mode origins (and input sample points)
-    spacing = Float(0.2) #in mm
+    radius = Property()
     
     ### Wavefront curvature estimate, as a radius from the focus to decomposition plane centre
     curvature = Float(0.0)
     
-    intaction_range = Float(2.1)
-    
     resolution = Float(10.0)
     
-    blending = Float(1.5)
+    blending = Float(1.2)
     
     ### Keep the sample points and sampled fields around 
     ### for debugging purposes
@@ -83,10 +80,19 @@ class PositionDecompositionPlane(BaseDecompositionPlane):
                     Traceable.uigroup,
                     Item("radius", editor=NumEditor),
                     Item("resolution", editor=NumEditor),
-                    Item("curvature", editor=IntEditor),
+                    Item("curvature", editor=NumEditor),
                     Item("blending", editor=NumEditor),
-                    Item("interaction_range", editor=NumEditor)
                     ))
+    
+    def _get_radius(self):
+        return self.diameter/2.
+    
+    def _set_radius(self, val):
+        self.diamter = val*2.0
+        
+    @observe("radius, curvature, resolution, blending")
+    def _on_changed(self, evt):
+        self.update=True
     
     def evaluate_decomposed_rays(self, input_rays):
         start_time = time.monotonic()
@@ -94,7 +100,6 @@ class PositionDecompositionPlane(BaseDecompositionPlane):
         curvature = self.curvature
         resolution = self.resolution
         blending = self.blending
-        interaction_range = self.intaction_range
         
         origin = numpy.asarray(self.centre)
         direction = normaliseVector(numpy.asarray(self.direction))
@@ -104,8 +109,7 @@ class PositionDecompositionPlane(BaseDecompositionPlane):
             curvature=None
         
         gausslets, E_field, uphase = decompose_position(input_rays, origin, direction, axis1, radius, \
-                                                        resolution, curvature=curvature, blending=blending,
-                                                        interaction_range=interaction_range)
+                                                        resolution, curvature=curvature, blending=blending)
         
         self._unwrapped_phase = uphase
         self._E_field = E_field

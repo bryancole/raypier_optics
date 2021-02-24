@@ -2,7 +2,7 @@
 from traits.api import Float, Str
 
 from .lenses import AsphericLens
-from .cmaterials import CoatedDispersiveMaterial
+from .core.cmaterials import CoatedDispersiveMaterial
 from .dispersion import NamedDispersionCurve, NondispersiveCurve
 
 
