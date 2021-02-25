@@ -121,6 +121,35 @@ cdef double eval_zernike_R(double r, int j, int n, int m, double[:] workspace) n
     else:
         return val
     
+    
+cdef double eval_zernike_Rprime(double r, int j, int n, int m, double[:] workspace, double[:] workspace2) nogil:
+    cdef:
+        int jA, jB, jC, nA, nB, nC, mA, mB, mC
+        double val
+        
+    if n < m:
+        return 0.0
+    
+    val = workspace2[j]
+    if isnan(val):
+        nA = n-1
+        mA = abs(m-1)
+        jA = (nA*(nA+2) + mA)//2
+        nB = nA
+        mB = m+1
+        jB = (nB*(nB+2) + mB)//2
+        nC = n-2
+        mC = m
+        jC = (nC*(nC+2) + mC)//2
+        val = eval_zernike_R(r, jA, nA, mA, workspace) + eval_zernike_R(r, jB, nB, mB, workspace)
+        val += r*( eval_zernike_Rprime(r, jA, nA, mA, workspace, workspace2) + \
+                   eval_zernike_Rprime(r, jB, nB, mB, workspace, workspace2) )
+        val -= eval_zernike_Rprime(r, jC, nC, mC, workspace, workspace2)
+        workspace2[j] = val
+        return val
+    else:
+        return val
+    
                 
 cdef class ZernikeDistortion(Distortion):
     cdef:
