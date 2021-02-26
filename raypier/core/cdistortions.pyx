@@ -214,48 +214,93 @@ cdef class ZernikeDistortion(Distortion):
         
         public int n_coefs, j_max, k_max
         
+        public dict coef_map
+        
+        zernike_coef_t * p_coefs
+        double * p_workspace
+        double * p_workspace2
         zernike_coef_t[:] coefs
         double[:] workspace
         double[:] workspace2
          
-    def __cinit__(self, **coefs):
+    def __cinit__(self, *args, **coefs):
         cdef:
             int n,m,i, j,size, j_max, k_max
             list clist
             zer_nmk nmk
             double v
+#             zernike_coef_t[:] acoefs=<zernike_coef_t[:]>self.coefs
+#             double[:] workspace=<double[:]>self.workspace
+#             double[:] workspace2=<double[:]>self.workspace2
             
-        clist = [(int(k[1:]), float(v)) for k,v in coefs if k.startswith("j")]
+        self.coef_map = {}
+        self.unit_radius = coefs.get("unit_radius", 1.0)
+        cdict = {int(k[1:]): float(v) for k,v in coefs.items() if k.startswith("j")}
+        if args:
+            for k,v in args[0]:
+                cdict[int(k)] = float(v)
+        clist = sorted(cdict.items())
         j_max = max(a[0] for a in clist)
-        k_max = eval_nmk(j_max)[2]
-        self.j_max = j_max
-        self.k_max = k_max
+        self.j_max = j_max        
         size = len(clist)
-        self.coefs = <zernike_coef_t[:size]>malloc(size*sizeof(zernike_coef_t))
+        self.p_coefs = <zernike_coef_t*>malloc(size*sizeof(zernike_coef_t))
+        self.coefs = <zernike_coef_t[:size]>self.p_coefs
         self.n_coefs = size
+        
         for i in range(size):
             j,v = clist[i]
+            self.coef_map[j] = i
             self.coefs[i].j = j
             nmk = eval_nmk_c(j)
             self.coefs[i].n = nmk.n
             self.coefs[i].m = nmk.m
             self.coefs[i].k = nmk.k
             self.coefs[i].value = v
-            
-        self.workspace = <double[:k_max]>malloc(k_max*sizeof(double))
-        self.workspace2 = <double[:k_max]>malloc(k_max*sizeof(double))
+        
+        k_max = max(a[2] for a in jnm_map[:j_max])    
+        k_max += 1 ### Size needs to be one higher than biggest index
+        self.k_max = k_max
+        self.p_workspace = <double*>malloc(k_max*sizeof(double))
+        self.workspace = <double[:k_max]>self.p_workspace
+        self.p_workspace2 = <double*>malloc(k_max*sizeof(double))
+        self.workspace2 = <double[:k_max]>self.p_workspace2
             
     def __dealloc__(self):
-        free(&(self.coefs[0]))
-        free(&(self.workspace[0]))
-        free(&(self.workspace2[0]))
+        free(<void *>(self.p_coefs))
+        free(<void *>(self.p_workspace))
+        free(<void *>(self.p_workspace2))
         
     def __getitem__(self, int idx):
+        cdef zernike_coef_t out
+            
         if idx >= self.n_coefs:
             raise IndexError(f"Index {idx} greater than number of coeffs ({self.n_coefs}).")
         
+        out = self.coefs[idx]
+        return (out.j, out.n, out.m, out.k, out.value)
+        
     def __len__(self):
         return self.n_coefs
+    
+    property workspace:
+        def __get__(self):
+            return [self.workspace[i] for i in range(self.k_max)]
+    
+    def set_coef(self, int j, double value):
+        cdef: 
+            int i
+        try:
+            i = self.coef_map[j]
+            self.coefs[i].value = value
+        except KeyError:
+            self.append_coef(j,value)
+        
+    def get_coef(self, int j):
+        cdef int i=self.coef_map[j]
+        return self.coefs[i].value
+    
+    def append_coef(self, int k, double value):
+        raise NotImplementedError()
         
     @cython.boundscheck(False)  # Deactivate bounds checking
     @cython.wraparound(False)   # Deactivate negative indexing.
@@ -263,7 +308,7 @@ cdef class ZernikeDistortion(Distortion):
     @cython.cdivision(True)
     cdef double z_offset_c(self, double x, double y) nogil:
         cdef:
-            double r, theta, Z=0.0, N, PH
+            double r, theta, Z=0.0, N, PH, R
             int i
             zernike_coef_t coef
             double[:] workspace
@@ -274,7 +319,7 @@ cdef class ZernikeDistortion(Distortion):
         theta = atan2(y, x)
         
         workspace = self.workspace
-        for i in range(self.j_max):
+        for i in range(self.k_max):
             workspace[i] = NAN
         workspace[0] = 1.0 #initialise the R_0_0 term
         
@@ -286,12 +331,15 @@ cdef class ZernikeDistortion(Distortion):
             else:
                 N = sqrt(2*(coef.n+1))
                 
+            N *= coef.value
+                
             if coef.m >= 0:
                 PH = cos(coef.m*theta)
             else:
                 PH = -sin(coef.m*theta)
             
-            Z += N * zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace) * PH * coef.value
+            R = zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace)
+            Z += N * R * PH 
         
         return Z
         
@@ -310,8 +358,8 @@ cdef class ZernikeDistortion(Distortion):
             double r, theta, N, PH, Rprime
             int i
             zernike_coef_t coef
-            double[:] workspace
-            double[:] workspace2
+            double[:] workspace=self.workspace
+            double[:] workspace2=self.workspace2
             vector_t Z
             
         x /= self.unit_radius
@@ -319,8 +367,6 @@ cdef class ZernikeDistortion(Distortion):
         r = sqrt(x*x + y*y)
         theta = atan2(y, x)
         
-        workspace = self.workspace
-        workspace2 = self.workspace2
         for i in range(self.k_max):
             workspace[i] = NAN
             workspace2[i] = NAN
@@ -341,12 +387,21 @@ cdef class ZernikeDistortion(Distortion):
                 
             if coef.m >= 0:
                 PH = cos(coef.m*theta)
+                PHprime = -coef.m*sin(coef.m*theta)
             else:
                 PH = -sin(coef.m*theta)
+                PHprime = -coef.m*cos(coef.m*theta)
             
-            Z.z += N * zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace) * PH * coef.value
+            N *= coef.value
+            R = zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace)
+            Z.z += N * R * PH
             Rprime = zernike_Rprime_c(r, coef.k, coef.n, abs(coef.m), workspace, workspace2)
             ### Now eval partial derivatives
+            Z.x += N*(Rprime*cos(theta)*PH + R*(-sin(theta)/r)*PHprime)
+            Z.y += N*(Rprime*sin(theta)*PH + R*(cos(theta)/r)*PHprime)
+            
+        Z.x /= self.unit_radius
+        Z.y /= self.unit_radius
         
         return Z
         
