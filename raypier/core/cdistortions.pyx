@@ -145,6 +145,9 @@ cdef double zernike_R_c(double r, int k, int n, int m, double[:] workspace) nogi
     if n < m:
         return 0.0
     
+    if n == 0:
+        return 1.0
+    
     val = workspace[k]
     if isnan(val):
         nA = n-1
@@ -156,7 +159,8 @@ cdef double zernike_R_c(double r, int k, int n, int m, double[:] workspace) nogi
         kB = half_n*(half_n+1) + abs(mB) #(nB*(nB+2) + mB)//2
         nC = n-2
         mC = m
-        kC = (half_n-1)*half_n + abs(mC) #(nC*(nC+2) + mC)//2
+        half_n = nC/2
+        kC = half_n*(half_n+1) + abs(mC) #(nC*(nC+2) + mC)//2
         val = r*(zernike_R_c(r, kA, nA, mA, workspace) + zernike_R_c(r, kB, nB, mB, workspace))
         val -= zernike_R_c(r, kC, nC, mC, workspace)
         workspace[k] = val
@@ -179,6 +183,9 @@ cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:] workspace,
         double val
         
     if n < m:
+        return 0.0
+    
+    if n == 0:
         return 0.0
     
     val = workspace2[k]
@@ -206,7 +213,99 @@ cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:] workspace,
 def zernike_Rprime(double r, int k, int n, int m, double[:] workspace, double[:] workspace2):
     return zernike_Rprime_c(r,k,n,m,workspace, workspace2)
 
+
+# @cython.boundscheck(False)  # Deactivate bounds checking
+# @cython.wraparound(False)   # Deactivate negative indexing.
+# @cython.nonecheck(False)
+# @cython.cdivision(True)
+# cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:] workspace) nogil:
+#     cdef:
+#         int kA, kB, kC, nA, nB, nC, mA, mB, mC , half_n
+#         double val, val1, val2, t1,t2,t3,t4
+#         
+#     if n < m:
+#         return 0.0
+#     
+#     if (n == 0) and (r != 0.0):
+#         return 1./r
+# 
+#     nA = n-1
+#     mA = abs(m-1)
+#     half_n = nA/2
+#     kA = half_n*(half_n+1) + abs(mA)#(nA*(nA+2) + mA)//2
+#     nB = nA
+#     mB = m+1
+#     kB = half_n*(half_n+1) + abs(mB) #(nB*(nB+2) + mB)//2
+#     nC = n-2
+#     mC = m
+#     kC = (half_n-1)*half_n + abs(mC) #(nC*(nC+2) + mC)//2
+#     
+#     t1 = zernike_R_c(r, kA, nA, mA, workspace)
+#     t2 = zernike_R_c(r, kB, nB, mB, workspace)
+#     val1 = (t1 + t2)
+#     
+#     t3 = 0.0        
+#     if (nA == 0) and (mA == 0):
+#         t3 += 1.0
+#     elif (nA == 2) and (mA == 0):
+#         t3 -= 1.0
+#     elif nA>0:
+#         t3 += r*zernike_R_over_r_c(r, kA, nA, mA, workspace)
+#     val2 = t3
+#             
+#     t4 = 0.0
+#     if (nB == 0) and (mB == 0):
+#         t4 += 1.0
+#     elif (nB == 2) and (mB == 0):
+#         t4 -= 1.0
+#     elif nB>0:
+#         t4 += r*zernike_R_over_r_c(r, kB, nB, mB, workspace)
+#     val2 += t4
+#     
+#     val = val1
+#     
+#     val -= zernike_R_over_r_c(r, kC, nC, mC, workspace)
+#         
+#     with gil:
+#         print("nmk:", (n,m,k), (nA,mA,kA),(nB,mB,kB), val1, val2, t1, t2, t3, t4 )
+#     
+#     return val
+
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:] workspace) nogil:
+    """
+    Results is undefined for m==0.
+    """
+    cdef:
+        int kA, kB, kC, nA, nB, nC, mA, mB, mC , half_n
+        double val
+        
+    if n < m:
+        return 0.0
+
+    nA = n-1
+    mA = abs(m-1)
+    half_n = nA/2
+    kA = half_n*(half_n+1) + abs(mA)
+    nB = nA
+    mB = m+1
+    kB = half_n*(half_n+1) + abs(mB)
+    nC = n-2
+    mC = m
+    kC = (half_n-1)*half_n + abs(mC)
     
+    val = zernike_R_c(r, kA, nA, mA, workspace) + zernike_R_c(r, kB, nB, mB, workspace) 
+    val -= zernike_R_over_r_c(r, kC, nC, mC, workspace)    
+    return val
+
+
+def zernike_R_over_r(double r, int k, int n, int m, double[:] workspace):
+    return zernike_R_over_r_c(r,k,n,m, workspace)
+
                 
 cdef class ZernikeDistortion(Distortion):
     cdef:
@@ -355,7 +454,7 @@ cdef class ZernikeDistortion(Distortion):
             (dz(x,y)/dx, dz(x,y)/dy, z(x,y))
         """
         cdef:
-            double r, theta, N, PH, Rprime
+            double r, theta, N, PH, R, Rprime, R_over_r
             int i
             zernike_coef_t coef
             double[:] workspace=self.workspace
@@ -370,8 +469,6 @@ cdef class ZernikeDistortion(Distortion):
         for i in range(self.k_max):
             workspace[i] = NAN
             workspace2[i] = NAN
-        workspace[0] = 1.0 #initialise the R_0_0 term
-        workspace2[0] = 0.0 #Gradient of 0th term is zero
         
         Z.x = 0.0
         Z.y = 0.0
@@ -379,11 +476,6 @@ cdef class ZernikeDistortion(Distortion):
         
         for i in range(self.n_coefs):
             coef = self.coefs[i]
-            
-            if coef.m==0:
-                N = sqrt(coef.n+1)
-            else:
-                N = sqrt(2*(coef.n+1))
                 
             if coef.m >= 0:
                 PH = cos(coef.m*theta)
@@ -392,13 +484,20 @@ cdef class ZernikeDistortion(Distortion):
                 PH = -sin(coef.m*theta)
                 PHprime = -coef.m*cos(coef.m*theta)
             
-            N *= coef.value
             R = zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace)
-            Z.z += N * R * PH
             Rprime = zernike_Rprime_c(r, coef.k, coef.n, abs(coef.m), workspace, workspace2)
+            R_over_r = zernike_R_over_r_c(r, coef.k, coef.n, abs(coef.m), workspace)
+            
+            if coef.m==0:
+                N = sqrt(coef.n+1)
+            else:
+                N = sqrt(2*(coef.n+1))
+            N *= coef.value
+            
+            Z.z += N * R * PH
             ### Now eval partial derivatives
-            Z.x += N*(Rprime*cos(theta)*PH + R*(-sin(theta)/r)*PHprime)
-            Z.y += N*(Rprime*sin(theta)*PH + R*(cos(theta)/r)*PHprime)
+            Z.x += N*(Rprime*cos(theta)*PH + R_over_r*(-sin(theta))*PHprime)
+            Z.y += N*(Rprime*sin(theta)*PH + R_over_r*(cos(theta))*PHprime)
             
         Z.x /= self.unit_radius
         Z.y /= self.unit_radius

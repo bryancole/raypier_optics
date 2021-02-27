@@ -9,7 +9,8 @@ from matplotlib import pyplot as pp
 from collections import Counter
 
 
-from raypier.core.cdistortions import SimpleTestZernikeJ7, eval_nmk, zernike_R, zernike_Rprime, ZernikeDistortion
+from raypier.core.cdistortions import SimpleTestZernikeJ7, eval_nmk, zernike_R, zernike_Rprime, \
+        ZernikeDistortion, zernike_R_over_r#, zernike_R2
 from raypier.core import cdistortions
 
 
@@ -99,6 +100,8 @@ class TestZernikeSeriesDistortion(unittest.TestCase):
         y=y.ravel()
         a = Z.z_offset_and_gradient(x,y)
         b = Z2.z_offset_and_gradient(x,y)
+        print(a)
+        print(b)
         self.assertTrue(numpy.allclose(a, b))
         del Z
         
@@ -110,6 +113,7 @@ class TestZernikeSeriesDistortion(unittest.TestCase):
         b = Z2.z_offset_and_gradient(x,y)
         print(a,b)
         self.assertTrue(numpy.allclose(a, b))
+        
         
         
 class TestEvalZernikeR(unittest.TestCase):
@@ -129,4 +133,28 @@ class TestEvalZernikeR(unittest.TestCase):
         
         R2 = 3*(r**3) - (2*r)
         self.assertAlmostEqual(R, R2)
+        
+    def test_R_over_r(self):
+        r=0.13
+        n,m,k = eval_nmk(19)
+        k_max = max(eval_nmk(j)[2] for j in range(34))
+        print("k_max=", k_max)
+        workspace = numpy.zeros(k_max,'d')
+        workspace[:] = float("nan")
+        workspace[0] = 1.0
+
+        for n in range(1,7):
+            if 2*(n//2)==n:
+                start=2
+            else:
+                start=1
+            for m in range(start,n+1,2):
+                half_n = int(n//2)
+                k = half_n*(half_n+1) + abs(m)
+                R = zernike_R(r,k,n,m,workspace)
+                #Ra = zernike_R2(r,k,n,m,workspace)
+                R2 = r*zernike_R_over_r(r,k,n,m,workspace)
+                print("n,m,k=", (n,m,k), "R=",R, "R2=", R2)
+                self.assertAlmostEqual(R,R2)
+        
         

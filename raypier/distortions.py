@@ -2,8 +2,9 @@
 Traits wrappers for Distortion objects
 """
 
-from traits.api import Instance, Float, HasTraits, observe, Event, List
+from traits.api import Instance, Float, HasTraits, observe, Event, List, Tuple, Int
 from traitsui.api import View, VGroup, Item
+from traitsui.editors import ListEditor
 
 from .editors import NumEditor
 from .core import cdistortions, ctracer
@@ -45,9 +46,15 @@ class SimpleTestZernikeJ7(BaseDistortion):
 class ZernikeSeries(BaseDistortion):
     unit_radius = Float(10.0)
     
-    coefficients = List()
+    coefficients = List(Tuple(Int,Float))
     
     c_distortion = Instance(cdistortions.ZernikeDistortion)
+    
+    traits_view = View(VGroup(
+                    Item("unit_radius", editor=NumEditor),
+                    Item("coefficients", editor=ListEditor())
+                        )
+                    )
     
     def __init__(self, *args, **kwds):
         coefs = dict(kwds.get("coefficients", []))
@@ -58,7 +65,7 @@ class ZernikeSeries(BaseDistortion):
         for k in jks:
             del kwds[k]
         kwds['coefficients'] = sorted(coefs.items())
-        super.__init__(**kwds)
+        super().__init__(**kwds)
     
     def _c_distortion_default(self):
         return cdistortions.ZernikeDistortion(self.coefficients,
