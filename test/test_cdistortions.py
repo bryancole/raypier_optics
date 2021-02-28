@@ -10,7 +10,7 @@ from collections import Counter
 
 
 from raypier.core.cdistortions import SimpleTestZernikeJ7, eval_nmk, zernike_R, zernike_Rprime, \
-        ZernikeDistortion, zernike_R_over_r#, zernike_R2
+        ZernikeDistortion, zernike_R_over_r
 from raypier.core import cdistortions
 
 
@@ -110,6 +110,9 @@ class TestZernikeSeriesDistortion(unittest.TestCase):
         self.assertTrue(numpy.allclose(a, b))
         del Z
         
+    def test_show_num_threads(self):
+        print(cdistortions.num_threads)
+        
     def test_get_coefs(self):
         Z = ZernikeDistortion(j7=1.0, unit_radius=10.0)
         self.assertEqual(1.0, Z.get_coef(7))
@@ -146,9 +149,9 @@ class TestEvalZernikeR(unittest.TestCase):
         n,m,k = eval_nmk(7)
         k_max = max(eval_nmk(j)[2] for j in range(7))
         print("k_max=", k_max)
-        workspace = numpy.zeros(k_max,'d')
-        workspace[:] = float("nan")
-        workspace[0] = 1.0
+        workspace = numpy.zeros((3,k_max),'d')
+        workspace[0,:] = float("nan")
+        workspace[0,0] = 1.0
         print("k=",k, "n=",n, "m=",m)
         print("init=",workspace)
         R = zernike_R(r,k,n,m,workspace)
@@ -161,9 +164,9 @@ class TestEvalZernikeR(unittest.TestCase):
     def test_eval_zernike_R_all(self):
         r_all = numpy.linspace(0,1.0,20)
         k_max = 3*4 + 6 + 1
-        workspace = numpy.zeros(k_max, 'd')
+        workspace = numpy.zeros((3,k_max), 'd')
         for r in r_all: 
-            workspace[:] = float("nan")
+            workspace[:,:] = float("nan")
             for n in range(7):
                 if 2*(n//2) == n:
                     start=0
@@ -180,11 +183,12 @@ class TestEvalZernikeR(unittest.TestCase):
     def test_R_over_r(self):
         r=0.13
         n,m,k = eval_nmk(19)
-        k_max = max(eval_nmk(j)[2] for j in range(34))
-        print("k_max=", k_max)
-        workspace = numpy.zeros(k_max,'d')
-        workspace[:] = float("nan")
-        workspace[0] = 1.0
+        k_max = (6//2)*(6//2 + 1) + 6 + 1
+        print(">> k_max=", k_max)
+        k_max *= 2
+        workspace = numpy.zeros((3,k_max),'d')
+        workspace[:,:] = float("nan")
+        #workspace[0,0] = 1.0
 
         for n in range(1,7):
             if 2*(n//2)==n:

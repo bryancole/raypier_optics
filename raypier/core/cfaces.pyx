@@ -86,7 +86,7 @@ cdef class ShapedFace(Face):
         with nogil:
             ###Not using prange here because ZernikeDistortion uses a cache for its calculation. 
             ###Threading screws this up.
-            for i in range(ni):
+            for i in prange(ni):
                 out[i] = self.eval_z_c(points[i,0],points[i,1])
         return aout
     

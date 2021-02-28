@@ -4,11 +4,12 @@ Traits wrappers for Distortion objects
 
 from traits.api import Instance, Float, HasTraits, observe, Event, List, Tuple, Int
 from traitsui.api import View, VGroup, Item
-from traitsui.editors import ListEditor
+from traitsui.editors import ListEditor, TupleEditor
 
 from .editors import NumEditor
 from .core import cdistortions, ctracer
 from traits.observation.events import ListChangeEvent
+from traits.observation._trait_change_event import TraitChangeEvent
 
 
 class BaseDistortion(HasTraits):
@@ -43,6 +44,9 @@ class SimpleTestZernikeJ7(BaseDistortion):
         self.updated = True
         
         
+coef_editor = TupleEditor(cols=2, labels=["j", "value"])
+        
+        
 class ZernikeSeries(BaseDistortion):
     unit_radius = Float(10.0)
     
@@ -52,7 +56,7 @@ class ZernikeSeries(BaseDistortion):
     
     traits_view = View(VGroup(
                     Item("unit_radius", editor=NumEditor),
-                    Item("coefficients", editor=ListEditor())
+                    Item("coefficients", editor=ListEditor(editor=coef_editor))
                         )
                     )
     
@@ -73,14 +77,9 @@ class ZernikeSeries(BaseDistortion):
         
     @observe("coefficients.items, unit_radius")
     def on_params_change(self, evt):
-        if isinstance(evt, ListChangeEvent):
-            for item in evt.added:
-                self.c_distortion.set_coef(item[0],item[1])
+        if isinstance(evt, TraitChangeEvent) and evt.name == "unit_radius":
+            self.c_distortion.unit_radius = evt.new
         else:
-            if evt.name == "unit_radius":
-                self.c_distortion.unit_radius = evt.new
-            elif evt.name == "coefficients":
-                for k,v in evt.new:
-                    self.c_distortion.set_coef(k,v)
+            self.c_distortion.set_coefs(self.coefficients)
         self.updated = True
         

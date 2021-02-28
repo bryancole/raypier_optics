@@ -26,8 +26,14 @@ from .ctracer cimport Face, sep_, \
                 rotate_c, Shape, Distortion
                 
 cimport cython
+from cython.parallel cimport threadid
 cimport numpy as np_
 import numpy as np
+cimport openmp
+
+
+num_threads = openmp.omp_get_num_procs()
+openmp.omp_set_num_threads(num_threads)
                 
                 
 cdef class SimpleTestZernikeJ7(Distortion):
@@ -81,6 +87,9 @@ cdef packed struct zernike_coef_t:
     int m
     int k
     double value
+    
+zcoefs_dtype = np.dtype([('j', np.int32),('n',np.int32),('m',np.int32),
+                         ('k',np.int32),('value',np.double)])
     
     
 cdef struct zer_nmk:
@@ -137,7 +146,7 @@ def eval_nmk(int j):
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double zernike_R_c(double r, int k, int n, int m, double[:] workspace) nogil:
+cdef double zernike_R_c(double r, int k, int n, int m, double[:,:] workspace) nogil:
     cdef:
         int kA, kB, kC, nA, nB, nC, mA, mB, mC , half_n
         double val
@@ -148,7 +157,7 @@ cdef double zernike_R_c(double r, int k, int n, int m, double[:] workspace) nogi
     if n == 0:
         return 1.0
     
-    val = workspace[k]
+    val = workspace[0,k]
     if isnan(val):
         nA = n-1
         mA = abs(m-1)
@@ -163,13 +172,13 @@ cdef double zernike_R_c(double r, int k, int n, int m, double[:] workspace) nogi
         kC = half_n*(half_n+1) + abs(mC) #(nC*(nC+2) + mC)//2
         val = r*(zernike_R_c(r, kA, nA, mA, workspace) + zernike_R_c(r, kB, nB, mB, workspace))
         val -= zernike_R_c(r, kC, nC, mC, workspace)
-        workspace[k] = val
+        workspace[0,k] = val
         return val
     else:
         return val
 
     
-def zernike_R(double r, int k, int n, int m, double[:] workspace):
+def zernike_R(double r, int k, int n, int m, double[:,:] workspace):
     return zernike_R_c(r,k,n,m, workspace)
     
     
@@ -177,7 +186,7 @@ def zernike_R(double r, int k, int n, int m, double[:] workspace):
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:] workspace, double[:] workspace2) nogil:
+cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:,:] workspace) nogil:
     cdef:
         int kA, kB, kC, nA, nB, nC, mA, mB, mC, half_n
         double val
@@ -188,7 +197,7 @@ cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:] workspace,
     if n == 0:
         return 0.0
     
-    val = workspace2[k]
+    val = workspace[1,k]
     if isnan(val):
         nA = n-1
         mA = abs(m-1)
@@ -201,17 +210,17 @@ cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:] workspace,
         mC = m
         kC = (half_n-1)*half_n + abs(mC)
         val = zernike_R_c(r, kA, nA, mA, workspace) + zernike_R_c(r, kB, nB, mB, workspace)
-        val += r*( zernike_Rprime_c(r, kA, nA, mA, workspace, workspace2) + \
-                   zernike_Rprime_c(r, kB, nB, mB, workspace, workspace2) )
-        val -= zernike_Rprime_c(r, kC, nC, mC, workspace, workspace2)
-        workspace2[k] = val
+        val += r*( zernike_Rprime_c(r, kA, nA, mA, workspace) + \
+                   zernike_Rprime_c(r, kB, nB, mB, workspace) )
+        val -= zernike_Rprime_c(r, kC, nC, mC, workspace)
+        workspace[1,k] = val
         return val
     else:
         return val
     
     
-def zernike_Rprime(double r, int k, int n, int m, double[:] workspace, double[:] workspace2):
-    return zernike_Rprime_c(r,k,n,m,workspace, workspace2)
+def zernike_Rprime(double r, int k, int n, int m, double[:,:] workspace):
+    return zernike_Rprime_c(r,k,n,m,workspace)
 
 
 # @cython.boundscheck(False)  # Deactivate bounds checking
@@ -276,7 +285,7 @@ def zernike_Rprime(double r, int k, int n, int m, double[:] workspace, double[:]
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:] workspace) nogil:
+cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:,:] workspace) nogil:
     """
     Results is undefined for m==0.
     """
@@ -286,24 +295,28 @@ cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:] workspac
         
     if n < m:
         return 0.0
-
-    nA = n-1
-    mA = abs(m-1)
-    half_n = nA/2
-    kA = half_n*(half_n+1) + abs(mA)
-    nB = nA
-    mB = m+1
-    kB = half_n*(half_n+1) + abs(mB)
-    nC = n-2
-    mC = m
-    kC = (half_n-1)*half_n + abs(mC)
     
-    val = zernike_R_c(r, kA, nA, mA, workspace) + zernike_R_c(r, kB, nB, mB, workspace) 
-    val -= zernike_R_over_r_c(r, kC, nC, mC, workspace)    
+    val = workspace[2,k]
+    if isnan(val):
+        nA = n-1
+        mA = abs(m-1)
+        half_n = nA/2
+        kA = half_n*(half_n+1) + abs(mA)
+        nB = nA
+        mB = m+1
+        kB = half_n*(half_n+1) + abs(mB)
+        nC = n-2
+        mC = m
+        half_n = nC/2
+        kC = half_n*(half_n+1) + abs(mC)
+        
+        val = zernike_R_c(r, kA, nA, mA, workspace) + zernike_R_c(r, kB, nB, mB, workspace) 
+        val -= zernike_R_over_r_c(r, kC, nC, mC, workspace)
+        workspace[2,k]=val
     return val
 
 
-def zernike_R_over_r(double r, int k, int n, int m, double[:] workspace):
+def zernike_R_over_r(double r, int k, int n, int m, double[:,:] workspace):
     return zernike_R_over_r_c(r,k,n,m, workspace)
 
                 
@@ -314,13 +327,8 @@ cdef class ZernikeDistortion(Distortion):
         public int n_coefs, j_max, k_max
         
         public dict coef_map
-        
-        zernike_coef_t * p_coefs
-        double * p_workspace
-        double * p_workspace2
         zernike_coef_t[:] coefs
-        double[:] workspace
-        double[:] workspace2
+        double[:,:,:] workspace
          
     def __cinit__(self, *args, **coefs):
         cdef:
@@ -328,9 +336,6 @@ cdef class ZernikeDistortion(Distortion):
             list clist
             zer_nmk nmk
             double v
-#             zernike_coef_t[:] acoefs=<zernike_coef_t[:]>self.coefs
-#             double[:] workspace=<double[:]>self.workspace
-#             double[:] workspace2=<double[:]>self.workspace2
             
         self.coef_map = {}
         self.unit_radius = coefs.get("unit_radius", 1.0)
@@ -338,39 +343,8 @@ cdef class ZernikeDistortion(Distortion):
         if args:
             for k,v in args[0]:
                 cdict[int(k)] = float(v)
-        clist = sorted(cdict.items())
-        j_max = max(a[0] for a in clist)
-        self.j_max = j_max        
-        size = len(clist)
-        self.p_coefs = <zernike_coef_t*>malloc(size*sizeof(zernike_coef_t))
-        self.coefs = <zernike_coef_t[:size]>self.p_coefs
-        self.n_coefs = size
-        
-        for i in range(size):
-            j,v = clist[i]
-            self.coef_map[j] = i
-            self.coefs[i].j = j
-            nmk = eval_nmk_c(j)
-            self.coefs[i].n = nmk.n
-            self.coefs[i].m = nmk.m
-            self.coefs[i].k = nmk.k
-            self.coefs[i].value = v
-            if nmk.n > n_max:
-                n_max = nmk.n
-        
-        half_n = n_max//2
-        k_max = half_n*(half_n + 1) + n_max
-        k_max += 1 ### Size needs to be one higher than biggest index
-        self.k_max = k_max
-        self.p_workspace = <double*>malloc(k_max*sizeof(double))
-        self.workspace = <double[:k_max]>self.p_workspace
-        self.p_workspace2 = <double*>malloc(k_max*sizeof(double))
-        self.workspace2 = <double[:k_max]>self.p_workspace2
-            
-    def __dealloc__(self):
-        free(<void *>(self.p_coefs))
-        free(<void *>(self.p_workspace))
-        free(<void *>(self.p_workspace2))
+        self.k_max = 0
+        self.set_coefs(list(cdict.items()))
         
     def __getitem__(self, int idx):
         cdef zernike_coef_t out
@@ -386,9 +360,40 @@ cdef class ZernikeDistortion(Distortion):
     
     property workspace:
         def __get__(self):
-            return [self.workspace[i] for i in range(self.k_max)]
+            return np.asarray(self.workspace)
+        
+    def set_coefs(self, coefs):
+        cdef:
+            int i,j, n_max, k_max
+            zernike_coef_t coef
+            zer_nmk nmk
+            double v
+            
+        clist = sorted(coefs)
+        j_max = max(j for j,v in clist)
+        self.j_max = j_max
+        self.n_coefs = len(clist)
+        self.coefs = np.empty(len(clist), dtype=zcoefs_dtype)
+        n_max = 0
+        self.coef_map = {}
+        for i in range(self.n_coefs):
+            j,v = clist[i]
+            nmk = eval_nmk_c(j)
+            self.coef_map[j]=i
+            coef.j = j
+            coef.n = nmk.n
+            coef.m = nmk.m
+            coef.k = nmk.k
+            coef.value = v
+            self.coefs[i] = coef
+            if nmk.n > n_max:
+                n_max = nmk.n
+        k_max = (n_max//2)*(n_max//2 + 1) + n_max + 1
+        if k_max > self.k_max:
+            self.workspace = np.empty((num_threads, 3, k_max),'d')
+            self.k_max = k_max
     
-    def set_coef(self, int j, double value):
+    def update_coef(self, int j, double value):
         cdef: 
             int i
         try:
@@ -413,17 +418,17 @@ cdef class ZernikeDistortion(Distortion):
             double r, theta, Z=0.0, N, PH, R
             int i
             zernike_coef_t coef
-            double[:] workspace
+            double[:,:] workspace
             
         x /= self.unit_radius
         y /= self.unit_radius
         r = sqrt(x*x + y*y)
         theta = atan2(y, x)
         
-        workspace = self.workspace
+        workspace = self.workspace[threadid(),:,:]
         for i in range(self.k_max):
-            workspace[i] = NAN
-        workspace[0] = 1.0 #initialise the R_0_0 term
+            workspace[0,i] = NAN
+        workspace[0,0] = 1.0 #initialise the R_0_0 term
         
         for i in range(self.n_coefs):
             coef = self.coefs[i]
@@ -458,9 +463,9 @@ cdef class ZernikeDistortion(Distortion):
         cdef:
             double r, theta, N, PH, R, Rprime, R_over_r
             int i
+            int thd = threadid()
             zernike_coef_t coef
-            double[:] workspace=self.workspace
-            double[:] workspace2=self.workspace2
+            double[:,:] workspace
             vector_t Z
             
         x /= self.unit_radius
@@ -468,9 +473,11 @@ cdef class ZernikeDistortion(Distortion):
         r = sqrt(x*x + y*y)
         theta = atan2(y, x)
         
+        workspace = self.workspace[thd,:,:]
         for i in range(self.k_max):
-            workspace[i] = NAN
-            workspace2[i] = NAN
+            workspace[0,i] = NAN
+            workspace[1,i] = NAN
+            workspace[2,i] = NAN
         
         Z.x = 0.0
         Z.y = 0.0
@@ -487,7 +494,7 @@ cdef class ZernikeDistortion(Distortion):
                 PHprime = -coef.m*cos(coef.m*theta)
             
             R = zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace)
-            Rprime = zernike_Rprime_c(r, coef.k, coef.n, abs(coef.m), workspace, workspace2)
+            Rprime = zernike_Rprime_c(r, coef.k, coef.n, abs(coef.m), workspace)
             R_over_r = zernike_R_over_r_c(r, coef.k, coef.n, abs(coef.m), workspace)
             
             if coef.m==0:

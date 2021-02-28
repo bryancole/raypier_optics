@@ -22,3 +22,7 @@ from raypier.has_queue import HasQueue, on_trait_change
 class BaseConstraint(HasQueue):
     update = Event()
     name = Str("a constraint")
+    
+    
+class Constraint(BaseConstraint):
+    pass

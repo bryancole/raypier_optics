@@ -31,5 +31,7 @@ from .intensity_surface import IntensitySurface
 
 from .beamsplitters import UnpolarisingBeamsplitterCube, PolarisingBeamsplitterCube
 
+from .constraints import Constraint
+
 from .core.ctracer import ray_dtype, gausslet_dtype, RayCollection, GaussletCollection
 from .core.fields import eval_Efield_from_gausslets, eval_Efield_from_rays
