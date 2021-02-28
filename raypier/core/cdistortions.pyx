@@ -324,7 +324,7 @@ cdef class ZernikeDistortion(Distortion):
          
     def __cinit__(self, *args, **coefs):
         cdef:
-            int n,m,i, j,size, j_max, k_max
+            int n,m,i, j,size, j_max, k_max, half_n, n_max=0
             list clist
             zer_nmk nmk
             double v
@@ -355,8 +355,11 @@ cdef class ZernikeDistortion(Distortion):
             self.coefs[i].m = nmk.m
             self.coefs[i].k = nmk.k
             self.coefs[i].value = v
+            if nmk.n > n_max:
+                n_max = nmk.n
         
-        k_max = max(a[2] for a in jnm_map[:j_max])    
+        half_n = n_max//2
+        k_max = half_n*(half_n + 1) + n_max
         k_max += 1 ### Size needs to be one higher than biggest index
         self.k_max = k_max
         self.p_workspace = <double*>malloc(k_max*sizeof(double))
@@ -439,7 +442,6 @@ cdef class ZernikeDistortion(Distortion):
             
             R = zernike_R_c(r, coef.k, coef.n, abs(coef.m), workspace)
             Z += N * R * PH 
-        
         return Z
         
     @cython.boundscheck(False)  # Deactivate bounds checking

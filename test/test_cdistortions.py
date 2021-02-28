@@ -28,6 +28,27 @@ class TestSimpleTestZernikeJ7(unittest.TestCase):
         pp.imshow(v[:,2].reshape(x.shape))
         
         pp.show()
+        
+        
+### Copied off Wikipedia
+zernike_R_funcs = {
+    (0,0): lambda r: 1.0,
+    (1,1): lambda r: r,
+    (2,0): lambda r: 2*(r**2) - 1,
+    (2,2): lambda r: r**2,
+    (3,1): lambda r: 3*(r**3) - (2*r),
+    (3,3): lambda r: r**3,
+    (4,0): lambda r: 6*(r**4) - 6*(r**2) + 1,
+    (4,2): lambda r: 4*(r**4) - 3*(r**2),
+    (4,4): lambda r: r**4,
+    (5,1): lambda r: 10*(r**5) - 12*(r**3) + 3*r,
+    (5,3): lambda r: 5*(r**5) - 4*(r**3),
+    (5,5): lambda r: r**5,
+    (6,0): lambda r: 20*(r**6) - 30*(r**4) + 12*(r**2) - 1,
+    (6,2): lambda r: 15*(r**6) - 20*(r**4) + 6*(r**2),
+    (6,4): lambda r: 6*(r**6) - 5*(r**4),
+    (6,6): lambda r: r**6
+    }
 
 
 class TestEvalNMK(unittest.TestCase):
@@ -70,6 +91,9 @@ class TestEvalNMK(unittest.TestCase):
         dups = {(n, abs(m)): k for n,m,k in nmk}
         c=Counter(dups.values())
         self.assertLessEqual(max(c.values()), 1)
+        
+        
+
         
         
 class TestZernikeSeriesDistortion(unittest.TestCase):
@@ -133,6 +157,25 @@ class TestEvalZernikeR(unittest.TestCase):
         
         R2 = 3*(r**3) - (2*r)
         self.assertAlmostEqual(R, R2)
+        
+    def test_eval_zernike_R_all(self):
+        r_all = numpy.linspace(0,1.0,20)
+        k_max = 3*4 + 6 + 1
+        workspace = numpy.zeros(k_max, 'd')
+        for r in r_all: 
+            workspace[:] = float("nan")
+            for n in range(7):
+                if 2*(n//2) == n:
+                    start=0
+                else:
+                    start=1
+                for m in range(start,n+1,2):
+                    half_n = n//2
+                    k=half_n*(half_n+1) + m
+                    R = zernike_R(r,k,n,m,workspace)
+                    R2 = zernike_R_funcs[(n,m)](r)
+                    self.assertAlmostEqual(R,R2)
+                
         
     def test_R_over_r(self):
         r=0.13
