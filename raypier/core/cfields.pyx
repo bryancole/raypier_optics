@@ -176,7 +176,7 @@ cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y,
         b2 += yi2
     
     out[0].imag = blending *(-b0*(a11*a22 - a12**2) + b1*(a01*a22 - a02*a12) - b2*(a01*a12 - a02*a11))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
-    out[1].imag = blending *(b0*(a01*a22 - a02*a12) - b1*(a00*a22 - a02**2) + b2*(a00*a12 - a01*a02))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
+    out[1].imag = -blending *(b0*(a01*a22 - a02*a12) - b1*(a00*a22 - a02**2) + b2*(a00*a12 - a01*a02))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
     out[2].imag = blending *(-b0*(a01*a12 - a02*a11) + b1*(a00*a12 - a01*a02) - b2*(a00*a11 - a01**2))/(-a00*a11*a22 + a00*a12**2 + a01**2*a22 - 2*a01*a02*a12 + a02**2*a11)
     
     ### Real parts ###
