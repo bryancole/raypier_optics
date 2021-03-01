@@ -18,18 +18,19 @@ from traitsui.api import View, Item, VGroup
 
 
 shape = CircleShape(radius=10.0)
+
 #f1 = SphericalFace(z_height=0.0, curvature=-25.0)
+
 f1 = PlanarFace(z_height=0.0)
 f2 = PlanarFace(z_height=5.0)
-
-#dist = SimpleTestZernikeJ7(unit_radius=10.0, amplitude=0.01)
-#dist = NullDistortion()
 
 dist = ZernikeSeries(unit_radius=10.0, coefficients=[(i,0.0) for i in range(12)])
 f1 = DistortionFace(base_face=f1, distortion=dist)
 
 
 class Sliders(Constraint):
+    """Make a Constrain object just to give us a more convenient UI for adjusting Zernike coefficients.
+    """
     J0 = Range(-1.0,1.0,0.0)
     J1 = Range(-1.0,1.0,0.0)
     J2 = Range(-1.0,1.0,0.0)
