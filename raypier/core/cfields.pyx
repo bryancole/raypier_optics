@@ -205,7 +205,7 @@ cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y,
     a12 = a01*a01 #reuse a12 as an optimisation
 
     out[0].real = (-a12*b2 + a01*a22*b1 + b0*(a12 - a11*a22))/(a00*a12 - a00*a11*a22 + a12*a22)
-    out[1].real = (a00*a01*b2 - a00*a22*b1 + a01*a22*b0)/(a00*a12 - a00*a11*a22 + a12*a22)
+    out[1].real = -(a00*a01*b2 - a00*a22*b1 + a01*a22*b0)/(a00*a12 - a00*a11*a22 + a12*a22)
     out[2].real = (a00*a01*b1 - a12*b0 - b2*(a00*a11 - a12))/(a00*a12 - a00*a11*a22 + a12*a22)
     
     return
