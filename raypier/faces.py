@@ -5,7 +5,8 @@ Traited wrappers for cfaces objects
 
 
 from .core.cfaces import ShapedPlanarFace, ShapedSphericalFace, ConicRevolutionFace, AsphericFace as AsphericFace_,\
-            ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_, DistortionFace as DistortionFace_
+            ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_, DistortionFace as DistortionFace_,\
+            SaddleFace as SaddleFace_
             
 from .distortions import BaseDistortion
             
@@ -88,6 +89,24 @@ class AxiconFace(PlanarFace):
         
     def _gradient_changed(self, vnew):
         self.cface.gradient = vnew
+        self.updated=True
+        
+        
+class SaddleFace(PlanarFace):
+    curvature = Float(1.0)
+    
+    cface = Instance(SaddleFace_, ())
+    
+    traits_view = View(VGroup(
+            Item("z_height", editor=NumEditor, tooltip="surface height at x=0,y=0 in mm"),
+            Item("curvature", editor=NumEditor, tooltip="curvature of the saddle-point")
+        ))
+    
+    def _cface_default(self):
+        return SaddleFace_(z_height=self.z_height, curvature=self.curvature)
+        
+    def _curvature_changed(self, vnew):
+        self.cface.curvature = vnew
         self.updated=True
         
         

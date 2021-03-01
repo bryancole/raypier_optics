@@ -1212,6 +1212,90 @@ cdef class EllipsoidalFace(Face):
         rot = [[m.get_element(i,j) for j in xrange(3)] for i in xrange(3)]
         dt = [m.get_element(i,3) for i in xrange(3)]
         self.inverse_transform = Transform(rotation=rot, translation=dt)
+        
+        
+cdef class SaddleFace(ShapedFace):
+    cdef:
+        public double z_height, curvature
+        
+    params=[]
+    
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get("z_height", 0.0)
+        self.curvature = kwds.get("curvature", 0.0)
+        
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        cdef:
+            double A=sqrt(6.0), root, denom, a1, a2
+            vector_t d,p, pt1, pt2
+            
+        A *= self.curvature
+        p = p1
+        p.z -= self.z_height
+        d = subvv_(p2,p1)
+        
+        if d.x==0.0:
+            a1 = (-A*(p.x*p.y) + p.z)/(A*d.y*p.x - d.z)
+            a2 = INF
+        elif d.y==0.0:
+            a1 = (-A*(p.x*p.y) + p.z)/(A*d.x*p.y - d.z)
+            a2 = INF
+        else:
+            root = (A**2)*(d.x**2)*(p.y**2) - 2*(A**2)*d.x*d.y*p.x*p.y + (A**2)*(d.y**2)*(p.x**2) + \
+                    4*A*d.x*d.y*p.z - 2*A*d.x*d.z*p.y - 2*A*d.y*d.z*p.x + d.z**2
+                    
+            if root < 0:
+                return -1
+            
+            root = sqrt(root)
+            denom = 2*A*(d.x*d.y)
+            
+            a1 = a2 = -A*d.x*p.y - A*d.y*p.x + d.z
+            a1 += root
+            a2 -= root
+            a1 /= denom
+            a2 /= denom
+        
+        #print("a1:", a1, "a2:", a2, "root:", root, "sep:", sep_(p1,p2))
+        
+        pt1 = addvv_(p1, multvs_(d, a1))
+        pt2 = addvv_(p1, multvs_(d, a2))
+        
+        if a1 < 0.0:
+            a1 = INF
+        if a2 < 0.0:
+            a2 = INF
+        
+        if is_base_ray:
+            if not (<Shape>self.shape).point_inside_c( pt1.x, pt1.y ):
+                a1 = INF
+            if not (<Shape>self.shape).point_inside_c( pt2.x, pt2.y ):
+                a2 = INF
+        
+        if a2 < a1:
+            a1 = a2
+        
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+        return a1 * sep_(p1, p2)
+    
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            vector_t n
+            double rt6 = sqrt(6)*self.curvature
+        
+        n.z = 1.0
+        n.x = -rt6*p.y
+        n.y = -rt6*p.x
+        return norm_(n)
+    
+    cdef double eval_z_c(self, double x, double y) nogil:
+        return sqrt(6) * self.curvature * x * y
+        
+        
     
         
 cdef class CylindericalFace(ShapedFace):
