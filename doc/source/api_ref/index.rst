@@ -9,5 +9,6 @@ API Reference
 	faces
 	shapes
 	materials
+	distortions
 	
 	core <core/index>

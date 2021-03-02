@@ -15,6 +15,8 @@ from .ctracer cimport Shape, sep_, \
         vector_t, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, cross_
             
+import numpy as np
+            
 
 cdef class LogicalOpShape(Shape):
     def __and__(self, Shape other):
@@ -133,3 +135,39 @@ cdef class RectangleShape(BasicShape):
             return 1
         else:
             return 0
+
+
+cdef class PolygonShape(BasicShape):
+    cdef:
+        double[:,:] _coordinates
+        
+    property coordinates:
+        def __get__(self):
+            return np.asarray(self._coordinates)
+        
+        def __set__(self, val):
+            self._coordinates = val
+            
+    cdef bint point_inside_c(self, double X, double Y):
+        cdef:
+            int i, size, ct=0
+            double y1, y2, h, x, x1, x2
+            double[:,:] pts = self._coordinates
+        
+        size = pts.shape[0]
+        
+        y1 = pts[size-1,1]
+        x1 = pts[size-1,0]
+        for i in range(size):
+            y2 = pts[i,1]
+            x2 = pts[i,0]
+            h = (Y - y1) / (y2 - y1)
+            if 0 < h <= 1.0:
+                x = x1 + h*(x2 - x1)
+                if x > X:
+                    ct = not ct
+            y1 = y2
+            x1 = x2
+        return ct!=0
+    
+        

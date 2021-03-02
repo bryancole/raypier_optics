@@ -18,13 +18,24 @@ class BaseDistortion(HasTraits):
     
     
 class NullDistortion(BaseDistortion):
+    """Any zero-amplitude distortion. Mainly used in testing.
+    """
     pass
 
 
 class SimpleTestZernikeJ7(BaseDistortion):
+    """
+    An implementation of a specific Zernike polynomial 
+    distortion, using J=7. Mainly used in testing.
+    """
+    
+    #: Defines the unit-radius for the Zernike polynomial function.
     unit_radius = Float(10.0)
+    
+    #: RMS amplitude of the distortion
     amplitude = Float(0.001)
     
+    #: The underlying core.Distortion object 
     c_distortion = Instance(cdistortions.SimpleTestZernikeJ7, ())
     
     traits_view = View(VGroup(
@@ -48,8 +59,29 @@ coef_editor = TupleEditor(cols=2, labels=["j", "value"])
         
         
 class ZernikeSeries(BaseDistortion):
+    """
+    Represents a general surface distortion in terms of a sequence of Zernike polynomials.
+    The Zernike terms are identified using the ANSI standard single-index notation (J).
+    
+    The standard normalisation is used such that the amplitude coefficients give the RMS
+    deviation of the surface over the unit-disk.
+    
+    A recursive algorithm is used for evaluation of the function with caching
+    for efficient evaluation where many non-zero coefficients exist.
+    
+    Both the given parameters are traits on this object and updates to either 
+    one will automatically update the internal state of the object (and trigger
+    re-tracing of the model).
+    
+    This class is intended to be used with the DistortionSurface to wrap any underlying ShapedFace.
+    """
+    
+    #: The unit-radius for the Zernike polynomial radial function
     unit_radius = Float(10.0)
     
+    #: A list of (int,float) tuples giving the amplitudes of all non-zero Zernike coefficients.
+    #:     in terms of the ANSI standard single index J = (n*(n+1) + m)/2.
+    #:     Any number of coefficients can be given.
     coefficients = List(Tuple(Int,Float))
     
     c_distortion = Instance(cdistortions.ZernikeDistortion)

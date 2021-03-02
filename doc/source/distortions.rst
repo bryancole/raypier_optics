@@ -56,30 +56,15 @@ More general distortions can be applied using the :py:class:`raypier.distortions
 
 As previously, instances of this object are passed to a :py:class:`raypier.faces.DistortionFace` , along
 with the base-surface to which the distortion is to be applied.
-
-.. py:class:: ZernikeSeries(unit_radius=10.0, coefficients=[])
-    :canonical: raypier.distortions.ZernikeSeries
-    
-    Describes a general distortion defined in terms of Zernike polynomials. 
-    The ANSI single-index (J) notation is used to identify coefficients.
-    
-    A recursive algorithm is used for evaluation of the function with caching
-    for efficient evaluation where many non-zero coefficients exist.
-    
-    Both the given parameters are traits on this object and updates to either 
-    one will automatically update the internal state of the object (and trigger
-    re-tracing of the model).
-    
-    :param float unit_radius: Specifies the unit-radius for the Zernike polynomials.
-    :param list coefficients: A sequence of coefficient amplitudes, given a tuples (J, amplitude).
-                            E.g. [(0,0.1),(2,0.3),(7,2.34)]. Any number of coefficients
-                            can be specified.
-
     
 An example of the this class in action can be seen here:
 
 .. literalinclude:: /../../examples/zernike_distortion_example.py
 
-.. image:: images/zernike_distortion_example.png
+Here's what the model looks like in the UI.
 
+.. image:: images/zernike_distortions_example.png
+
+This example also demonstrates the use of a Constraints object to provide some UI controls for
+easier adjustment of the relevant model parameters.
     
