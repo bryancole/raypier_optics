@@ -107,9 +107,8 @@ def evaluate_phase(all_wavelengths, traced_rays, target_face,
     returns - (freq, phase) #freq in THz
     """
     c = 2.99792458e8 * 1e-9 #convert to mm/ps
-    all_rays = [r.copy_as_array() for r in reversed(traced_rays)]
     idx = target_face.idx
-    last = all_rays[0]
+    last = traced_rays[-1].copy_as_array() #all_rays[0]
     selected_idx = numpy.argwhere(last['end_face_idx']==idx).ravel()
     wavelengths = all_wavelengths[last['wavelength_idx'][selected_idx]]
     sort_idx = numpy.argsort(wavelengths)[::-1]
@@ -119,13 +118,9 @@ def evaluate_phase(all_wavelengths, traced_rays, target_face,
     idx = len(selected_idx)//2
     phase = last['phase'][selected_idx].copy()
     phase -= phase.mean()
-    total = numpy.zeros(len(selected_idx), 'd')
-    for ray in all_rays:
-        selected = ray[selected_idx]
-        total += selected['length'] * selected['refractive_index'].real
-        selected_idx = selected['parent_idx']
-        
-    #print "Phase:", phase
+    
+    total = last['accumulated_path'][selected_idx]
+
     if len(total) < 6:
         raise ValueError("Not enough rays to evaluate 2nd and 3rd derivatives")
     ave_path = total.mean()
@@ -137,7 +132,6 @@ def evaluate_phase(all_wavelengths, traced_rays, target_face,
     fs_total -= fs_total.mean()
     total += fs_total
     
-    #phase += 2*numpy.pi*total/(0.001*wavelengths) #total*omega/c
     phase += total*f*((2*numpy.pi)/c)
     return (f, phase)
     
