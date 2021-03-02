@@ -162,7 +162,7 @@ class AngleDecompositionPlane(BaseDecompositionPlane):
         points += origin[None,None,:]
         
         flat_points = points.reshape(-1,3)
-        E_field = eval_Efield_from_gausslets(input_rays, flat_points, wavelengths).reshape(*points.shape)
+        E_field = eval_Efield_from_gausslets(input_rays, flat_points).reshape(*points.shape)
         self._E_field = E_field
         mask = self._mask
         if mask is not None:

@@ -6,16 +6,16 @@ design tools for modelling optical systems (cameras, imaging systems, telescopes
 
 The main features of ray-trace are:
  - Non-sequential tracing (no need to specify the order of optical components)
+ - Physical optics propagation with "Gausslet" tracing and beam decomposition
  - Nice visualisation of the traced result
  - Live update to the traced result as the user adjusts the model
  - Reasonable performance (tracing algorithms runs at C-speed using Cython)
  - STEP export of models for integration with CAD design (using PythonOCC)
  - Saving / Loading models in YAML format.
  - Trace rays with full polarisation and phase information
- - Physical optics propagation with "Gausslet" tracing and beam decomposition 
+ - Define Zernike Polynomial sequences and apply them as distortions to surfaces
  - Dielectric Materials with simple-coating supported, including dispersion
  - A basic library of materials (from RefractiveIndex.info)
- - 
  - Various analysis algorithms including E-field evaluation by sum-of-Gaussian-Modes, and
    dispersion calculations for ultra-fast optics applications.
 

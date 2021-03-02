@@ -171,7 +171,7 @@ class EFieldPlane(Probe):
             
             if isinstance(rays, GaussletCollection):
                 n_list.append(rays.base_rays.refractive_index.real)
-                E = eval_Efield_from_gausslets(rays, points2, wavelengths, 
+                E = eval_Efield_from_gausslets(rays, points2,
                                                blending=self.blending)
             else:
                 n_list.append(rays.refractive_index.real)

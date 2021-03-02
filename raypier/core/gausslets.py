@@ -201,7 +201,7 @@ def decompose_angle(origin, direction, axis1, E_field, input_spacing, max_angle,
     
     if E_max is not None and pos_max is not None:
         print("E_max:", E_max, "pos_max:", pos_max)
-        e_test = eval_Efield_from_gausslets(rays, pos_max[None,:], wl, blending=1.0)
+        e_test = eval_Efield_from_gausslets(rays, pos_max[None,:], blending=1.0)
         print("e_test:", e_test)
         scaling = (E_max/e_test).mean()
         #ray_data['E1_amp'] *= scaling
@@ -344,10 +344,11 @@ def decompose_position(input_rays, origin, direction, axis1, radius, resolution,
     ray_data['E2_amp'] = E2_amp
     
     gausslets = GaussletCollection.from_rays(ray_data)
+    gausslets.wavelengths = wavelengths
     gausslets.config_parabasal_rays(wavelengths, spacing/blending, 0.0)
     apply_mode_curvature(gausslets, -A, -B, -C)
     
-    E_test = eval_Efield_from_gausslets(gausslets, origins, wavelengths)
+    E_test = eval_Efield_from_gausslets(gausslets, origins)
     
     power_scaling = (E_in.real**2 + E_in.imag**2).sum() / (E_test.real**2 + E_test.imag**2).sum()
     

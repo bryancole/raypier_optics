@@ -240,9 +240,12 @@ class EFieldSummation(object):
         return E
 
 
-def eval_Efield_from_gausslets(gausslet_collection, points, wavelengths,
+def eval_Efield_from_gausslets(gausslet_collection, points, 
+                               wavelengths = None,
                                blending=1.0, **kwds):
     gc = gausslet_collection.copy_as_array() 
+    if wavelengths is None:
+        wavelengths = numpy.asarray(gc.wavelengths)
     rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
     modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
     _rays = RayCollection.from_array(rays)
