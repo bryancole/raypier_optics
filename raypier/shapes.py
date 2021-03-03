@@ -1,11 +1,13 @@
 
 
 from traits.api import Instance, HasStrictTraits, Property, cached_property,\
-        Tuple, Float, Enum, Event, Str, observe
+        Tuple, Float, Enum, Event, Str, observe, List, ComparisonMode
         
-from traitsui.api import View, Item, VGroup, Label, Group
+from traitsui.api import View, Item, VGroup, Label, Group, TupleEditor, ListEditor
 
 from tvtk.api import tvtk
+
+import numpy as np
 
 from .core import cshapes
 from .core.ctracer import Shape
@@ -108,17 +110,16 @@ class BooleanShape(BaseShape):
         return func
         
         
-class BasicShape(BaseShape):
-    centre = Tuple(Float(0.0),Float(0.0))
+class BasicShape(BaseShape):    
     cshape = Instance(Shape)
     impl_func = Instance(tvtk.ImplicitFunction)
     
     bounds = Property()
     
-    traits_view = View(Item("centre"))
     
     
 class CircleShape(BasicShape):
+    centre = Tuple(Float(0.0),Float(0.0))
     radius = Float(1.0)
     
     bounds = Property(depends_on="radius, centre")
@@ -154,6 +155,7 @@ class CircleShape(BasicShape):
         
         
 class RectangleShape(BasicShape):
+    centre = Tuple(Float(0.0),Float(0.0))
     width = Float(5.0)
     height = Float(7.0)
     
@@ -198,4 +200,90 @@ class RectangleShape(BasicShape):
         cshape.height = self.height
         cshape.centre = (x,y)
         self.updated = True
+        
+        
+coord_editor = TupleEditor(cols=2, labels=["x", "y"])
     
+    
+class PolygonShape(BasicShape):
+    """
+    A general polygon shape outline, defined in terms of a list of 2-tuples for the 
+    (x,y) corner points in the local coordinate system of the optic.
+    """
+    
+    #: A list of (x,y) coordinates. There should be at least 3 points in the list.
+    #: The shape boundary should be non-self-intersecting.
+    coordinates = List(trait=Tuple(Float,Float), comparison_mode=ComparisonMode.identity) #List()
+    
+    _coords_evt = Event()
+    
+    #: A property giving the bounding box for the shape.
+    bounds = Property(depends_on="_coords_evt")
+    
+    traits_view = View(Item("coordinates", editor=ListEditor(editor=coord_editor)))
+    
+    
+    def _cshape_default(self):
+        return cshapes.PolygonShape(coordinates=np.asarray(self.coordinates))
+    
+    def _coordinates_default(self):
+        return [(-1.,-1.),(0.,1.),(1.,-1.)]
+    
+    @cached_property
+    def _get_bounds(self):
+        coords = self.coordinates
+        xmin = min(a[0] for a in coords)
+        xmax = max(a[0] for a in coords)
+        ymin = min(a[1] for a in coords)
+        ymax = max(a[1] for a in coords)
+        return (xmin,xmax,ymin,ymax)
+    
+    def _impl_func_default(self):
+        points = [(a[0],a[1],0.0) for a in self.coordinates]
+        func = tvtk.ImplicitSelectionLoop(loop=points,
+                                          normal=(0.,0.,1.))
+        return func
+    
+    @observe("coordinates.items")
+    def _update_coords(self, evt):
+        self._coords_evt = True 
+        coords = self.coordinates
+        points = [(a[0],a[1],0.0) for a in coords]
+        self.impl_func.loop = points
+        self.cshape.coordinates = np.array(coords)
+        self.updated=True
+        
+        
+class HexagonShape(PolygonShape):
+    """A Hexagon shape, provided as a convenience. Subclasses PolygonShape
+    """
+    
+    #: The centre of the hexagon
+    centre = Tuple(Float(0.0),Float(0.0))
+    
+    #: The distance from the centre to the corners of the hexagon
+    radius = Float(25.0)
+    
+    #: A rotation angle to be applied to the hexagon, in degrees
+    rotation = Float(0.0)
+    
+    traits_view = View(VGroup(
+            Item("centre", editor=TupleEditor(cols=2,labels=["x","y"])),
+            Item("radius", editor=NumEditor),
+            Item("rotation", editor=NumEditor)
+            ))
+    
+    def make_coords(self):
+        r = self.radius
+        x,y = self.centre
+        rot = self.rotation*np.pi/180.0
+        angle = (rot + i*np.pi/3 for i in range(6))
+        coords = [(r*np.cos(th)+x, r*np.sin(th)+y) for th in angle]
+        return coords
+    
+    def _coordinates_default(self):
+        return self.make_coords()
+    
+    @observe("radius, rotation, centre")
+    def _radius_updated(self, evt):
+        self.coordinates = self.make_coords()

@@ -2,7 +2,7 @@
 
 
 
-from raypier.api import CircleShape, RectangleShape
+from raypier.api import CircleShape, RectangleShape, PolygonShape, HexagonShape
 from raypier.api import SphericalFace, PlanarFace
 
 from raypier.api import OpticalMaterial
@@ -11,7 +11,15 @@ from raypier.api import RayTraceModel
 from raypier.api import HexagonalRayFieldSource
 
 
-s1 = RectangleShape(width=30,height=25) ^ CircleShape(radius=3.0)
+#s1 = RectangleShape(width=30,height=25) ^ CircleShape(radius=3.0)
+# s1 = PolygonShape(coordinates=list(reversed([(-30.0,0.),
+#                                (-15.,25.98),
+#                                (15.0,25.98),
+#                                (30.,0.),
+#                                (15.,-25.98),
+#                                (-15.,-25.98)])))
+s1 = HexagonShape(radius=15)
+s1 = s1 ^ CircleShape(radius=3.0)
 
 f1 = SphericalFace(z_height=8.0, curvature=50.0)
 m1 = OpticalMaterial(from_database=False, refractive_index=1.5)

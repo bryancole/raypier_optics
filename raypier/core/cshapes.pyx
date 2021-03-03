@@ -151,7 +151,7 @@ cdef class PolygonShape(BasicShape):
     cdef bint point_inside_c(self, double X, double Y):
         cdef:
             int i, size, ct=0
-            double y1, y2, h, x, x1, x2
+            double y1, y2, x1, x2
             double[:,:] pts = self._coordinates
         
         size = pts.shape[0]
@@ -161,13 +161,11 @@ cdef class PolygonShape(BasicShape):
         for i in range(size):
             y2 = pts[i,1]
             x2 = pts[i,0]
-            h = (Y - y1) / (y2 - y1)
-            if 0 < h <= 1.0:
-                x = x1 + h*(x2 - x1)
-                if x > X:
+            if (y1 <= Y < y2) or (y2 <= Y < y1):
+                if (x1 + (Y-y1)*(x2 - x1)/(y2 - y1)) > X:
                     ct = not ct
             y1 = y2
             x1 = x2
-        return ct!=0
+        return ct
     
         

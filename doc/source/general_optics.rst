@@ -20,13 +20,17 @@ Shapes
 Shapes define the 2D outline of the optic in its local XY-plane (remember that every component has its own local 
 coordinate system. The optic can have any position and orientation in the global frame of reference). 
 
-There are two shape primitives, at the time of writing:
+There are four shape primitives, at the time of writing:
 
  * :py:class:`RectangleShape`
  
  * :py:class:`CircleShape`
  
-There are two more I have yet to implement, being PolygonShape and EllipseShape.
+ * :py:class:`PolygonShape`
+ 
+ * :py:class:`HexagonShape`
+ 
+There is one more I have yet to implement, being EllipseShape.
 
 Shapes support boolean operation so that 
 they can be combined into more complex shapes. For example, to make a rectangular lens 

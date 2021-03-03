@@ -1,6 +1,6 @@
 
 
-from .shapes import CircleShape, RectangleShape
+from .shapes import CircleShape, RectangleShape, PolygonShape, HexagonShape
 
 from .general_optic import GeneralLens
 
