@@ -935,7 +935,7 @@ cdef class ExtrudedBezierFace(Face):
 
 
         #how did you get here?  p was supposed to be a point on the curve!
-        print "error: Bezier normal not found, point not actually on curve!"
+        print("error: Bezier normal not found, point not actually on curve!")
         p.x=p.y=p.z = 0
         return p
 

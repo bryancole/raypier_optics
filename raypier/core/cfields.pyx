@@ -33,7 +33,7 @@ from .ctracer cimport Face, sep_, \
                 rotate_c, cross_, RayCollection, complex_t, \
                 GaussletCollection, gausslet_t, para_t
 
-from ctracer import ray_dtype
+from .ctracer import ray_dtype
 cimport cython
 import numpy as np
 cimport numpy as np_

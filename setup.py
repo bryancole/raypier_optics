@@ -54,7 +54,8 @@ Win64 = sys.platform.startswith("win")
 
 ext_modules = cythonize("raypier/core/*.pyx",
                         language="c++" if Win64 else None,
-                        include_path=[numpy.get_include()])
+                        include_path=[numpy.get_include()],
+                        language_level = "3")
 
 for module in ext_modules:
     module.extra_compile_args.append('-fopenmp')
