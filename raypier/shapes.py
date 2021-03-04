@@ -15,6 +15,8 @@ from .editors import NumEditor
 
 
 class BaseShape(HasStrictTraits):
+    """Abstract base class for all Shape objects.
+    """
     updated = Event()
     
     def __and__(self, other):
@@ -33,6 +35,8 @@ class BaseShape(HasStrictTraits):
     
     
 class InvertedShape(BaseShape):
+    """Performs a unary NOT operation on the given Shape
+    """
     shape = Instance(BaseShape)
     cshape = Property(depends_on="shape")
     impl_func = Property(tvtk.ImplicitFunction, depends_on="shape")
@@ -48,6 +52,13 @@ class InvertedShape(BaseShape):
     
 
 class BooleanShape(BaseShape):
+    """
+    Abstract base class for shape boolean operations.
+    
+    A BooleanShape owns two subshapes, `shape1` and `shape2`.
+    These can be combined using any of the logical operations: difference,
+    union, intersection and union-of-magnitudes.
+    """
     ###Inputs
     shape1 = Instance(BaseShape)
     shape2 = Instance(BaseShape)
@@ -110,7 +121,10 @@ class BooleanShape(BaseShape):
         return func
         
         
-class BasicShape(BaseShape):    
+class BasicShape(BaseShape):
+    """
+    Abstract base class for Shape primitives.
+    """
     cshape = Instance(Shape)
     impl_func = Instance(tvtk.ImplicitFunction)
     
@@ -119,6 +133,17 @@ class BasicShape(BaseShape):
     
     
 class CircleShape(BasicShape):
+    """
+    A Shape representing a circle.
+    
+    Params
+    ------
+    
+    centre - a 2-tuple giving the local centre coordinate
+    
+    radius - a float giving the circle radius
+    
+    """
     centre = Tuple(Float(0.0),Float(0.0))
     radius = Float(1.0)
     
@@ -155,6 +180,18 @@ class CircleShape(BasicShape):
         
         
 class RectangleShape(BasicShape):
+    """
+    A Shape representing a rectangle.
+    
+    Params
+    ------
+    
+    centre - a 2-tuple of floats giving the centre of the rectangle in local coordinates.
+    
+    width - the width of the rectangle
+    
+    height - the height of the rectangle
+    """
     centre = Tuple(Float(0.0),Float(0.0))
     width = Float(5.0)
     height = Float(7.0)

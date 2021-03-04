@@ -74,10 +74,10 @@ setup(
     include_dirs = [numpy.get_include()],
     zip_safe = True, #why not!
 
-    install_requires = ["numpy >= 1.1",
+    install_requires = [
         #"VTK",
         #"wxPython", #maybe can avoid an explicit dependancy on wx
-        "numpy >= 1.19", 
+        "numpy == 1.19", 
         "traits >= 3.0",
         "mayavi >= 3.0", #TVTK is distributed as part of Mayavi
         "traitsui >= 3.0"
