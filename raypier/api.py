@@ -17,11 +17,13 @@ from .sources import ConfocalRaySource, ConfocalRayFieldSource, ParallelRaySourc
         
 from .gausslet_sources import CollimatedGaussletSource
 
-from .gausslets import AngleDecompositionPlane, PositionDecompositionPlane
+from raypier.decompositions import AngleDecompositionPlane, PositionDecompositionPlane
 
 from .tracer import RayTraceModel
 
 from .fields import EFieldPlane
+
+from .decompositions import AngleDecompositionPlane, PositionDecompositionPlane
 
 from .probes import RayCapturePlane, GaussletCapturePlane
 

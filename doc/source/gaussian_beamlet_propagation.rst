@@ -44,37 +44,12 @@ Gausslets have their own set of predefined source-objects, found in :py:mod:`ray
 Evaluating the E-field
 ======================
 
+Algorithms for evaluation of E-fields are provided in :py:mod:`raypier.core.fields`
+
 The nice thing about Gausslet ray-tracing is that you can evaluate the E-field at any point in your model. For script-based analysis,
 you can give any GaussletCollection object (obtained from a source-object after a tracing operation) to the 
 :py:func:`raypier.core.fields.eval_Efield_from_gausslets` function.
- 
- .. py:module:: raypier.core.fields
- 
-Algorithms for evaluation of E-fields are provided here.
- 
- .. py:function:: raypier.core.fields.eval_Efield_from_gausslets(gc : GaussletCollection, points : ndarray[N,3], wavelengths=None, blending=1.0) -> Efield ndarray[N,3]
-                                                
-    Calculates the vector E-field is each of the points given. The returned 
-    array of field-vectors will have the same length as `points` and 
-    has `numpy.complex128` dtype.
-    
-    :param GaussletCollection gc: The set of Gausslets for which the field should be calculated
-    :param ndarray[N,3] points: An array of shape (N,3) giving the points at which the field will be evaluated.
-    :param ndarray[] wavelengths: A 1d array containing the wavelengths to be used for the field calculation, 
-                                    overriding the wavelengths data contained by the GaussletCollection object.
-    :param float blending: The 1/width of each Gaussian mode at the evaluation points. A value of unity (the default),
-                            means the parabasal rays are determined to be the 1/e point in the field amplitude.
-                            
-.. py:class:: EFieldSummation(gc : GaussletCollection, points : ndarray[N,3], wavelengths=None, blending=1.0) -> EFieldSummation object
-
-    For situations where you wish to evaluate the E-field from a set of Gausslets with different sets of evaluation points,
-    this class provides a small optimisation by performing the maths to convert ray-intercepts to Gaussian mode parameters
-    up front.
-    
-    .. py:method:: evaluate(points : ndarray[N,3]) -> Efield ndarray[N,3]
-    
-        Called to calculate the E-field for the given points.
-        
+  
         
 Beam Decomposition
 ==================

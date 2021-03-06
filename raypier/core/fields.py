@@ -218,6 +218,11 @@ def eval_Efield_from_rays(ray_collection, points, wavelengths,
 
 
 class EFieldSummation(object):
+    """
+    For situations where you wish to evaluate the E-field from a set of Gausslets with different sets of evaluation points,
+    this class provides a small optimisation by performing the maths to convert ray-intercepts to Gaussian mode parameters
+    up front.
+    """
     def __init__(self, gausslet_collection, wavelengths=None, blending=1.0 ):
         if wavelengths is None:
             wavelengths = numpy.asarray(gausslet_collection.wavelengths)
@@ -230,6 +235,9 @@ class EFieldSummation(object):
         self.base_rays = RayCollection.from_array(rays)
         
     def evaluate(self, points):
+        """
+        Called to calculate the E-field for the given points.
+        """
         points = numpy.ascontiguousarray(points)
         shape = points.shape
         points.shape=(-1,3)
@@ -243,6 +251,18 @@ class EFieldSummation(object):
 def eval_Efield_from_gausslets(gausslet_collection, points, 
                                wavelengths = None,
                                blending=1.0, **kwds):
+    """
+    Calculates the vector E-field is each of the points given. The returned 
+    array of field-vectors will have the same length as `points` and 
+    has `numpy.complex128` dtype.
+    
+    :param GaussletCollection gc: The set of Gausslets for which the field should be calculated
+    :param ndarray[N,3] points: An array of shape (N,3) giving the points at which the field will be evaluated.
+    :param ndarray[] wavelengths: A 1d array containing the wavelengths to be used for the field calculation, 
+                                    overriding the wavelengths data contained by the GaussletCollection object.
+    :param float blending: The 1/width of each Gaussian mode at the evaluation points. A value of unity (the default),
+                            means the parabasal rays are determined to be the 1/e point in the field amplitude.
+    """
     gc = gausslet_collection.copy_as_array() 
     if wavelengths is None:
         wavelengths = numpy.asarray(gausslet_collection.wavelengths)

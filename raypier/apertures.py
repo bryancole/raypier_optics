@@ -48,7 +48,8 @@ class BaseAperture(Traceable):
 class CircularAperture(BaseAperture):
     abstract=False
     """
-    This circular aperture is characterised by 3 diameters:
+    This circular aperture is characterised by 3 diameters::
+    
       outer_diameter : rays passing outside this diameter do not intersect
       inner_diameter : rays passing within the outer diameter but outside of the inner
                        diameter are blocked (creating no child rays).
