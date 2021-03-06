@@ -26,21 +26,35 @@ alist_editor = ListEditor(use_notebook=True,
 
 
 class GeneralLens(BaseLens):
+    #: The name of the object in the model-tree
     name = Str("General Lens")
+    
+    #: An instance of a :py:class:`raypier.shapes.BaseShape` subclass, defining
+    #: the 2D outline of the optic.
     shape = Instance(BaseShape)
     
+    #: A list of :py:class:`raypier.faces.BaseFace` objects which defines the
+    #: geometry of the surfaces comprising this optic.
     surfaces = List(faces.BaseFace, comparison_mode=ComparisonMode.identity)
     
+    #: A list of :py:class:`raypier.materials.OpticalMaterial` objects describing 
+    #: the materials properties of the dielectrics between the previously given
+    #: surfaces. For a list of N surfaces, you should provide (N-1) materials.
     materials = List(OpticalMaterial, comparison_mode=ComparisonMode.identity)
     
     _grid = Instance(tvtk.PlaneSource, ())
     _clip = Instance(tvtk.ClipPolyData, ())
     
+    #: A :py:class:`raypier.materials.OpticalMaterial` object to define the 
+    #: characteristics of a single-layer dielectric coating applied to the outer
+    #: surfaces of the object.
     coating_material = Instance(OpticalMaterial, ())
+    
+    #: The thickness, in microns, of the coating on the outer surfaces.
     coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
     
-    grid_resolution = Tuple((200,200))
     
+    grid_resolution = Tuple((200,200))
     glass_colour = Tuple((204,204,255,102))
     mirror_colour = Tuple((104,64,104,255))
     

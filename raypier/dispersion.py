@@ -1,7 +1,7 @@
 '''
 Created on 23 Nov 2018
 
-@author: bryan
+:author: bryan
 '''
 import pyximport
 pyximport.install()
@@ -18,6 +18,9 @@ MATERIAL_DATABASE = pkg_resources.resource_filename("raypier", GLASS_DATABASE_PA
 
 
 class NondispersiveCurve(BaseDispersionCurve):
+    """
+    A Dispersion curve for a non-dispersive material with a given refractive index and absorption.
+    """
     def __init__(self, refractive_index=1.37, absorption=0.0):
         self._refractive_index=refractive_index
         self._absorption=absorption
@@ -36,6 +39,9 @@ class NondispersiveCurve(BaseDispersionCurve):
         return f"<Nondispersion Curve: ri={self._refractive_index}, absorption={self._absorption}>"
         
 class FusedSilica(BaseDispersionCurve):
+    """
+    A Dispersion curve for fused silica.
+    """
     def __init__(self, absorption=0.0):
         formula_id=1
         coefs = numpy.array([0.0,
@@ -56,6 +62,9 @@ class FusedSilica(BaseDispersionCurve):
 
 
 class NamedDispersionCurve(BaseDispersionCurve):
+    """
+    A Dispersion curve obtained from the materials database (http://refractiveindex.info).
+    """
     def __init__(self, name=None, book=None, filename=None, absorption=0.0):
         filters = {"name": name, "book": book, "filename": filename}
         names, vals = list(zip(*[('(%s=?)'%(k,),v) for k,v in list(filters.items())\

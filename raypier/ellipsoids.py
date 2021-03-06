@@ -46,17 +46,36 @@ class MinMax(BaseTuple):
 
 
 class Ellipsoid(BaseMirror):
+    """
+    An off-axis ellipsoidal mirror formed into a axis-aligned block.
+    """    
+
     name = "Ellipsoid"
     abstract = False
+    
+    #: The position of the first focus, in local coordinates.
     focus1 = Tuple(-50.,0.,0.)
+    
+    #: The position of the second focus, in local coordinates.
     focus2 = Tuple(0., 50., 0.)
+    
+    #: twice the major axis length, or the distance from one
+    #: focus to the ellipsoid edge to the other focus
     size = Float(100.0, desc="twice the major axis length, or the distance from one\
  focus to the ellipsoid edge to the other focus")
+    
+    #: A 2-tuple giving the lower and upper x-axis bounds of the mirror block. 
     X_bounds = MinMax(-25., 25.)
+    
+    #: A 2-tuple giving the lower and upper y-axis bounds of the mirror block. 
     Y_bounds = MinMax(-25., 25.)
+    
+    #: A 2-tuple giving the lower and upper z-axis bounds of the mirror block. 
     Z_bounds = MinMax(0., 50.)
     
+    #: Render a glyph at the foci of the ellipsoid.
     show_foci = Bool(True)
+    
     foci_Actors = Instance(tvtk.ActorCollection, ())
     
     axes = Property(Tuple, depends_on="focus1, focus2, size",

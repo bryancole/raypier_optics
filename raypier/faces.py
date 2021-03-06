@@ -18,20 +18,32 @@ from traitsui.api import View, VGroup, Item, VGrid
 
 
 class BaseFace(HasStrictTraits):
+    """
+    Base class for all high-level Face objects (not to be confused with raypier.core.cfaces classes). 
+    
+    raypier.Face objects wrap a lower level raypier.core.cfaces class which is the actual object that
+    particiates in the raytracing operations. 
+    
+    The higher level objects which derive from this class provide a Traited wrapper with visualisation
+    and UI for the object.
+    """
+    
+    #: Local Z-axis intercept for the face 
     z_height = Float(0.0)
     
+    #: An event-trait which fires whenever a face-parameter changes.
     updated = Event()
     
-    ###Indicates if this face should be included in the ray-tracing. If not, it's purely cosmetic
+    #: Indicates if this face should be included in the ray-tracing. If not, it's purely cosmetic
     trace = Bool(True)
     
-    ###If mirror is True, this face is reflective (i.e. doesn't use material info to transmit rays
+    #: If mirror is True, this face is reflective (i.e. doesn't use material info to transmit rays
     mirror = Bool(False)
     
-    ###I'm not 100% sure if we need this.
+    #: I'm not 100% sure if we need this. This inverts the direction of the face-normal.
     invert = Bool(False)
     
-    ###Override this in subclasses with the specific face type required.
+    #: Override this in subclasses with the specific face type required.
     cface = Instance(ShapedFace)
         
     def _invert_changed(self, vnew):
@@ -44,6 +56,9 @@ class BaseFace(HasStrictTraits):
     
 
 class PlanarFace(BaseFace):
+    """
+    A planar face. You probably guessed this from the name.
+    """
     cface = Instance(ShapedPlanarFace, (), )
     
     traits_view = View(VGroup(Item("z_height", editor=NumEditor, tooltip="surface height in mm")))
@@ -57,6 +72,7 @@ class PlanarFace(BaseFace):
         
         
 class SphericalFace(PlanarFace):
+    #: Radius of curvature for the spherical face, in mm.
     curvature = Float(100.0)
     
     cface = Instance(ShapedSphericalFace, ())
@@ -75,6 +91,8 @@ class SphericalFace(PlanarFace):
         
         
 class AxiconFace(PlanarFace):
+    
+    #: Sets the gradient of the axicon face in terms of dz/dr. 
     gradient = Float(0.1)
     
     cface = Instance(AxiconFace_, ())
@@ -93,6 +111,14 @@ class AxiconFace(PlanarFace):
         
         
 class SaddleFace(PlanarFace):
+    """
+    Creates a saddle-shaped face equivalent to a n=2,m=2 Zernike distortion.
+    
+    This is mainly useful in creating a highly astigmatic beam, as a way of verifying the
+    correct calculation and propagation of astigmatic Gaussian modes. 
+    """
+    
+    #: Sets the second order curvature of a face, i.e. d2z/dxdy.
     curvature = Float(1.0)
     
     cface = Instance(SaddleFace_, ())
@@ -111,6 +137,9 @@ class SaddleFace(PlanarFace):
         
         
 class CylindericalFace(SphericalFace):
+    """
+    A cylinderical face.
+    """
     cface = Instance(CylindericalFace_)
     
     def __repr__(self):
@@ -125,6 +154,10 @@ class CylindericalFace(SphericalFace):
     
         
 class ConicFace(SphericalFace):
+    """
+    Creates a conic surface of revolution.
+    """
+    #: Conic constant.
     conic_const = Float(0.0)
     
     cface = Instance(ConicRevolutionFace, ())
@@ -142,12 +175,31 @@ class ConicFace(SphericalFace):
     
     
 class AsphericFace(ConicFace):
+    """
+    A General aspheric face, defined in terms of a sag function given by a conic surface of revolution
+    plus a sequence of even-order polynomial coefficients in r.
+    
+    The quadratice term is absent, being redundant since the conic surface includes a quadratic component.
+    """
+    #: A**4 term
     A4 = Float(0.0)
+    
+    #: A**6 term
     A6 = Float(0.0)
+    
+    #: A**8 term
     A8 = Float(0.0)
+    
+    #: A**10 term
     A10 = Float(0.0)
+    
+    #: A**12 term
     A12 = Float(0.0)
+    
+    #: A**14 term
     A14 = Float(0.0)
+    
+    #: A**16 term
     A16 = Float(0.0)
                 
     cface = Instance(AsphericFace_, ())
@@ -173,8 +225,17 @@ class AsphericFace(ConicFace):
         
     
 class DistortionFace(BaseFace):
+    """
+    This face type wraps an underlying face (the 'base face') and applies a 2D distortion
+    function along the local Z-axis.
+    """
+    #: Z-offset for the face
     z_height = Property()
+    
+    #: Base face which this object wraps.
     base_face = Instance(BaseFace)
+    
+    #: The distortion function (e.g. see :py:mod:`rapier.distortions`)
     distortion = Instance(BaseDistortion, ())
     
     cface = Instance(DistortionFace_)

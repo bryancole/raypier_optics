@@ -24,27 +24,54 @@ import traceback
     
     
 class EFieldPlane(Probe):
+    #: The name of the object in the model-tree
     name = Str("E-Field Probe")
+    
+    #: An instance of a :py:class:`raypier.probes.BaseCapturePlane` which provides the
+    #: incident rays for which the E-field should be evaluated.
     detector = Instance(BaseCapturePlane)
+    
+    #: If True, the detector object should be positioned at the centre position for this EFieldPlane
+    #: whenever the object moves. 
     align_detector = Bool(True)
     
+    #: If no detector-object is given, select the input rays by indexing the source traced_rays list. 
     gen_idx = Int(-1)
+    
+    #: Width of the EFieldPlane
     width = Float(0.5) #in mm
+    
+    #: Height of the EField Plane
     height = Float(0.5)
+    
+    #: The resolution of the EFieldPlane. The same value is used for both x- and y-sides.
     size = Int(30)
             
+    #: For RayFields (not Gausslets), be can back-project the indicent rays on to a plane 
+    #: and evaluate the Gaussia modes from this "exit pupil" plane. This is ignored for 
+    #: the E-field evaluation of Gausslets.
     exit_pupil_offset = Float(10.0) #in mm
+    
+    #: Controls the overlap of the Gaussian modes at the point of evaluation. It's best to
+    #: leave this at unity, otherwise one can get confused between this and the blending factor
+    #: offered by the gausslet_source classes.
     blending = Float(1.0)
     
+    #: When assigned to (triggered) the EField plane will be repositioned on the geometric focus
+    #: of the input rays (calculated as the point of closest approach of the input rays).
     centre_on_focus_btn = Button()
     
-    ###The output of the probe
+    #: The output of the probe. A (size,size,3)-shaped complex array.
     E_field = Array()
+    
+    #: property - The "|E-field|**2" calculated from the E-field.
     intensity = Property(Array, depends_on="E_field")
+    
+    #: property - The sum of the intensity array.
     total_power = Property(depends_on="intensity, width, height, size")
     
-    ### The mean real part of the refractive index for the material where the probe plane lies
-    ### Get get this from the selected/captured rays.
+    #: The mean real part of the refractive index for the material where the probe plane lies
+    #: Get get this from the selected/captured rays.
     refractive_index = Float(1.0)
         
     _mtime = Float(0.0)

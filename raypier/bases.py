@@ -484,12 +484,17 @@ class Optic(Traceable):
     def calc_refractive_index(self, wavelengths):
         """
         Evaluates an array of (complex) refractive indices.
-        @param wavelengths: a shape=(N,1) array of wavelengths
-        @returns: a 2-tuple representing the inside and outside
+        
+        :param wavelengths: a shape=(N,1) array of wavelengths
+        
+        :returns: a 2-tuple representing the inside and outside
+        
         refractive indices respectively. The items in the tuple can be
-        either 1) an arrays with the same shape as wavelengths and with
-                    dtype=numpy.complex128
-            or 2) a complex scalar
+        either:
+         
+          1) an arrays with the same shape as wavelengths and with
+             dtype=numpy.complex128
+          2) a complex scalar
         """
         return self.n_inside, self.n_outside
     

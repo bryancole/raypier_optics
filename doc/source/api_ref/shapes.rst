@@ -5,4 +5,8 @@ raypier.shapes
 
 
 .. automodule:: raypier.shapes
-	:members:
+    :members:
+    :show-inheritance:
+    :inherited-members: HasTraits
+    
+    

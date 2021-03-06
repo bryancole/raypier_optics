@@ -5,4 +5,7 @@ raypier.faces
 
 
 .. automodule:: raypier.faces
-	:members:
+    :members:
+    :show-inheritance:
+    :inherited-members: HasTraits
+    

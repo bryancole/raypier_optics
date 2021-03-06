@@ -195,10 +195,13 @@ class BaseRaySource(BaseBase):
 
     def eval_angular_spread(self, idx):
         """A helper method to evaluate the angular spread of a ray-segment.
-        @param idx: the index of the RayCollection in the TracedRay list 
+        
+        :param idx: the index of the RayCollection in the TracedRay list 
                     to analyse
                     
-        @returns: the average angle from the mean ray, in degrees"""
+        :returns: the average angle from the mean ray, in degrees
+        
+        """
         rays = self.traced_rays[idx]
         ave_dir = normaliseVector(rays.direction.mean(axis=0))
         dotprod = (ave_dir[numpy.newaxis,:] * rays.direction).sum(axis=1)

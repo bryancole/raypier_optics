@@ -3,7 +3,7 @@ Support for achromat lenses
 
 Created on 23 Nov 2018
 
-@author: bryan
+:author: bryan
 '''
 from traits.api import Float, Instance, on_trait_change
 from traitsui.api import View, Item, VGroup

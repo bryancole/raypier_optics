@@ -14,18 +14,28 @@ from raypier.decompositions import decompose_angle, make_hexagonal_grid
 
 
 class BaseGaussletSource(BaseRaySource):
+    """
+    Abstract base class for Gausslet Sources.
+    """
+    #:object title
     name = Title("Gausslet Source", allow_selection=False)
+    
     para_data_source = Instance(tvtk.ProgrammableSource, transient=True)
     para_tube = Instance(tvtk.TubeFilter, (), transient=True)
     para_ray_actor = Instance(tvtk.Actor, transient=True)
     para_property = Instance(tvtk.Property, (), {'color':(0.0,0.5,0.5), 'opacity': 1.0}, transient=True)
     para_mapper = Instance(tvtk.PolyDataMapper, (), transient=True)
     
+    #: set True to render the parabasal rays
     show_paras = Bool(False)
     
+    #: wavelength, in microns.
     wavelength = Float(0.78) # in microns
     
-    ###Total power in the source beam, in Watts
+    #: Total power in the source beam, in Watts, calculated as the sum of the power in each individual
+    #: gausslet. This is, in fact,  *not* the true beam power. Due to the overlap between the modes,
+    #: the actual beam power due to the coherent sum of the modes is greater than the sum of the 
+    #: single-mode powers.
     beam_power = Float(1.0)
     
     display_grp = VGroup(Item('display'),
@@ -179,18 +189,31 @@ class BaseGaussletSource(BaseRaySource):
         
         
 class SingleGaussletSource(BaseGaussletSource):
+    """
+    A source which launches a single Gausslet. Mainly used for testing.
+    """
     abstract=False
     
+    #: The origin of the Gausslet base-ray
     origin = Tuple((0.,0.,0.))
+    
+    #: Base-ray direction unit-vector.
     direction = UnitTupleVector
     
+    #: Polarisation unit-vector for the E1 amplitude. Orthogonal to the direction vector.
     E_vector = UnitVectorTrait((1.,0.,0.), editor_traits={'cols':3,
                                 'labels':['x','y','z']})
+    
+    #: Complex amplitude for the E1_vector polarisation direction. 
     E1_amp = Complex(1.0+0.0j)
+    
+    #: Complex amplitude for the E2_vector, implicitly orthogonal to both `direction` and `E1_vector`.
     E2_amp = Complex(0.0+0.0j)
     
+    #: Gaussian 1/e**2 beam radius, in microns, at the beam waist.
     beam_waist = Float(1.0) #radius, in microns
     
+    #: The GaussletCollection launched by this object.
     input_rays = Property(Instance(GaussletCollection), 
                          depends_on="origin, direction, max_ray_len, E_vector, E1_amp, E2_amp, beam_waist")
     
@@ -251,8 +274,17 @@ class SingleGaussletSource(BaseGaussletSource):
     
     
 class TopHatGaussletSource(SingleGaussletSource):
+    """
+    Launches Gausslets forming a top-hat intensity profile at the beam-waist.
+    """
+    
+    #: The diameter of the beam at the beam-waist, in microns.
     beam_waist = Float(100.0) #diameter, in microns
+    
+    #: The sample-spacing across the beam waist. 
     sample_spacing = Float(10.0) #in microns
+    
+    #: The maximum divergence angle for the Gausslet base-rays.
     max_angle = Float(10.0)
     
     input_rays = Property(Instance(GaussletCollection), 
@@ -313,8 +345,20 @@ class TopHatGaussletSource(SingleGaussletSource):
     
     
 class CollimatedGaussletSource(SingleGaussletSource):
+    """
+    Launches a quasi-collimated beam of Gausslets.
+    """
+    
+    #: The max radius of the Gausslets at the objects origin.
     radius = Float(10.,editor=NumEditor)
+    
+    #: Sets the number of Gausslets found along the radius of the beam, 
+    #: I.e. Controls the spacing of the Gausslets, being radius/resolution.  
     resolution = Float(10.0, editor=NumEditor)
+    
+    #: Controls the overlap between adjacent Gausslets. If blending==1.0, the 
+    #: Gaussian 1/e^2 intensity width is equal to the Gausslet spacing.
+    #: The Gausslet width = spacing/blending. I.e. a higher value reduces the Gausslet overlap.
     blending = Float(1.5)
     
     input_rays = Property(Instance(GaussletCollection), 
@@ -407,25 +451,31 @@ class GaussianPointSource(SingleGaussletSource):
     """
     Creates a low-F# point source with symmetric Gaussian profile.
     
-    Traits
-    ------
-    
-    resolution - the number of rays along the angular radius.
-    
-    working_dist - the distance in front of the origin plane at which the focus is found
-    
-    numerical_aperture - equal of the sin of the maximum ray angle
-    
-    blending - determines the mode overlap
+        resolution - the number of rays along the angular radius.
+        
+        working_dist - the distance in front of the origin plane at which the focus is found
+        
+        numerical_aperture - equal of the sin of the maximum ray angle
+        
+        blending - determines the mode overlap
     """
     abstract = False
     
-    ### Number of angle steps along the radius
+    #: Number of angle steps along the radius
     resolution = Range(0.0, None, 10.0)
+    
+    #: The distance from the object origin to the beam waist. A negative value
+    #: means that the focus is behind the origin. 
     working_dist = Float(100.0)
+    
+    #: The maximum numerical aperture of the base-rays in the beam.
     numerical_aperture = Float(0.2)
+    
+    #: Sets the overlap between adjacent Gausslets *in the far field*.
+    #: I.e. a higher value increases the Gausslet beam waist, which
+    #: reduces the divergence of the Gaussian modes such that their
+    #: overlap in the far field is reduced.
     blending = Float(1.0)
-    #We already have beam_waist defined in SingleGaussletSource
     
     ### Traits Properties seems to be broken. No good way to flush the cache so I'm doing it myself.
     _input_rays = Instance(GaussletCollection)
@@ -449,11 +499,11 @@ class GaussianPointSource(SingleGaussletSource):
     def _get_input_rays(self):
         rays = self._input_rays
         if rays is None:
-            rays = self.eval_input_rays()
+            rays = self._eval_input_rays()
             self._input_rays = rays
         return rays
     
-    def eval_input_rays(self):
+    def _eval_input_rays(self):
         self.wavelength_list = [self.wavelength]
         origin = numpy.array(self.origin)
         direction = normaliseVector(numpy.array(self.direction))

@@ -7,3 +7,6 @@ Core C-level algorimths for computing the electric field from a set of traced ra
 
 .. automodule:: raypier.core.cfields
 	:members:
+	:show-inheritance:
+    :inherited-members:
+    

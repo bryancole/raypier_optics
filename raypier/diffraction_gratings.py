@@ -15,9 +15,20 @@ from raypier.mirrors import RectMirror
 
 
 class RectangularGrating(RectMirror):
+    """
+    A reflective diffraction-grating.
+    """
+    
+    #: Object name is display in model-tree
     name = "Rectangular Diffraction Grating"
+    
+    #: Order of diffraction (int).
     order = Int(1)
+    
+    #: Lines per mm for the grating
     lines_per_mm = Float(600.0)
+    
+    #: The diffraction efficiency. A float in range 0.0 -> 1.0 (no loss).
     efficiency = Float(1.0)
     
     traits_view = View(VGroup(
