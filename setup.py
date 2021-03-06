@@ -73,7 +73,7 @@ setup(
     #ext_package = "raypier", ###Not needed on linux. Is it necessary on Win64?
     ext_modules = ext_modules,
     include_dirs = [numpy.get_include()],
-    zip_safe = True, #why not!
+    zip_safe = False, #Zipped eggs cause the ReadTheDocs build to fail.
 
     install_requires = [
         #"VTK",
