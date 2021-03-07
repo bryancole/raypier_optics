@@ -22,16 +22,31 @@ from numpy import sqrt
 
 
 class Singlet(BaseLens):
+    """
+    A dispersive singlet lens with spherical surfaces. Not really achromatic at all.
+    """
     abstract = False
     name = "sperical singlet"
     
+    #: Lens diameter in mm
     diameter = Float(25.0)
+    
+    #: Center thickness in mm
     CT = Float(6.0, desc="first centre thickness")
+    
+    #: Radius of curvature for the first surface, in mm
     curvature1 = Float(43.96, desc="radius of curvature for first outer face")
+    
+    #: Radius of curvature for the second surface, in mm
     curvature2 = Float(-42.90, desc="radius of curvature for the inner face")
     
+    #: Dispersion curve for the lens bulk :type raypier.core.cmaterials.BaseDispersionCurve:
     dispersion = Instance(BaseDispersionCurve, desc="Dispersion curve for the glass")
+    
+    #: Dispersion curve for the lens coating :type raypier.core.cmaterials.BaseDispersionCurve:
     dispersion_coating = Instance(BaseDispersionCurve, desc="Dispersion curve for the coating")
+    
+    #: Coating thickness, in microns
     coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
     
     _material1 = Instance(CoatedDispersiveMaterial, ())

@@ -4,7 +4,7 @@ API Reference
 =============
 
 .. toctree::
-
+    
 	achromats
 	apertures
 	aspherics
@@ -42,5 +42,4 @@ API Reference
 	vtk_algorithms
 	waveplates
 	windows
-	
 	core <core/index>
