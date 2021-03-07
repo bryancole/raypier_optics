@@ -145,6 +145,24 @@ cdef double sellmeier_5(double wavelen, double[:] coefs):
         
         
 cdef class BaseDispersionCurve(object):
+    """
+    Base class for DispersionCurve objects. This extension class provides 
+    efficient C-API methods for evaluation of the refractive index for a
+    given wavelength, based on one of various dispersion functions (e.g. 
+    Sellmeier curves) and a set of coefficients obtained from https://refractiveindex.info
+    
+    :param formula_id: Specifies the formula to use in evaluating this dispersion-curve
+    :type formula_id: int, readonly
+    :param wavelength_min: Minimum wavelength that can be evaluated, in microns.
+    :type wavelength_min: float, readonly
+    :param wavelength_max: Maximum wavelength that can be evaluated, in microns.
+    :type wavelength_max: float, readonly
+    :param coefs: an array-like list of coefficients for the particular formula used.
+    :type coefs: list[float], readonly
+    :param absorption: The (constant) absorption coefficient used to evaluate the complex refractive index.
+                        Given in cm^-1.
+    :type absorption: float, readonly
+    """
     cdef:
         readonly double wavelength_min
         readonly double wavelength_max
@@ -157,6 +175,11 @@ cdef class BaseDispersionCurve(object):
                   double absorption=0.0,
                   double wavelength_min=0.1, 
                   double wavelength_max=1000000.0):
+        """
+        Object constructor
+        
+        :param int formula_id: The formula identifier {0,1,2,3,5}
+        """
         self.coefs = coefs
         if formula_id==1:
             self.curve = &sellmeier_1
@@ -200,6 +223,14 @@ cdef class BaseDispersionCurve(object):
         return n_out
     
     def evaluate_n(self, wavelen):
+        """
+        Calculates the complex refractive index for the given wavelengths.
+        
+        :param wavelen: An array-like collection of wavelength, in microns.
+        :type wavelen: double[:]
+        :return: The refractive index for the given wavelength.
+        :rtype: complex128[:]
+        """
         return np.asarray(self.c_evaluate_n(np.asarray(wavelen)))
 
 
@@ -243,7 +274,8 @@ cdef class TransparentMaterial(InterfaceMaterial):
 
 
 cdef class PECMaterial(InterfaceMaterial):
-    """Simulates a Perfect Electrical Conductor
+    """Simulates a Perfect Electrical Conductor. I.e. incident rays are reflected with 
+    100% reflectivity.
     """
     cdef void eval_child_ray_c(self,
                             ray_t *in_ray, 
@@ -283,6 +315,12 @@ cdef class PECMaterial(InterfaceMaterial):
         
         
 cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
+    """
+    A simple materials with a fixed reflectivity.
+    
+    :param reflectivity: The material power-reflectivity given as a value from 0.0. to 1.0 
+    :type reflectivity: double
+    """
     cdef:
         ### power reflectivity, from 0. to 1.
         public double _reflectivity
@@ -413,7 +451,13 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         
         
 cdef class WaveplateMaterial(InterfaceMaterial):
-    """An idealised optical retarder"""
+    """An idealised optical retarder.
+    
+    :param retardance: The optical retardance, given in terms of numbers-of-wavelengths.
+    :type retardance: double
+    :param fast_axis: A vector giving the "fast" polarisation axis
+    :type fast_axis: (double, double, double)
+    """
     cdef complex_t retardance_
     cdef vector_t fast_axis_
     
@@ -455,6 +499,13 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         return r
     
     def apply_retardance(self, Ray r):
+        """Applies the retardance to the given Ray object.
+        
+        :param r: an input Ray object.
+        :type r: raypier.core.ctracer.Ray
+        :return: a new Ray instance
+        :rtype: raypier.core.ctracer.Ray
+        """
         cdef Ray out
         out = Ray()
         out.ray = self.apply_retardance_c(r.ray)
@@ -497,7 +548,12 @@ cdef class WaveplateMaterial(InterfaceMaterial):
     
 cdef class DielectricMaterial(InterfaceMaterial):
     """Simulates Fresnel reflection and refraction at a
-    normal dielectric interface
+    normal dielectric interface.
+    
+    The surface normal is assumed to be pointing "out" of the material.
+    
+    :param complex n_inside: The refractive index on the inside of the material interface
+    :param complex n_outside: The refractive index on the outside of the material interface
     """
     cdef complex_t n_inside_, n_outside_
     
@@ -666,6 +722,9 @@ cdef class DielectricMaterial(InterfaceMaterial):
 cdef class FullDielectricMaterial(DielectricMaterial):
     """Model for dielectric using full Fresnel equations 
     to give true phase and amplitude response
+    
+    :param double reflection_threshold: Sets the amplitude threshold for generating a reflected ray.
+    :param double transmission_threshold: Sets the amplitude threshold for generating a transmitted ray.
     """
     cdef:
         public double reflection_threshold, transmission_threshold
@@ -815,6 +874,12 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             
             
 cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
+    """
+    A material with a single-layer dielectric coating at the interface.
+    
+    :param complex n_coating: The complex refractive index for the coating.
+    :param double thickness: The thickness of the coating in microns
+    """
             
     @cython.cdivision(True)
     cdef void eval_child_ray_c(self,
@@ -979,6 +1044,22 @@ vacuum = BaseDispersionCurve(0,np.array([1.0,]))
     
             
 cdef class CoatedDispersiveMaterial(InterfaceMaterial):
+    """
+    A full implementation of the Fresnel Equations for a single-layer 
+    coated dielectric interface. The refractive index for each ray is obtained
+    by look up of the provided dispersio-curve objects for the materials on
+    each side of the interface.
+    
+    :param dispersion_inside: The dispersion curve for the inside side of the interface
+    :type dispersion_inside: raypier.core.cmaterials.BaseDispersionCurve
+    :param dispersion_outside: The dispersion curve for the "outside" of the interface
+    :type dispersion_outside: raypier.core.cmaterials.BaseDispersionCurve
+    :param dispersion_coating: The dispersion curve for the coating material
+    :type dispersion_coating: raypier.core.cmaterials.BaseDispersionCurve
+    :param double coating_thickness: The coating thickness, in microns
+    :param double reflection_threshold: Sets the amplitude threshold for generating a reflected ray.
+    :param double transmission_threshold: Sets the amplitude threshold for generating a transmitted ray.
+    """
     cdef:
         public np_.npy_complex128[:] n_inside, n_outside, n_coating
         public BaseDispersionCurve dispersion_inside
@@ -1213,9 +1294,20 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             
 
 cdef class DiffractionGratingMaterial(InterfaceMaterial):
+    """
+    A specialised material modelling the behaviour of a reflective diffraction grating.
+    
+    :param double lines_per_mm: The grating line density
+    :param int order: The order-of-diffraction
+    :param double efficiency: A value from 0.0 to 1.0 giving the reflection efficiency of the grating
+    :param origin: A vector (3-tuple) indicating the origin of the grating. Unimportant in most cases. 
+                    This affects the "grating phase" which is unobservable in most situations.
+    :type origin: (double, double, double)
+    
+    """
     ###A perfect reflection diffraction grating
     cdef:
-        public double lines_per_mm 
+        public double lines_per_mm #: The line-density of the grating
         public int order #order of diffraction
         public double efficiency
         vector_t origin_
@@ -1371,6 +1463,15 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
     outgoing ray with identical direction, polarisation etc.
     to the incoming ray. The material attenuates the E_field amplitudes
     according to the radial distance from the surface origin. 
+    
+    :param double outer_radius: Rays passing outside this radius are not intercepted.
+    :param double radius: The radius of the inner hole.
+    :param double edge_width: Rays passing through the inner hole are attenuated according to their 
+                    proximity to the edge. The edge-width sets the width of the error-function (errf)
+                    used to calculate the attenuation.
+    :param int invert: Inverts the aperture to make a field-stop.
+    :param origin: The centre point of the aperture.
+    :type origin: (double, double, double)
     """
     cdef:
         public double outer_radius
@@ -1433,6 +1534,18 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
 
 
 cdef class RectangularApertureMaterial(InterfaceMaterial):
+    """
+    A rectangular aperture.
+    
+    :param double outer_width:
+    :param double outer_height:
+    :param double width:
+    :param double height:
+    :param double edge_width:
+    :param int invert:
+    :param origin:
+    :type origin: (double, double, double)
+    """
     cdef:
         public double outer_width
         public double outer_height
@@ -1518,6 +1631,9 @@ cdef class ResampleGaussletMaterial(InterfaceMaterial):
     
     The material needs the set of new launch-positions to be given up front (i.e. before tracing). 
     
+    :param int size: The size of the new GaussletCollection to allocate up front.
+    :param callable eval_func: A callable taking a GaussletCollection as its single argument.
+            The new outgoing rays will be returned by this callable.
     """
     cdef:
         public int capture_count

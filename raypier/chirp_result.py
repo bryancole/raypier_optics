@@ -4,7 +4,7 @@ from raypier.results import TargetResult, evaluate_phase
 from raypier.dispersion import FusedSilica
 
 from traits.api import Float, Instance, Bool
-from traitsui.api import View, Item, VGroup
+from traitsui.api import View, Item, VGroup, HGroup
 from chaco.api import Plot, ArrayPlotData
 from enable.api import ComponentEditor
 from chaco.tools.api import PanTool, ZoomTool
@@ -21,22 +21,33 @@ class ChirpResult(TargetResult):
     name = "Pulse Intensity Envelope"
     plot = Instance(Plot)
     
+    #: The input pulse width, in picoseconds
     pulse_width = Float(0.2) #in picoseconds
+    
+    #: The length of additional fibre (fused silica) in the optical path, in metres
     glass_path = Float(0.0) #glass path in metres
+    
+    #: Display the autocorrelation function
     ACF = Bool(False)
+    
+    #: Force the output pulse peak to be at the centre of the array
+    centre = Bool(True)
+    
+    #: Calculated FWHM for the output pulse width
     fwhm = Float(0.0)
     
-    wavelength = Float(0.8) #in microns
+    #: Centre wavelength, in microns.
+    wavelength = Float(0.780) #in microns
     
     _fs = Instance(FusedSilica, ())
     
     _pd = Instance(ArrayPlotData, ())
     
-    traits_view = View(VGroup(Item("pulse_width"),
-                              Item("glass_path"),
-                              Item("ACF"),
+    traits_view = View(VGroup(HGroup(Item("pulse_width", tooltip="input pulse width (picoseconds)."), 
+                                     Item("glass_path", tooltip="Fused silica glass path (metres)")),
+                              HGroup(Item("ACF", tooltip="Autocorrelation Function"), Item("centre"),
                               Item("fwhm", label="FWHM", style="readonly", 
-                                   tooltip="femtoseconds")
+                                   tooltip="femtoseconds"))
                               ),
                        Item("plot", editor=ComponentEditor(), show_label=False))
     
@@ -99,6 +110,11 @@ class ChirpResult(TargetResult):
             psp = fft.rfft(pwr)
             pwr = fft.irfft(psp * psp.conjugate())
             pwr = np.roll(pwr, len(pwr)//2)
+            
+        if self.centre:
+            imax = np.argmax(pwr)
+            middle = len(pwr)//2
+            pwr = np.roll(pwr, middle-imax)
         
         mask = np.arange(len(pwr))[(pwr > (pwr.max()/2))]
         fwhm = t[mask.max()+1] - t[mask.min()]
