@@ -79,9 +79,9 @@ setup(
         #"VTK",
         #"wxPython", #maybe can avoid an explicit dependancy on wx
         "numpy == 1.19", 
-        "traits >= 3.0",
-        "mayavi >= 3.0", #TVTK is distributed as part of Mayavi
-        "traitsui >= 3.0"
+        "traits >= 6.0",
+        "mayavi >= 4.7", #TVTK is distributed as part of Mayavi
+        "traitsui >= 7.0"
         ],
 
     package_data = {

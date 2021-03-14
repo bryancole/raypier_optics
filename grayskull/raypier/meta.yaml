@@ -1,5 +1,5 @@
 {% set name = "raypier" %}
-{% set version = "0.2.0" %}
+{% set version = "0.2.1" %}
 
 
 package:
@@ -8,14 +8,14 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/raypier-{{ version }}.tar.gz
-  sha256: 5ed1b473e26200c8e8a99ec5e969e914963a974a47812c47626748c48071c167
+  sha256: 56a7661d9a38c17caa1765249d01908468921043800e702f6613cc9bec9285c4
 
 build:
   number: 0
+  script: {{ PYTHON }} setup.py install
+  
 
 requirements:
-  build:
-    - cython >=0.29
   host:
     - cython >=0.29
     - numpy ==1.19
@@ -27,6 +27,7 @@ requirements:
     - traits >=6.0
     - mayavi >=4.7
     - traitsui >=7.0
+    - numpy ==1.19
 
 test:
   imports:
