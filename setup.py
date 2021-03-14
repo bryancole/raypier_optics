@@ -66,7 +66,7 @@ with open("README.rst", 'r', encoding="utf-8") as fh:
 
 setup(
     name="raypier",
-    version="0.1.1dev",
+    version="0.2.0",
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
@@ -109,5 +109,5 @@ visualisation of mirror/lens systems.""",
         "Source" : "https://github.com/bryancole/raypier_optics.git",
         "Issues" : "https://github.com/bryancole/raypier_optics/issues"
         },
-    python_requires=">=3.6"
+    python_requires=">=3.7"
     )
