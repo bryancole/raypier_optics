@@ -66,7 +66,7 @@ with open("README.rst", 'r', encoding="utf-8") as fh:
 
 setup(
     name="raypier",
-    version="0.2.1",
+    version="0.2.3",
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},

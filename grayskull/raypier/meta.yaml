@@ -1,5 +1,5 @@
 {% set name = "raypier" %}
-{% set version = "0.2.1" %}
+{% set version = "0.2.3" %}
 
 
 package:
@@ -8,11 +8,11 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/raypier-{{ version }}.tar.gz
-  sha256: 56a7661d9a38c17caa1765249d01908468921043800e702f6613cc9bec9285c4
+  sha256: e7813e835f29cc4ffab4332785e1ccb49148c7433895a0fbd0f15dcaf2b4eb7a
 
 build:
   number: 0
-  script: {{ PYTHON }} setup.py install
+  script: {{ PYTHON }} setup.py install --single-version-externally-managed --record=record.txt
   
 
 requirements:
@@ -21,13 +21,18 @@ requirements:
     - numpy ==1.19
     - pip
     - python >=3.7
+    - vtk >=9.0
+    - traits >=6.0
+    - mayavi >=4.7
+    - traitsui >=7.0
+    - configobj >=5.0
   run:
     - python >=3.7
     - vtk >=9.0
     - traits >=6.0
     - mayavi >=4.7
     - traitsui >=7.0
-    - numpy ==1.19
+    - configobj >=5.0
 
 test:
   imports:
@@ -42,6 +47,8 @@ test:
     - pip check
   requires:
     - pip
+    - configobj
+    - numpy ==1.19
 
 about:
   home: https://groups.google.com/u/1/g/python-raytrace

@@ -1,4 +1,3 @@
-from fontTools.cffLib import width
 
 cdef extern from "math.h":
     double M_PI
