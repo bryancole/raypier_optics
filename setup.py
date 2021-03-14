@@ -66,7 +66,7 @@ with open("README.rst", 'r', encoding="utf-8") as fh:
 
 setup(
     name="raypier",
-    version="0.2.0",
+    version="0.2.1",
     packages=find_packages(),
     scripts = [], #no stand-alone application yet
     cmdclass = {'build_ext': build_ext},
@@ -84,7 +84,10 @@ setup(
         "traitsui >= 3.0"
         ],
 
-    package_data = {}, #none, yet
+    package_data = {
+        "": ["*.pyx", "*.pxd"],
+        "raypier": ["material_data/glass_dispersion_database.db"]
+        },
 
     author = "Bryan Cole",
     author_email = "bryancole.cam@gmail.com",
