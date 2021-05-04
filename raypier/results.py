@@ -6,7 +6,7 @@ A module for Results subclasses
 from traits.api import Instance, Float, on_trait_change,\
             Button, DictStrFloat, Str
 
-from traitsui.api import View, Item, DropEditor
+from traitsui.api import View, Item
 
 from raypier.bases import Result, Traceable
 from raypier.sources import BaseRaySource
@@ -14,8 +14,7 @@ from raypier.sources import BaseRaySource
 from raypier.core.ctracer import Face
 from raypier.dispersion import FusedSilica
 
-from traitsui.editors.drop_editor import DropEditor
-from traitsui.editors.title_editor import TitleEditor
+from traitsui.editors.api import DropEditor,TitleEditor
 
 import numpy
 import itertools

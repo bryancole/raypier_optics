@@ -4,7 +4,7 @@ Traits wrappers for Distortion objects
 
 from traits.api import Instance, Float, HasTraits, observe, Event, List, Tuple, Int
 from traitsui.api import View, VGroup, Item
-from traitsui.editors import ListEditor, TupleEditor
+from traitsui.editors.api import ListEditor, TupleEditor
 
 from .editors import NumEditor
 from .core import cdistortions, ctracer
