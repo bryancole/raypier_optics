@@ -75,7 +75,7 @@ class SphericalFace(PlanarFace):
     #: Radius of curvature for the spherical face, in mm.
     curvature = Float(100.0)
     
-    cface = Instance(ShapedSphericalFace, ())
+    cface = Instance(ShapedSphericalFace)
     
     traits_view = View(VGroup(
             Item("z_height", editor=NumEditor, tooltip="surface height at x=0,y=0 in mm"),
@@ -85,7 +85,11 @@ class SphericalFace(PlanarFace):
     def __repr__(self):
         return f"<Spherical Face: z={self.z_height}, curvature={self.curvature}>"
     
+    def _cface_default(self):
+        return ShapedSphericalFace(z_height=self.z_height, curvature=self.curvature)
+    
     def _curvature_changed(self, cnew):
+        print("new curvature", cnew)
         self.cface.curvature = cnew
         self.updated=True
         

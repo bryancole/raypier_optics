@@ -92,11 +92,13 @@ class PlanoConvexLens(BaseLens):
     
     def _faces_default(self):
         fl = FaceList(owner=self)
-        fl.faces = [CircularFace(owner=self, diameter=self.diameter,
-                                material = self.material), 
-                SphericalFace(owner=self, diameter=self.diameter,
+        f1 = CircularFace(owner=self, diameter=self.diameter,
+                                material = self.material)
+        f2 = SphericalFace(owner=self, diameter=self.diameter,
                                 material=self.material,
-                                z_height=self.CT, curvature=self.curvature)]
+                                z_height=self.CT, curvature=self.curvature)
+        f2.curvature = self.curvature
+        fl.faces = [f1, f2]
         return fl
     
     def _CT_changed(self, new_ct):
