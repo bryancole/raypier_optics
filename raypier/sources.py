@@ -753,7 +753,9 @@ class ConfocalRaySource(SingleRaySource):
     #view_ray_ids = numpy.arange(20)
     
     input_rays = Property(Instance(RayCollection), 
-                         depends_on="focus, direction, number, rings, theta, working_dist, max_ray_len")
+                         depends_on="origin, direction, number, wavelength, "\
+                                    "max_ray_len, E_vector, "\
+                                    "focus, rings, theta, working_dist")
     
     geom_grp = VGroup(Group(Item('focus', show_label=False,resizable=True), 
                             show_border=True,

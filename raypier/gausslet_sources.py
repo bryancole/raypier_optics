@@ -2,7 +2,8 @@
 import numpy
 import itertools
 import time
-from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, observe, Bool, Range
+from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, \
+        observe, Bool, Range, Int
 from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
 from tvtk.api import tvtk
 
@@ -219,9 +220,7 @@ class SingleGaussletSource(BaseGaussletSource):
     
     params_grp = VGroup(
                        Item("wavelength"),
-                       Item("max_angle"),
                        Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns"),
-                       Item('sample_spacing', tooltip="Sample spacing for the field in the aperture"),
                        label="Parameters")
     
     def _wavelength_list_default(self):
@@ -554,4 +553,115 @@ class GaussianPointSource(SingleGaussletSource):
         rays.config_parabasal_rays(wl, gauss_radius, working_dist)
         rays.project_to_plane(origin, direction)
         return rays
+    
+    
+class BroadbandGaussletSource(SingleGaussletSource):
+    """
+    Creates a set of Gausslets aligned along a common axis,
+    with a range of wavelengths.
+    """
+    #: Number of wavelengths to include
+    number = Int(200, auto_set=False, enter_set=True)
+    
+    #: Centre wavelength, in microns
+    wavelength = Float(0.95, editor=NumEditor)
+    
+    #: Full extent of wavelength list, in microns
+    wavelength_extent = Float(0.1, editor=NumEditor)
+    
+    #: gaussian width of the spectral amplitude, in nanometers
+    bandwidth_nm = Float(10.0)
+    
+    #: Apply a time-offset to the phases of each wavelength, in picoseconds
+    time_offset_ps = Float(0.0)
+    
+    #: If True, the wavelengths will be uniformly spaced in frequency. Otherwise,
+    #:    they are uniformly spaced in wavelength.
+    uniform_deltaf = Bool(True)
+    
+    #: The distance from the object origin to the beam waist. A negative value
+    #: means that the focus is behind the origin. 
+    working_dist = Float(100.0)
+    
+    #: The diameter of the beam at the beam-waist, in microns.
+    beam_waist = Float(100.0) #diameter, in microns
+    
+    ### Traits Properties seems to be broken. No good way to flush the cache so I'm doing it myself.
+    _input_rays = Instance(GaussletCollection)
+    input_rays = Property(Instance(GaussletCollection))
+    
+    params_grp = VGroup(Item('number'),
+                       Item('wavelength'),
+                       Item('wavelength_extent'),
+                       Item("uniform_deltaf"),
+                       Item("bandwidth_nm"),
+                       Item('beam_waist', tooltip="1/e^2 beam intensity radius, in microns", editor=NumEditor),
+                       Item('working_dist', editor=NumEditor),
+                       label="Parameters")
+    
+    
+    @observe("number, wavelength, wavelength_extent, uniform_deltaf")
+    def _do_wavelength_changed(self, evt):
+        wavelength_start = self.wavelength + self.wavelength_extent/2.
+        wavelength_end = self.wavelength - self.wavelength_extent/2.
+        if self.uniform_deltaf:
+            f_start = 1./wavelength_start
+            f_end = 1./wavelength_end
+            wavelengths = 1./numpy.linspace(f_start, f_end, self.number)
+        else:
+            wavelengths = numpy.linspace(wavelength_start, wavelength_end,
+                                         self.number)
+        self.wavelength_list = list(wavelengths)
+    
+    @observe("origin, direction, max_ray_len, E_vector, E1_amp, "\
+            "E2_amp, number, beam_waist, working_dist")
+    def _clear_input_rays(self, evt):
+        del self._input_rays
+        self.update = True
+    
+    def _get_input_rays(self):
+        rays = self._input_rays
+        if rays is None:
+            rays = self._eval_input_rays()
+            self._input_rays = rays
+        return rays
+    
+    def _eval_input_rays(self):
+        self.wavelength_list = [self.wavelength]
+        origin = numpy.array(self.origin)
+        direction = normaliseVector(numpy.array(self.direction))
+        
+        focal_radius = self.beam_waist/1000.0 #convert to mm
+        
+        waist_location = origin + self.working_dist*direction
+        bandwidth = (self.bandwidth_nm / 2.0)/1000.0 #convert to microns 
+        
+        self._do_wavelength_changed(None)
+        wl = numpy.asarray(self.wavelength_list) #in microns
+        ampl = numpy.exp(-((wl-self.wavelength)**2)/(bandwidth**2))
+        
+        E1_amp = ampl * self.E1_amp
+        E2_amp = ampl * self.E2_amp
+        
+        ray_data = numpy.zeros(ampl.shape[0], dtype=ray_dtype)
+        print("Ampl", ampl.shape)
+        ray_data['origin'] = origin
+        ray_data['direction'] = direction
+        ray_data['wavelength_idx'] = numpy.arange(self.number)
+        ray_data['E_vector'] = self.E_vector
+        ray_data['E1_amp'] = E1_amp
+        ray_data['E2_amp'] = E2_amp
+        ray_data['refractive_index'] = 1.0+0.0j
+        ray_data['normal'] = [[0,1,0]]
+        ray_data['ray_type_id'] = (1<<1) #indicates Gausslets
+        
+        rays = GaussletCollection.from_rays(ray_data)
+        wl = numpy.array(self.wavelength_list)
+        rays.wavelengths = wl
+        working_dist = self.working_dist
+        gauss_radius = self.beam_waist/1000. #convert microns to mm
+        rays.config_parabasal_rays(wl, gauss_radius, working_dist)
+        rays.project_to_plane(origin, direction)
+        return rays
+    
     
