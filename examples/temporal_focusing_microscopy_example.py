@@ -22,9 +22,10 @@ src = BroadbandGaussletSource(
     working_dist=0.0,
     wavelength = 1.0,
     wavelength_extent = 0.01,
+    bandwidth_nm = 1.0,
     beam_waist = 1000.0,
     display='wires',
-    show_paras=True
+    show_paras=False
     )
 
 # src = SingleGaussletSource(
@@ -61,12 +62,12 @@ bs = UnpolarisingBeamsplitterCube(centre = (10.0, 0., 0.),
                                   size=15.0,
                                   )
 
-capture = GaussletCapturePlane(centre=(10,-80,0), 
+capture = GaussletCapturePlane(centre=(10,-66,0), 
                                direction=(0,1,0),
                                width=15.0,
                                height=15.0)
 
-field = EFieldPlane(centre=(10,-80,0),
+field = EFieldPlane(centre=(10,-66,0),
                     direction=(0,0,1),
                     detector=capture,
                     align_detector=True,
@@ -79,7 +80,7 @@ surf = IntensitySurface(field_probe=field)
 
 
 class MyConstraint(Constraint):
-    time = Range(-5.0,5.0,0.0)
+    time = Range(-15.0,15.0,0.0)
     time_offset = Float(0.0)
     
     traits_view = View(VGroup(

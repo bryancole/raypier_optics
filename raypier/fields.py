@@ -67,6 +67,8 @@ class EFieldPlane(Probe):
     #: property - The "|E-field|**2" calculated from the E-field.
     intensity = Property(Array, depends_on="E_field")
     
+    #_intensity = Array()
+    
     #: property - The sum of the intensity array.
     total_power = Property(depends_on="intensity, width, height, size")
     
@@ -76,6 +78,9 @@ class EFieldPlane(Probe):
     #: The mean real part of the refractive index for the material where the probe plane lies
     #: Get get this from the selected/captured rays.
     refractive_index = Float(1.0)
+    
+    #: If True, the intensity keeps to largest values of the previous pixel and a new pixel value 
+    peak_hold = Bool(False)
         
     _mtime = Float(0.0)
     _src_list = List()
@@ -94,6 +99,7 @@ class EFieldPlane(Probe):
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
                        Item('time_ps', editor=NumEditor),
+                       Item('peak_hold'),
                        Item('blending', editor=NumEditor),
                        Item('gen_idx', editor=IntEditor),
                        Item('centre_on_focus_btn', show_label=False, label="Centre on focus")
@@ -161,7 +167,11 @@ class EFieldPlane(Probe):
     @cached_property
     def _get_intensity(self):        
         E = self.E_field
-        return (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
+        pwr = (E.real**2).sum(axis=-1) + (E.imag**2).sum(axis=-1)
+        if self.peak_hold:
+            pwr = numpy.maximum(pwr, self._intensity, out=pwr)
+        self._intensity = pwr
+        return pwr
     
     def _get_total_power(self):
         power = self.intensity.sum()*(self.width*self.height/(self.size**2))

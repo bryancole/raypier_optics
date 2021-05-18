@@ -12,6 +12,7 @@ from raypier.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
 from raypier.tracer import normaliseVector
 from raypier.editors import NumEditor
 from raypier.decompositions import decompose_angle, make_hexagonal_grid
+from virtualenv.create.via_global_ref.builtin import via_global_self_do
 
 
 class BaseGaussletSource(BaseRaySource):
@@ -613,9 +614,10 @@ class BroadbandGaussletSource(SingleGaussletSource):
             wavelengths = numpy.linspace(wavelength_start, wavelength_end,
                                          self.number)
         self.wavelength_list = list(wavelengths)
+        print("set wavelengths", len(self.wavelength_list), self.wavelength_list[0], self.wavelength_list[-1])
     
     @observe("origin, direction, max_ray_len, E_vector, E1_amp, "\
-            "E2_amp, number, beam_waist, working_dist")
+            "E2_amp, beam_waist, bandwidth_nm, working_dist, wavelength_list")
     def _clear_input_rays(self, evt):
         del self._input_rays
         self.update = True
@@ -637,7 +639,8 @@ class BroadbandGaussletSource(SingleGaussletSource):
         waist_location = origin + self.working_dist*direction
         bandwidth = (self.bandwidth_nm / 2.0)/1000.0 #convert to microns 
         
-        self._do_wavelength_changed(None)
+        if self.number != len(self.wavelength_list):
+            self._do_wavelength_changed(None)
         wl = numpy.asarray(self.wavelength_list) #in microns
         ampl = numpy.exp(-((wl-self.wavelength)**2)/(bandwidth**2))
         
@@ -648,7 +651,7 @@ class BroadbandGaussletSource(SingleGaussletSource):
         print("Ampl", ampl.shape)
         ray_data['origin'] = origin
         ray_data['direction'] = direction
-        ray_data['wavelength_idx'] = numpy.arange(self.number)
+        ray_data['wavelength_idx'] = numpy.arange(len(self.wavelength_list))
         ray_data['E_vector'] = self.E_vector
         ray_data['E1_amp'] = E1_amp
         ray_data['E2_amp'] = E2_amp
