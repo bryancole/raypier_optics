@@ -52,7 +52,8 @@ cdef:
 cpdef  sum_gaussian_modes(RayCollection rays,
                           double complex[:,:] modes, 
                           np_.npy_float64[:] wavelengths,
-                          np_.npy_float64[:,:] points):
+                          np_.npy_float64[:,:] points,
+                          double time_ps):
     """
     Compute the E-field at the given points by propagation of the
     given rays, with phase and mode-coefficients.
@@ -67,6 +68,9 @@ cpdef  sum_gaussian_modes(RayCollection rays,
         vector_t pt, H, E
         double complex U, A, B, C, E1, E2, detG0, kz
         double x,y,z, phase, k, inv_root_area, invk
+        double c = 0.299792458 #speed of light (in mm/ps)
+        
+    c *= time_ps  #x time (in picoseconds)
     
     with nogil:
         for iray in range(Nray):
@@ -76,7 +80,7 @@ cpdef  sum_gaussian_modes(RayCollection rays,
             k = 2000.0*M_PI/wavelengths[ray.wavelength_idx]
             ### The accumulated path length already includes the refractive index of up-stream rays
             ### Hence, need to calculate it before applying the refractive index of the last leg.
-            phase = ray.phase + (ray.accumulated_path*k)
+            phase = ray.phase + (ray.accumulated_path*k) - (c*k/ray.refractive_index.real)
             
             #kz = ray.refractive_index.real + I*ray.refractive_index.imag
             kz = ray.refractive_index

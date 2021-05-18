@@ -259,6 +259,7 @@ class SingleGaussletSource(BaseGaussletSource):
         base_ray['E_vector'] = E_vector[None,:]
         base_ray['E1_amp'] = 1.0
         base_ray['length'] = self.max_ray_len
+        base_ray['refractive_index'] = 1.0
         
         para = data['para_rays']
         para['direction'] = direction[None,None,:]

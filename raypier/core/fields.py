@@ -195,6 +195,7 @@ def ExtractGamma(gausslet_collection, blending=1.0):
     
 def eval_Efield_from_rays(ray_collection, points, wavelengths, 
                           blending=1.0,
+                          time_ps=0.0,
                           exit_pupil_offset=0.0, 
                           exit_pupil_centre=(0.0,0.0,0.0)):
     rays = ray_collection.copy_as_array() 
@@ -212,7 +213,7 @@ def eval_Efield_from_rays(ray_collection, points, wavelengths,
     
     _rays = RayCollection.from_array(rays)
     
-    E = sum_gaussian_modes(_rays, modes, wavelengths, points)
+    E = sum_gaussian_modes(_rays, modes, wavelengths, points, time_ps)
     
     return E
 
@@ -234,7 +235,7 @@ class EFieldSummation(object):
         self.modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
         self.base_rays = RayCollection.from_array(rays)
         
-    def evaluate(self, points):
+    def evaluate(self, points, time_ps=0.0):
         """
         Called to calculate the E-field for the given points.
         """
@@ -243,14 +244,16 @@ class EFieldSummation(object):
         points.shape=(-1,3)
         E = sum_gaussian_modes(self.base_rays, 
                               self.modes, 
-                              self.wavelengths, points)
+                              self.wavelengths, points, time_ps)
         E.shape = shape
         return E
 
 
 def eval_Efield_from_gausslets(gausslet_collection, points, 
                                wavelengths = None,
-                               blending=1.0, **kwds):
+                               blending=1.0,
+                               time_ps=0.0, 
+                               **kwds):
     """
     Calculates the vector E-field is each of the points given. The returned 
     array of field-vectors will have the same length as `points` and 
@@ -269,6 +272,6 @@ def eval_Efield_from_gausslets(gausslet_collection, points,
     rays, x, y, dx, dy = evaluate_neighbours_gc(gc)
     modes = evaluate_modes_c(x, y, dx, dy, blending=blending)
     _rays = RayCollection.from_array(rays)
-    E = sum_gaussian_modes(_rays, modes, wavelengths, points)
+    E = sum_gaussian_modes(_rays, modes, wavelengths, points, time_ps)
     return E
 

@@ -70,6 +70,9 @@ class EFieldPlane(Probe):
     #: property - The sum of the intensity array.
     total_power = Property(depends_on="intensity, width, height, size")
     
+    #: time, in picoseconds.
+    time_ps = Float(0.0)
+    
     #: The mean real part of the refractive index for the material where the probe plane lies
     #: Get get this from the selected/captured rays.
     refractive_index = Float(1.0)
@@ -90,6 +93,7 @@ class EFieldPlane(Probe):
                        Item('width', editor=NumEditor),
                        Item('height', editor=NumEditor),
                        Item('exit_pupil_offset', editor=NumEditor),
+                       Item('time_ps', editor=NumEditor),
                        Item('blending', editor=NumEditor),
                        Item('gen_idx', editor=IntEditor),
                        Item('centre_on_focus_btn', show_label=False, label="Centre on focus")
@@ -100,6 +104,11 @@ class EFieldPlane(Probe):
         detector = self.detector
         if detector is not None and self.align_detector:
             detector.centre = evt.new
+        self._mtime = 0.0
+        self.on_change()
+        
+    @observe("time_ps")
+    def _on_time_change(self, evt):
         self._mtime = 0.0
         self.on_change()
     
@@ -121,6 +130,7 @@ class EFieldPlane(Probe):
         self.on_change()
         
     def on_change(self):
+        print("CHANGE")
         try:
             self.evaluate(None)
         except:
@@ -199,11 +209,13 @@ class EFieldPlane(Probe):
             if isinstance(rays, GaussletCollection):
                 n_list.append(rays.base_rays.refractive_index.real)
                 E = eval_Efield_from_gausslets(rays, points2,
-                                               blending=self.blending)
+                                               blending=self.blending,
+                                               time_ps=self.time_ps)
             else:
                 n_list.append(rays.refractive_index.real)
                 E = eval_Efield_from_rays(rays, points2, wavelengths, 
                                           blending=self.blending,
+                                          time_ps=self.time_ps,
                                           exit_pupil_offset=self.exit_pupil_offset,
                                           exit_pupil_centre=self.centre)
             
