@@ -37,19 +37,20 @@ src = BroadbandGaussletSource(
 #     E_vector=(0,0,1)
 #     )
 
-grating = RectangularGrating(centre=(80.0,0.,0.),
+grating = RectangularGrating(centre=(220.0,0.,0.),
                              direction=(-1,1,0.),
                              length=15.,
                              width=20.0,
                              thickness=3.0,
                              lines_per_mm=1400.0)
+grating.orientation = 45.5
 
 lens1 = PlanoConvexLens(centre=(40.0,0.0,0.0),
                         direction=(-1,0,0),
                         diameter=25.0,
                         CT=6.0,
                         n_inside=1.6,
-                        curvature=25.0)
+                        curvature=100.0)
 
 lens2 = PlanoConvexLens(centre=(10.0,-30.0,0.0),
                         direction=(0,1,0),
@@ -91,6 +92,14 @@ class MyConstraint(Constraint):
     @observe("time, time_offset")
     def on_time_change(self, evt):
         field.time_ps = self.time + self.time_offset
+        
+        
+    def animate(self, dt, count):
+        for i in range(count):
+            field.time_ps = self.time + self.time_offset + i*dt
+            U = field.intensity
+            print("Calc:", i)
+            image.save_plot(f"/home/bryan/tmp/range_{i:03d}.png")
 
 cst = MyConstraint()
 

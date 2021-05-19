@@ -12,7 +12,6 @@ from raypier.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
 from raypier.tracer import normaliseVector
 from raypier.editors import NumEditor
 from raypier.decompositions import decompose_angle, make_hexagonal_grid
-from virtualenv.create.via_global_ref.builtin import via_global_self_do
 
 
 class BaseGaussletSource(BaseRaySource):

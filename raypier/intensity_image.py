@@ -8,7 +8,7 @@ from chaco.api import GridDataSource, GridMapper, ImageData, Spectral,\
 from chaco.default_colormaps import Spectral
         
 from enable.api import ComponentEditor, KeySpec
-from chaco.tools.api import PanTool, ZoomTool
+from chaco.tools.api import PanTool, ZoomTool, SaveTool
 
 from .results import Result
 from .fields import EFieldPlane
@@ -158,6 +158,8 @@ class IntensityImageView(Result):
         hbox.add(self.plot)
         hbox.add(self.cbar)
         #hbox.bgcolor = 'sys_window' 
+        save_tool = SaveTool(component=hbox, filename="/home/bryan/saved_plot.png")
+        hbox.tools.append(save_tool)
         return hbox
     
     def _cbar_default(self):
@@ -202,12 +204,18 @@ class IntensityImageView(Result):
         plot.x_axis.title = "Width /mm"
         plot.y_axis.title = "Height /mm"
         a = probe.centre
-        plot.title = f"Intensity @ ({a[0]:0.3f}, {a[1]:0.3f}, {a[2]:0.3f})"
+        #plot.title = f"Intensity @ ({a[0]:0.3f}, {a[1]:0.3f}, {a[2]:0.3f})"
         
         pantool = PanTool(plot) #self.pan_tool
         pantool = self.pan_tool
         pantool.component = self.image_plot
         self.pan_tool = pantool
         plot.tools.append(pantool)
-        
         return plot
+    
+    def save_plot(self, filename):
+        from chaco.api import PlotGraphicsContext
+        component = self.hbox
+        gc = PlotGraphicsContext((int(component.outer_width), int(component.outer_height)))
+        component.draw(gc, mode="normal")
+        gc.save(filename)
