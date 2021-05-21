@@ -1788,7 +1788,10 @@ cdef class AsphericFace(ShapedFace):
             double R = self.curvature
     
         out = r2
-        out /= (R + sqrt(R*R - (1+self.conic_const)*r2) )
+        if R>=0.0:
+            out /= (-R - sqrt(R*R - (1+self.conic_const)*r2) )
+        else:
+            out /= (-R + sqrt(R*R - (1+self.conic_const)*r2) )
         out += self.A4*(r2**2) + self.A6*(r2**3) + self.A8*(r2**4) + self.A10*(r2**5) + self.A12*(r2**6) + self.A14*(r2**7) + self.A16*(r2**8)
         out += self.z_height
         return out
