@@ -11,6 +11,7 @@ Raypier is a non-sequential ray-tracing framework for modelling optical systems.
 #. Point Spread Function (PSF) and E-Field evaluation by summation of of Gaussian modes.
 #. Paraxial Gaussian mode evaluation covers generally astigmatic modes.
 #. Tracing support for conics section and general aspherics (conic + polnomial)
+#. Zurnike polynomial surface distortions.
 #. An interactive user-interface with 3D model/ray rendering through VTK. Tracing is performed "live".
 #. A modest selection of optic-types including singlet and achromatic doublet lenses (with AR coating), plane-mirrors, 
    ellipsoidal mirrors, prisms
@@ -26,13 +27,13 @@ Requirements
 
 Raypier requires:
 
-* python-3.6 (older versions work on 2.7) 
+* python >= 3.6
 * numpy
 * scipy
 * traits / traitsui
 * Cython
 * Mayavi (for TVTK) / VTK
-* (Optionally) PythonOCC - for STEP export
+* (Optionally) pythonocc_core - for STEP export
 * (Optionally) Chaco / Enable - for integrating line-plots into the UI
 
 

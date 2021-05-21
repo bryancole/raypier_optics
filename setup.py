@@ -24,33 +24,13 @@ from Cython.Distutils import build_ext
 from Cython.Build import cythonize
 #from setuptools import find_packages
 
-###Cython.Distutils and Distribute don't play nice so we'll create the
-###C-modules explicitly
-import subprocess, os, sys
-
-# def create_module(pyx_name):
-#     cname = os.path.splitext(pyx_name)[0] + ".c"
-#     if os.path.exists(cname) and \
-#         os.stat(cname).st_mtime > os.stat(pyx_name).st_mtime:
-#         return
-#     ret = subprocess.call(['cython',pyx_name])
-#     if ret < 0:
-#         raise CythonError("Failed to compile %s with Cython"%pyx_name)
-
-# for fname in ['ctracer.pyx','cfaces.pyx','cmaterials.pyx']:
-#     create_module("raypier/%s"%fname)
-
+import sys
 import numpy
+
 includes = [numpy.get_include()]
 libpath = []
 
-
 Win64 = sys.platform.startswith("win")
-
-# if sys.platform.startswith('win32'):
-#     os.environ['PATH'] = os.environ['PATH']+r";C:\Program Files\Microsoft SDKs\Windows\v6.0A\bin"
-#     includes.append(r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Include")
-#     libpath += [r"C:\Program Files\Microsoft SDKs\Windows\v6.0A\Lib"]
 
 ext_modules = cythonize("raypier/core/*.pyx",
                         language="c++" if Win64 else None,
@@ -78,10 +58,11 @@ setup(
     install_requires = [
         #"VTK",
         #"wxPython", #maybe can avoid an explicit dependancy on wx
-        "numpy == 1.19", 
+        "numpy >= 1.19", 
         "traits >= 6.0",
         "mayavi >= 4.7", #TVTK is distributed as part of Mayavi
-        "traitsui >= 7.0"
+        "traitsui >= 7.0",
+        "pyyaml"
         ],
 
     package_data = {
@@ -95,7 +76,7 @@ setup(
 visualisation of mirror/lens systems.""",
     long_description = long_description,
     license = "GPL3",
-    keywords = "science engineering optics ray-tracing physcics",
+    keywords = "science engineering optics ray-tracing physics",
     classifiers=["Development Status :: 4 - Beta",
                  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
                  "Natural Language :: English",
