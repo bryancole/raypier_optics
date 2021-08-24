@@ -79,7 +79,7 @@ cdef class ShapedFace(Face):
     @cython.wraparound(False)   # Deactivate negative indexing.
     def eval_z_points(self, double[:,:] points):
         cdef:
-            size_t i, ni=points.shape[0]
+            long i, ni=points.shape[0]
             np_.ndarray aout = np.empty((ni,), dtype='d')
             double[:] out = aout
             
@@ -94,7 +94,7 @@ cdef class ShapedFace(Face):
     @cython.wraparound(False)   # Deactivate negative indexing.
     def eval_implicit_grid(self, double[:] x, double[:] y, double[:] z):
         cdef:
-            size_t i,j,k, ni=x.shape[0], nj=y.shape[0], nk=z.shape[0]
+            long i,j,k, ni=x.shape[0], nj=y.shape[0], nk=z.shape[0]
             np_.ndarray aout = np.empty((ni,nj,nk), dtype='d')
             double[:,:,:] out = aout
             int sign
@@ -115,7 +115,7 @@ cdef class ShapedFace(Face):
     @cython.wraparound(False)   # Deactivate negative indexing.
     def eval_implicit_points(self, double[:,:] points):
         cdef:
-            size_t i, ni=points.shape[0]
+            long i, ni=points.shape[0]
             np_.ndarray aout = np.empty((ni,), dtype='d')
             double[:] out = aout
             int sign

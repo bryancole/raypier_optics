@@ -32,14 +32,16 @@ libpath = []
 
 Win64 = sys.platform.startswith("win")
 
+openmp = '/openmp' if Win64 else '-fopenmp'
+
 ext_modules = cythonize("raypier/core/*.pyx",
                         language="c++" if Win64 else None,
                         include_path=[numpy.get_include()],
                         language_level = "3")
 
 for module in ext_modules:
-    module.extra_compile_args.append('-fopenmp')
-    module.extra_link_args.append('-fopenmp')
+    module.extra_compile_args.append(openmp)
+    module.extra_link_args.append(openmp)
     
 with open("README.rst", 'r', encoding="utf-8") as fh:
     long_description = fh.read()

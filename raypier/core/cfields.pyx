@@ -59,9 +59,9 @@ cpdef  sum_gaussian_modes(RayCollection rays,
     given rays, with phase and mode-coefficients.
     """
     cdef:
-        size_t iray, ipt 
-        size_t Nray=rays.n_rays
-        size_t Npt=points.shape[0]
+        long iray, ipt 
+        long Nray=rays.n_rays
+        long Npt=points.shape[0]
         
         ray_t ray
         complex_t[:,:] out = np.zeros((Npt,3), dtype=np.complex128)
