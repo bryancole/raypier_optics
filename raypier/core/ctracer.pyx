@@ -13,9 +13,6 @@ cdef extern from "math.h":
     double sin(double arg) nogil
     double cos(double arg) nogil
     #double INFINITY
-    
-cdef extern from "float.h":
-    double DBL_MAX
 
 cdef:
     INF=(DBL_MAX+DBL_MAX)

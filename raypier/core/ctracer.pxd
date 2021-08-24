@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 from _operator import invert
 
-cdef extern from "math.h":
-    double sqrt(double arg)
-
 cdef extern from "float.h":
     #double INFINITY
     double DBL_MAX
