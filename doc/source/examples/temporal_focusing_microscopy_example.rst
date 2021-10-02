@@ -22,6 +22,8 @@ The BroadbandGaussletSource creates a set of Gausslets with centre wavelength of
 
 Since a single monochromatic Gausslet represents a periodic E-field amplitude (i.e. a sine-wave), a  linear combination of a finite set of such Gausslets is also periodic. It turns out our source creates a periodic pulse train where the interval between pulses is given by the inverse of the frequency-spacing of the Gausslets. If you want very widely spaced pulses, you thus need a smaller frequency-spacing and hence a larger number of rays. To keep the calculation times reasonable, it's best to use the shortest pulse-separation you can get away with to achieve your model objectives.
 
+The beam created by the BroadbandGaussletSource is paraxial (i.e. approximately collimated), since all the Gausslets have the same base-ray origin and direction. Thus this source is not accurate if you need to model non-paraxial broadband beams. For ultra-fast laser systems, this approximation is often fine.
+
 The 3D view of the model looks like this:
 
 .. image:: ../images/temporal_focusing_layout.png
