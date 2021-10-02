@@ -19,6 +19,7 @@ cdef struct MaxElem:
     double Amax
     int i
     int j 
+    
 
 cdef MaxElem max_elem(double[:,:] A):
     """Find max off-diagonal element of square matrix A
@@ -80,9 +81,43 @@ cdef rotate(double[:,:] A, double[:,:] p, int k, int l):
         temp = p[i,k]
         p[i,k] = temp - s*(p[i,l] + tau*p[i,k])
         p[i,l] = p[i,l] + s*(temp - tau*p[i,l])
+        
 
-
+cdef int _jacobi(double[:,:] A, double[:] eigenvals, double[:,:] p, double tol=1e-9):
+    cdef:
+        int i, j, n = A.shape[0]
+        int max_rot = 5*(n**2)
+        MaxElem me
+        
+    for i in range(n):
+        for j in range(n):
+            if i==j:
+                p[i,j] = 1.0
+            else:
+                p[i,j] = 0.0
+        
+    for i in range(max_rot):
+        me = max_elem(A)
+        if me.Amax < tol:
+            for j in range(n):
+                eigenvals[j] = A[j,j]
+            return 0
+        rotate(A,p,me.i, me.j)
+    return -1
+    
+    
 def jacobi(double[:,:] A, double tol=1e-9):
+    cdef:
+        int n=len(A)
+        double[:,:] p = np.identity(n)*1.0
+        double[:] vals = np.empty(n, dtype='d')
+        
+    if _jacobi(A, vals, p, tol=tol)<0:
+        raise Exception("Jacobi method did not converge")
+    
+    return (vals, np.asarray(p))
+
+def jacobi2(double[:,:] A, double tol=1e-9):
     cdef:
         int i, n = len(A)
         int max_rot = 5*(n**2)
@@ -92,7 +127,7 @@ def jacobi(double[:,:] A, double tol=1e-9):
     for i in range(max_rot):
         me = max_elem(A)
         if me.Amax < tol:
-            return np.diagonal(A),p
+            return np.diagonal(A),np.asarray(p)
         rotate(A,p,me.i, me.j)
     raise Exception("Jacobi method did not converge")
 
