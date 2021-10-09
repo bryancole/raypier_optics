@@ -141,6 +141,13 @@ cdef class OBBNode(object):
         int[:] cell_list
         
         
+cdef struct OBB:
+    double corner[3]
+    double long_axis[3]
+    double mid_axis[3]
+    double short_axis[3]
+    double sizes[3] #axis lengths for long, mid & short axes
+        
         
 cdef class OBBTree(object):
     cdef:
@@ -169,6 +176,8 @@ cdef class OBBTree(object):
             double[3][3] a = [[0.0,0.0,0.0],
                               [0.0,0.0,0.0],
                               [0.0,0.0,0.0]]
+            double[3] axis_lens
+            OBBNode node
         
         for i in range(n_pts):
             pt = self.points[point_ids[i]]
@@ -193,5 +202,9 @@ cdef class OBBTree(object):
             a[2][j] /= n_pts
             
         ### Find eigenvectors
+        if _jacobi(a, <double[:]>axis_lens, node.axes) < 0:
+            raise Exception("Jacobi iteration failed.")
+        
+        ### Get bounding box by projecting onto eigenvectors
         
         
