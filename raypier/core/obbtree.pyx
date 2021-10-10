@@ -13,6 +13,10 @@ cdef extern from "math.h":
     
 import numpy as np
 cimport numpy as np_
+from libc.float cimport DBL_MAX, DBL_MIN
+
+from .ctracer cimport vector_t, subvv_, dotprod_, mag_sq_, norm_,\
+            addvv_, multvs_
 
 
 cdef struct MaxElem:
@@ -104,6 +108,16 @@ cdef int _jacobi(double[:,:] A, double[:] eigenvals, double[:,:] p, double tol=1
             return 0
         rotate(A,p,me.i, me.j)
     return -1
+
+
+cdef inline vector_t as_vect(double[:] v_in):
+    cdef:
+        vector_t out
+    out.x = v_in[0]
+    out.y = v_in[1]
+    out.z = v_in[2]
+    return out
+    
     
     
 def jacobi(double[:,:] A, double tol=1e-9):
@@ -135,29 +149,49 @@ def jacobi2(double[:,:] A, double tol=1e-9):
 
 cdef class OBBNode(object):
     cdef:
-        double[3] centre #Centre coordinate of the box
-        double[3][3] axes #the three primary axes of the box, ordered from longest to smallest
-        OBBNode parent, child1, child2 #children will be None for leaf nodes. Parent will be None for root
-        int[:] cell_list
+        vector_t _corner #one corner of the box
+        double[3][3] _axes #the three primary axes of the box, ordered from longest to smallest
+        public OBBNode parent, child1, child2 #children will be None for leaf nodes. Parent will be None for root
+        public int[:] cell_list
         
+    property corner:
+        def __get__(self):
+            return np.array([self._corner.x, self._corner.y, self._corner.z])
         
-cdef struct OBB:
-    double corner[3]
-    double long_axis[3]
-    double mid_axis[3]
-    double short_axis[3]
-    double sizes[3] #axis lengths for long, mid & short axes
+        def __set__(self, c):
+            self._corner.x = c[0]
+            self._corner.y = c[1]
+            self._corner.z = c[2]
+            
+    property axes:
+        def __get__(self):
+            cdef:
+                int i,j
+                double[:,:] axes = np.empty((3,3), 'd')
+            for i in range(3):
+                for j in range(3):
+                    axes[i,j] = self._axes[i][j]
+            return np.asarray(axes)
+        
+        def __set__(self, double[:,:] axes):
+            cdef:
+                int i,j
+            for i in range(3):
+                for j in range(3):
+                    self._axes[i][j] = axes[i,j]
         
         
 cdef class OBBTree(object):
     cdef:
         double[:,:] points
         int[:,:] cells #always triangles
+        int[:] point_mask
         OBBNode root
         
     def __init__(self, double[:,:] points, int[:,:] cells):
         self.points = points
         self.cells = cells
+        self.point_mask = np.zeros(points.shape[0], dtype=np.int32)
         
     def compute_obb(self, int[:] point_ids):
         """
@@ -169,7 +203,7 @@ cdef class OBBTree(object):
         weighed by cell area.
         """
         cdef:
-            double[3] centre=[0,0,0], pt0
+            double[3] pt0
             double[:] pt
             int i,j, n_pts = point_ids.size
             ###co-variance matrix
@@ -177,21 +211,30 @@ cdef class OBBTree(object):
                               [0.0,0.0,0.0],
                               [0.0,0.0,0.0]]
             double[3] axis_lens
-            OBBNode node
+            OBBNode node = OBBNode()
+            double[3] tmin = [DBL_MAX, DBL_MAX, DBL_MAX]
+            double[3] tmax = [-DBL_MAX, -DBL_MAX, -DBL_MAX]
+            double t
+            vector_t ax, vpt, centre, corner
         
+        centre.x=0.
+        centre.y=0.
+        centre.z=0.
         for i in range(n_pts):
             pt = self.points[point_ids[i]]
-            for j in range(3):
-                centre[j] += pt[j]
-        for j in range(3):
-            centre[j] /= n_pts
+            centre.x += pt[0]
+            centre.y += pt[1]
+            centre.z += pt[2]
+        centre.x /= n_pts
+        centre.y /= n_pts
+        centre.z /= n_pts
 
         ### Populate covariance matrix
         for i in range(n_pts):
             pt = self.points[point_ids[i]]
-            pt0[0] = pt[0] - centre[0]
-            pt0[1] = pt[1] - centre[1]
-            pt0[2] = pt[2] - centre[2]
+            pt0[0] = pt[0] - centre.x
+            pt0[1] = pt[1] - centre.y
+            pt0[2] = pt[2] - centre.z
             for j in range(3):
                 a[0][j] += pt0[0] * pt0[j]
                 a[1][j] += pt0[1] * pt0[j]
@@ -202,9 +245,149 @@ cdef class OBBTree(object):
             a[2][j] /= n_pts
             
         ### Find eigenvectors
-        if _jacobi(a, <double[:]>axis_lens, node.axes) < 0:
+        if _jacobi(a, <double[:]>axis_lens, node._axes) < 0:
             raise Exception("Jacobi iteration failed.")
+        ### Jacobi method outputs unit-magnitude eigenvectors so we don't need to re-normalise
         
         ### Get bounding box by projecting onto eigenvectors
+        for i in range(n_pts):
+            vpt = as_vect(self.points[point_ids[i]])
+            vpt = subvv_(vpt, centre)
+            for j in range(3): #iterate over axes
+                ax = as_vect(node.axes[j])
+                t = dotprod_(ax, vpt)
+                if t < tmin[j]:
+                    tmin[j] = t
+                if t > tmax[j]:
+                    tmax[j] = t
         
+        print("min: ", tmin[0], tmin[1], tmin[2], "    max: ", tmax[0], tmax[1], tmax[2])
+        corner = addvv_(centre, multvs_(as_vect(node._axes[0]), tmin[0]))
+        corner = addvv_(corner, multvs_(as_vect(node._axes[1]), tmin[1]))
+        corner = addvv_(corner, multvs_(as_vect(node._axes[2]), tmin[2]))
+            
+        for j in range(3):
+            for i in range(3):
+                node._axes[j][i] *= (tmax[j] - tmin[j])
+                #pt0 = node.axes[i]
+                #pt0[j] *= (tmax[j] - tmin[j])
         
+        node._corner = corner
+        return node
+    
+    cdef clear_point_mask(self):
+        cdef:
+            int i, n=self.point_mask.shape[0]
+        for i in range(n):
+            self.point_mask[i] = 0
+    
+    def compute_obb_cells(self, int[:] cell_list):
+        cdef:
+            vector_t mean, p, q, r, dp0, dp1, c
+            int n_cells = cell_list.shape[0]
+            int i,j, n_pts=self.points.shape[0]
+            double tot_mass=0.0, tri_mass
+            int[:] tri
+            double[3] axis_lens
+            double[3] _mean
+            double[3] tmin = [DBL_MAX, DBL_MAX, DBL_MAX]
+            double[3] tmax = [-DBL_MAX, -DBL_MAX, -DBL_MAX]
+            ###co-variance matrix
+            double[3][3] a = [[0.0,0.0,0.0],
+                              [0.0,0.0,0.0],
+                              [0.0,0.0,0.0]]
+            double[:] a0 = a[0]
+            double[:] a1 = a[1]
+            double[:] a2 = a[2]
+            OBBNode node = OBBNode()
+            
+        mean.x=0.0
+        mean.y=0.0
+        mean.z=0.0
+        
+        self.clear_point_mask()
+            
+        for i in range(n_cells):
+            tri = self.cells[i]
+            self.point_mask[tri[0]] = 1
+            self.point_mask[tri[1]] = 1
+            self.point_mask[tri[2]] = 1
+            p = as_vect(self.points[tri[0]])
+            q = as_vect(self.points[tri[1]])
+            r = as_vect(self.points[tri[2]])
+            
+            dp0 = subvv_(q,p)
+            dp1 = subvv_(r,p)
+            
+            c.x = (p.x + q.x + r.x)/3.
+            c.y = (p.y + q.y + r.y)/3.
+            c.z = (p.z + q.z + r.z)/3.
+            
+            tri_mass = 0.5 * dotprod_(dp0, dp1)
+            tot_mass += tri_mass
+            
+            mean.x += tri_mass * c.x
+            mean.y += tri_mass * c.y
+            mean.z += tri_mass * c.z
+            
+            ## on-diagonal terms
+            a0[0] += tri_mass * (9 * c.x * c.x + p.x * p.x + q.x * q.x + r.x * r.x) / 12;
+            a1[1] += tri_mass * (9 * c.y * c.y + p.y * p.y + q.y * q.y + r.y * r.y) / 12;
+            a2[2] += tri_mass * (9 * c.z * c.z + p.z * p.z + q.z * q.z + r.z * r.z) / 12;
+            
+            ## off-diagonal terms
+            a0[1] += tri_mass * (9 * c.x * c.y + p.x * p.y + q.x * q.y + r.x * r.y) / 12;
+            a0[2] += tri_mass * (9 * c.x * c.z + p.x * p.z + q.x * q.z + r.x * r.z) / 12;
+            a1[2] += tri_mass * (9 * c.y * c.z + p.y * p.z + q.y * q.z + r.y * r.z) / 12;
+            
+        mean.x /= tot_mass
+        mean.y /= tot_mass
+        mean.z /= tot_mass
+        
+        ## matrix is symmetric
+        a1[0] = a0[1];
+        a2[0] = a0[2];
+        a2[1] = a1[2];
+        
+        _mean[0] = mean.x
+        _mean[1] = mean.y
+        _mean[2] = mean.z
+        
+        ## get covariance from moments
+        for i in range(3):
+            for j in range(3):
+                a[i][j] = (a[i][j] / tot_mass) - (_mean[i] * _mean[j])
+                
+        ### Find eigenvectors
+        if _jacobi(a, <double[:]>axis_lens, node._axes) < 0:
+            raise Exception("Jacobi iteration failed.")
+        ### Jacobi method outputs unit-magnitude eigenvectors so we don't need to re-normalise
+        
+        ### Get bounding box by projecting onto eigenvectors
+        for i in range(n_pts):
+            if self.point_mask[i]:
+                vpt = as_vect(self.points[i])
+                vpt = subvv_(vpt, mean)
+                for j in range(3): #iterate over axes
+                    ax = as_vect(node.axes[j])
+                    t = dotprod_(ax, vpt)
+                    if t < tmin[j]:
+                        tmin[j] = t
+                    if t > tmax[j]:
+                        tmax[j] = t
+        
+        #print("min: ", tmin[0], tmin[1], tmin[2], "    max: ", tmax[0], tmax[1], tmax[2])
+        corner = addvv_(mean, multvs_(as_vect(node._axes[0]), tmin[0]))
+        corner = addvv_(corner, multvs_(as_vect(node._axes[1]), tmin[1]))
+        corner = addvv_(corner, multvs_(as_vect(node._axes[2]), tmin[2]))
+            
+        for j in range(3):
+            for i in range(3):
+                node._axes[j][i] *= (tmax[j] - tmin[j])
+                #pt0 = node.axes[i]
+                #pt0[j] *= (tmax[j] - tmin[j])
+        
+        node._corner = corner
+        return node
+        
+            
