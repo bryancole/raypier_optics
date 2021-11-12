@@ -1,5 +1,5 @@
 
-from .ctracer import trace_segment, trace_gausslet, RayCollection, trace_one_face_segment,
+from .ctracer import trace_segment, trace_gausslet, RayCollection, trace_one_face_segment,\
         trace_one_face_gausslet
 
 from itertools import chain
@@ -66,7 +66,7 @@ def trace_ray_sequence(input_rays, face_lists, face_idx_list, recursion_limit=10
             traced ray indexes into this list to give the face where it terminates.
     """
     input_rays.reset_length(max_length)
-    traced_rays = []
+    traced_rays = [input_rays]
     trace_func = trace_one_face_segment if isinstance(input_rays, RayCollection) else trace_one_face_gausslet
     count = 0
     wavelengths = numpy.asarray(input_rays.wavelengths)
@@ -84,15 +84,14 @@ def trace_ray_sequence(input_rays, face_lists, face_idx_list, recursion_limit=10
     
     rays = input_rays
     
-    face_iter = zip(face_lists, face_idx_list)
-    
-    while rays.n_rays>0 and count<recursion_limit:
-        traced_rays.append(rays)
-        next_face_list, next_face_idx = next(face_iter)
+    for next_face_list, next_face_idx in zip(face_lists, face_idx_list):
         rays = trace_func(rays, next_face_list, next_face_idx, 
                           all_faces, 
                          max_length=max_length,
                          decomp_faces=decomp_faces)
+        if (count > recursion_limit) or (rays.n_rays==0):
+            break
+        traced_rays.append(rays)
         count += 1
     
     return traced_rays, all_faces 
