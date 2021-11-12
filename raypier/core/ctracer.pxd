@@ -229,6 +229,7 @@ cdef class FaceList(object):
 
     cpdef void sync_transforms(self)
     cdef int intersect_c(self, ray_t *ray, vector_t end_point)
+    cdef int intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx)
     cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point)
 
@@ -243,8 +244,22 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list decomp_faces,
                                     float max_length)
 
+cdef RayCollection trace_one_face_segment_c(RayCollection rays,
+                                    FaceList face_set,
+                                    int face_idx,
+                                    list all_faces,
+                                    list decomp_faces,
+                                    float max_length)
+
 cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
                                     list face_sets, 
+                                    list all_faces,
+                                    list decomp_faces,
+                                    double max_length)
+
+cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets, 
+                                    FaceList face_set,
+                                    int face_idx, 
                                     list all_faces,
                                     list decomp_faces,
                                     double max_length)
