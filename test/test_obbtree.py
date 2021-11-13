@@ -51,7 +51,25 @@ def view_obb(obb, in_points=None):
 
 class TestComputeOBBCells(unittest.TestCase):
     def test_compute_obb_cells(self):
-        pass
+        src = tvtk.ArrowSource()
+        tris = tvtk.TriangleFilter(input_connection=src.output_port)
+        tris.update()
+        pd = tris.output
+        points = np.asarray(pd.points)
+        cells = pd.polys.to_array().reshape(-1,4)[:,1:]
+        cells = np.ascontiguousarray(cells, dtype=np.int32)
+        print(points.shape)
+        print(points)
+        print(cells)
+        obbtree = OBBTree(points, cells)
+        
+        celllist = np.arange(len(cells)).astype(np.int32)
+        obb = obbtree.compute_obb_cells(celllist)
+        
+        print(obb.corner)
+        print(obb.axes)
+        
+        view_obb(obb, in_points=points)
 
 
 class TestComputeOBB(unittest.TestCase):
