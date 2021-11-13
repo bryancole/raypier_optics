@@ -47,7 +47,7 @@ def trace_rays(input_rays, face_lists, recursion_limit=100, max_length=100.0):
     return traced_rays, all_faces 
 
 
-def trace_ray_sequence(input_rays, face_lists, face_idx_list, recursion_limit=100, max_length=100.0):
+def trace_ray_sequence(input_rays, face_sequence, recursion_limit=100, max_length=100.0):
     """
     Tracing routine for a sequential ray-trace. Takes either a RayCollection or GaussletCollection
     and traces the rays sequentially through the given list of FaceList objects.
@@ -55,7 +55,7 @@ def trace_ray_sequence(input_rays, face_lists, face_idx_list, recursion_limit=10
     If you want to trace multiple faces within one FaceList object, then the FaceList should have 
     multiple entries in the face_lists list with corresponding face_idx entries in the face_idx_list list. 
     
-     - face_idx_list : list of indices specifying which face in each FaceList should be traced.
+     - face_sequence : a list of tuples like (FaceList, face_idx).
     
     The input_rays should already have a consistent wavelengths property set.
     
@@ -67,6 +67,8 @@ def trace_ray_sequence(input_rays, face_lists, face_idx_list, recursion_limit=10
     """
     input_rays.reset_length(max_length)
     traced_rays = [input_rays]
+    face_lists = [fl for fl, fidx in face_sequence]
+    face_idx_list = [fidx for fl, fidx in face_sequence]
     trace_func = trace_one_face_segment if isinstance(input_rays, RayCollection) else trace_one_face_gausslet
     count = 0
     wavelengths = numpy.asarray(input_rays.wavelengths)

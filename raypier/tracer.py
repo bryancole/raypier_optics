@@ -35,14 +35,14 @@ from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
 import numpy
 import threading, os, itertools
-import os
+import os, time
 import traceback
 import yaml
 from contextlib import contextmanager
 from itertools import chain, islice, count
 from raypier.sources import BaseRaySource
 from raypier.core.ctracer import Face, RayCollection
-from raypier.core.tracer import trace_rays
+from raypier.core.tracer import trace_rays, trace_ray_sequence
 from raypier.constraints import BaseConstraint
 from raypier.has_queue import HasQueue, on_trait_change
 from raypier.bases import Traceable, Probe, Result
@@ -373,9 +373,20 @@ class RayTraceModel(HasQueue):
         face_lists = self.face_sets
         rays.wavelengths = numpy.ascontiguousarray(ray_source.wavelength_list, numpy.double)
         try:
-            traced_rays, all_faces = trace_rays(rays, face_lists, 
-                                                recursion_limit=self.recursion_limit, 
-                                                max_length=max_length)
+            sequential = ray_source.sequential
+            face_sequence = ray_source._face_sequence
+            start_time = time.monotonic()
+            if sequential and face_sequence:
+                traced_rays, all_faces = trace_ray_sequence(rays, face_sequence,
+                                                    recursion_limit=self.recursion_limit, 
+                                                    max_length=max_length)
+            else:
+                traced_rays, all_faces = trace_rays(rays, face_lists, 
+                                                    recursion_limit=self.recursion_limit, 
+                                                    max_length=max_length)
+                if sequential:
+                    ray_source.set_face_sequence(traced_rays, face_lists, all_faces)
+            print(f"Trace time: {time.monotonic() - start_time} secs")
             self.all_faces = all_faces
             ray_source.traced_rays = traced_rays
         finally:
