@@ -1045,6 +1045,11 @@ cdef class RayCollection(RayArrayView):
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
     
+    ### A convenience property so one can use the same api as the GaussletCollection
+    property base_rays:
+        def __get__(self):
+            return self
+    
     property wavelengths:
         def __get__(self):
             return np.asarray(self._wavelengths)

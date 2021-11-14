@@ -38,6 +38,10 @@ from raypier.bases import RaypierObject, NumEditor, BaseRayCollection
 
 Vector = Array(shape=(3,))
 
+sequence_grp = HGroup(Item('sequential'),Item("clear_sequence", editor=ButtonEditor(),
+                                              enabled_when="len(_face_sequence) > 0",
+                                              show_label=False))
+
 
 class BaseBase(HasTraits, RaypierObject):
     pass
@@ -121,9 +125,7 @@ class BaseRaySource(BaseBase):
                        label="Display")
     
     traits_view = View(Item('name', show_label=False),
-                       HGroup(Item('sequential'),Item("clear_sequence", editor=ButtonEditor(),
-                                                      enabled_when="len(_face_sequence) > 0",
-                                                      show_label=False)),
+                       sequence_grp,
                        Tabbed(Include('geom_grp'),
                               display_grp)
                        )
@@ -140,7 +142,7 @@ class BaseRaySource(BaseBase):
         face_map = {global_map[face]: (fl, face_idx) for fl in face_lists for face_idx, face in enumerate(fl.faces)}
         face_sequence = []
         for rays in traced_rays:
-            face_ids = rays.end_face_idx
+            face_ids = rays.base_rays.end_face_idx
             ids, counts = numpy.unique(face_ids, return_counts=True)
             most_common = ids[counts.argmax()]
             try:
