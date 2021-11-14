@@ -1075,7 +1075,8 @@ class HexagonalRayFieldSource(RayFieldSource):
         
         gauss = numpy.exp(-(ri[select]*(spacing**2)/((self.gauss_width)**2))) 
         
-        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+        n_rays = offsets.shape[0]
+        ray_data = numpy.zeros(n_rays, dtype=ray_dtype)
             
         ray_data['origin'] = offsets
         ray_data['origin'] += origin
@@ -1086,6 +1087,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         ray_data['E2_amp'] = self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
+        ray_data['ray_ident'] = numpy.arange(n_rays)
         rays = RayCollection.from_array(ray_data)
         rays.neighbours = neighbours
         return rays

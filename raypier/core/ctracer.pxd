@@ -45,7 +45,7 @@ cdef packed struct ray_t:
     #simple attribs
     double length, phase, accumulated_path
     #reference ids to related objects
-    unsigned int wavelength_idx, parent_idx, end_face_idx, ray_type_id
+    unsigned int wavelength_idx, parent_idx, end_face_idx, ray_ident, ray_type_id
     
     ##objects
     #object face, end_face, child_refl, child_trans
