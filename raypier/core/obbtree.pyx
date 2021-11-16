@@ -25,6 +25,15 @@ cdef struct MaxElem:
     int j 
     
 
+cdef vector_t as_vector(double[3] pt):
+    cdef:
+        vector_t v
+    v.x = pt[0]
+    v.y = pt[1]
+    v.z = pt[2]
+    return v
+    
+
 cdef MaxElem max_elem(double[:,:] A):
     """Find max off-diagonal element of square matrix A
     """
@@ -188,10 +197,77 @@ cdef class OBBTree(object):
         int[:] point_mask
         OBBNode root
         
+        public int max_level
+        public int number_of_cells_per_node
+        
     def __init__(self, double[:,:] points, int[:,:] cells):
         self.points = points
         self.cells = cells
         self.point_mask = np.zeros(points.shape[0], dtype=np.int32)
+        self.max_level = 20
+        self.number_of_cells_per_node
+        
+    def build_tree(self):
+        cdef:
+            int n_cells = self.cells.shape[0]
+            int[:] cell_ids = np.arange(n_cells)
+
+        self.root = self.c_build_tree(cell_ids, 0)
+        
+    cdef c_build_tree(self, int[:] cell_ids, int level):
+        cdef:
+            OBBNode obb
+            int i, j, split_plane, icell, n_cells = cell_ids.shape[0]
+            vector_t p, n, c, pt
+            double best_ratio
+            int[:] cell
+            int negative, positive
+            
+        
+        obb = self.compute_obb_cells(cell_ids)
+        
+        if (level < self.max_level) and (n_cells > self.number_of_cells_per_node):
+            
+            p.x = obb.corner[0] + obb.axes[0][0]/2. + obb.axes[1][0]/2. + obb.axes[2][0]/2.
+            p.y = obb.corner[1] + obb.axes[0][1]/2. + obb.axes[1][1]/2. + obb.axes[2][1]/2.
+            p.z = obb.corner[2] + obb.axes[0][2]/2. + obb.axes[1][2]/2. + obb.axes[2][2]/2.
+                 
+            best_ratio = 1.0
+            found_best_split = 0
+            
+            for split_plane in range(3):
+                n = norm_(as_vector(obb.axes[split_plane]))
+                
+                for i in range(n_cells):
+                    cell = self.cells[i]
+                    c.x = 0
+                    c.y = 0
+                    c.z = 0
+                    negative = 0
+                    positive = 0
+                    for j in range(3): #Always triangles
+                        icell = cell[j]
+                        pt.x = self.points[icell, 0]
+                        pt.y = self.points[icell, 1]
+                        pt.z = self.points[icell, 2]
+                        
+                        val = dotprod_(n, subvv_(pt, p))
+                        
+                        c.x += pt.x
+                        c.y += pt.y
+                        c.z += pt.z
+                        
+                        if val < 0:
+                            negative = 1
+                        else:
+                            positive = 1
+                            
+                    if (negative and positive):
+                        c.x /= 3
+                        c.y /= 3
+                        c.z /= 3
+                        ### FIXME
+        
         
     def compute_obb(self, int[:] point_ids):
         """
@@ -282,6 +358,12 @@ cdef class OBBTree(object):
             self.point_mask[i] = 0
     
     def compute_obb_cells(self, int[:] cell_list):
+        """
+        cell_list - a 1d array of indices into the cells member.
+        
+        returns:
+            - a OBBNode instance
+        """
         cdef:
             vector_t mean, p, q, r, dp0, dp1, c
             int n_cells = cell_list.shape[0]

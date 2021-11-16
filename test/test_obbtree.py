@@ -11,6 +11,7 @@ from tvtk.api import tvtk
 def view_obb(obb, in_points=None):
     corner = obb.corner
     axes = obb.axes
+    print("Axes:", axes)
     points = [corner,
               corner + axes[0],
               corner + axes[1],
@@ -30,8 +31,9 @@ def view_obb(obb, in_points=None):
     ren.add_actor(act)
     
     if in_points is not None:
+        longest = np.sqrt((axes[0]**2).sum())
         pd2 = tvtk.PolyData(points=np.asarray(in_points))
-        dot = tvtk.SphereSource(radius=0.5)
+        dot = tvtk.SphereSource(radius=longest/50.)
         gly = tvtk.Glyph3D()
         gly.set_source_connection(dot.output_port)
         gly.set_input_data(pd2)
