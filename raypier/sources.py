@@ -26,7 +26,8 @@ from traits.api import HasTraits, Int, Float, \
      Instance, on_trait_change, Trait, Enum, Title, Complex, Dict
 
 from traitsui.api import View, Item, Tabbed, VGroup, Include, \
-    Group
+    Group, HGroup
+from traitsui.editors.api import ButtonEditor
 
 from tvtk.api import tvtk
 
@@ -36,6 +37,10 @@ from raypier.utils import normaliseVector, Range, TupleVector, Tuple, \
 from raypier.bases import RaypierObject, NumEditor, BaseRayCollection
 
 Vector = Array(shape=(3,))
+
+sequence_grp = HGroup(Item('sequential'),Item("clear_sequence", editor=ButtonEditor(),
+                                              enabled_when="len(_face_sequence) > 0",
+                                              show_label=False))
 
 
 class BaseBase(HasTraits, RaypierObject):
@@ -63,10 +68,16 @@ class BaseRaySource(BaseBase):
     input_rays = Property(Instance(BaseRayCollection), depends_on="max_ray_len")
     traced_rays = List(BaseRayCollection, transient=True)
     
-    InputDetailRays = Property(Instance(BaseRayCollection), depends_on="input_rays")
-    TracedDetailRays = List(BaseRayCollection, transient=True)
+    sequential = Bool(False)
+    _face_sequence = List() #A list of tuples (FaceList, face_idx) 
+    clear_sequence = Event()
+    
+    ### The "Detail Rays" stuff is now redundant and due to be removed.
+    #InputDetailRays = Property(Instance(BaseRayCollection), depends_on="input_rays")
+    #TracedDetailRays = List(BaseRayCollection, transient=True)
 
-    detail_resolution = Int(32)
+    #detail_resolution = Int(32)
+    ###
 
     max_ray_len = Float(200.0)
     
@@ -114,12 +125,38 @@ class BaseRaySource(BaseBase):
                        label="Display")
     
     traits_view = View(Item('name', show_label=False),
+                       sequence_grp,
                        Tabbed(Include('geom_grp'),
                               display_grp)
                        )
     
     def __repr__(self):
         return self.name
+    
+    def set_face_sequence(self, traced_rays, face_lists, all_faces):
+        """
+        Computes the face_sequence to be used in sequential tracing.
+        """
+        ### Make a dict to map global face idx to (FaceList, face_idx) tuple
+        global_map = {face: i  for i,face in enumerate(all_faces)}
+        face_map = {global_map[face]: (fl, face_idx) for fl in face_lists for face_idx, face in enumerate(fl.faces)}
+        face_sequence = []
+        for rays in traced_rays:
+            face_ids = rays.base_rays.end_face_idx
+            ids, counts = numpy.unique(face_ids, return_counts=True)
+            most_common = ids[counts.argmax()]
+            try:
+                face_tuple = face_map[most_common]
+            except KeyError:
+                break
+            face_sequence.append( face_tuple )
+        self._face_sequence = face_sequence
+    
+    def _clear_sequence_changed(self):
+        del self._face_sequence
+        
+    def _sequential_changed(self, val):
+        self.update = True
     
     def get_sequence_to_face(self, face):
         """returns a list of list of Face objects, those encountered
@@ -1040,7 +1077,8 @@ class HexagonalRayFieldSource(RayFieldSource):
         
         gauss = numpy.exp(-(ri[select]*(spacing**2)/((self.gauss_width)**2))) 
         
-        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+        n_rays = offsets.shape[0]
+        ray_data = numpy.zeros(n_rays, dtype=ray_dtype)
             
         ray_data['origin'] = offsets
         ray_data['origin'] += origin
@@ -1051,6 +1089,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         ray_data['E2_amp'] = self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
+        ray_data['ray_ident'] = numpy.arange(n_rays)
         rays = RayCollection.from_array(ray_data)
         rays.neighbours = neighbours
         return rays

@@ -47,6 +47,7 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
                         ('end_face_idx', np.uint32),
+                        ('ray_ident', np.uint32),
                         ('ray_type_id', np.uint32) #No point using a smaller type here as it'll probably get padded by the compiler
                         ])
                         
@@ -539,6 +540,15 @@ cdef class Ray:
         def __set__(self, unsigned int v):
             self.ray.end_face_idx = v
             
+    property ray_ident:
+        """An arbitrary identifier inherited from it's parent ray
+        """
+        def __get__(self):
+            return self.ray.ray_ident
+        
+        def __set__(self, unsigned int v):
+            self.ray.ray_ident = v
+            
     property ray_type_id:
         """Used to distinguish rays created by reflection vs transmission or some other mechanism.
         Transmission->0, Reflection->1"""
@@ -908,6 +918,18 @@ cdef class RayArrayView:
                 out[i] = v
             return out
         
+    property ray_ident:
+        def __get__(self):
+            cdef:
+                unsigned long N=self.get_n_rays()
+                np_.ndarray out = np.empty(N, dtype=np.uint32)
+                size_t i
+                unsigned int v
+            for i in xrange(N):
+                v = self.get_ray_c(i).ray_ident
+                out[i] = v
+            return out
+        
     property ray_type_id:
         def __get__(self):
             cdef:
@@ -1022,6 +1044,11 @@ cdef class RayCollection(RayArrayView):
         cdef np_.ndarray out = np.empty(self.n_rays, dtype=ray_dtype)
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
+    
+    ### A convenience property so one can use the same api as the GaussletCollection
+    property base_rays:
+        def __get__(self):
+            return self
     
     property wavelengths:
         def __get__(self):
@@ -1797,6 +1824,27 @@ cdef class FaceList(object):
         
     def __getitem__(self, intidx):
         return self.faces[intidx]
+    
+    
+    cdef int intersect_one_face_c(self, ray_t *ray, vector_t ray_end, int face_idx):
+        """Finds the intersection with the face specified by face_idx.
+        """
+        cdef:
+            vector_t p1 = transform_c(self.inv_trans, ray.origin)
+            vector_t p2 = transform_c(self.inv_trans, ray_end)
+            list faces=self.faces
+            unsigned int i
+            int all_idx=-1
+            double dist
+            Face face
+        
+        face = faces[face_idx]
+        dist = face.intersect_c(p1, p2, 1)
+        if face.tolerance < dist < ray.length:
+            ray.length = dist
+            all_idx = face.idx
+            ray.end_face_idx = all_idx
+        return all_idx
         
      
     cdef int intersect_c(self, ray_t *ray, vector_t ray_end):
@@ -2016,23 +2064,93 @@ cdef RayCollection trace_segment_c(RayCollection rays,
     return new_rays
 
 
+cdef RayCollection trace_one_face_segment_c(RayCollection rays, 
+                                    FaceList face_set,
+                                    int face_idx, 
+                                    list all_faces,
+                                    list decomp_faces,
+                                    float max_length):
+    cdef:
+        Face face
+        size_t i, j
+        vector_t point
+        orientation_t orient
+        int idx, nearest_idx=-1
+        ray_t *ray
+        RayCollection new_rays
+   
+    #need to allocate the output rays here 
+    new_rays = RayCollection(rays.n_rays)
+    new_rays.parent = rays
+    
+    for i in range(rays.n_rays):
+        ray = rays.rays + i
+        ray.length = max_length
+        ray.end_face_idx = -1
+        nearest_idx=-1
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    max_length))
+        #print "points", P1, P2
+        #intersect_c returns the face idx of the intersection, or -1 otherwise
+        idx = (<FaceList>face_set).intersect_one_face_c(ray, point, face_idx)
+        if idx >= 0:
+            nearest_idx = idx
+        if nearest_idx >= 0:
+            #print "GET FACE", nearest.face_idx, len(all_faces)
+            face = all_faces[nearest_idx]
+            face.count += 1
+            #print "ray length", ray.length
+            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+            orient = (<FaceList>face_set).compute_orientation_c(face, point)
+            #print "s normal", normal
+            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                    point,
+                                                    orient,
+                                                    new_rays
+                                                    )
+    return new_rays
+
+
 def trace_segment(RayCollection rays, 
                     list face_sets, 
                     list all_faces,
                     max_length=100,
                     decomp_faces=[]):
+    cdef:
+        FaceList fs
     for fs in face_sets:
         fs.sync_transforms()
     return trace_segment_c(rays, face_sets, all_faces, decomp_faces, max_length)
+
+def trace_one_face_segment(RayCollection rays, 
+                    FaceList face_set,
+                    int face_idx, 
+                    list all_faces,
+                    max_length=100,
+                    decomp_faces=[]):
+    face_set.sync_transforms()
+    return trace_one_face_segment_c(rays, face_set, face_idx, all_faces, decomp_faces, max_length)
 
 def trace_gausslet(GaussletCollection rays, 
                     list face_sets, 
                     list all_faces,
                     max_length=100,
                     decomp_faces=[]):
+    cdef:
+        FaceList fs
     for fs in face_sets:
         (<FaceList>fs).sync_transforms()
     return trace_gausslet_c(rays, face_sets, all_faces, decomp_faces, max_length)
+
+def trace_one_face_gausslet(GaussletCollection rays, 
+                    FaceList face_set,
+                    int face_idx, 
+                    list all_faces,
+                    max_length=100,
+                    decomp_faces=[]):
+    face_set.sync_transforms()
+    return trace_one_face_gausslet_c(rays, face_set, face_idx, all_faces, decomp_faces, max_length)
 
 
 cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
@@ -2081,6 +2199,69 @@ cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets,
             #print "ray length", ray.length
             point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
             face_set = (<FaceList>(face_sets[nearest_set])) 
+            orient = face_set.compute_orientation_c(face, point)
+            #print "s normal", normal
+            ### Clear the child_rays structure
+            child_rays.n_rays = 0
+            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                    point,
+                                                    orient,
+                                                    child_rays
+                                                    )
+            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length)
+            
+    for j in range(n_decomp):
+        face = decomp_faces[j]
+        if face.count:
+            (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(new_gausslets)
+            face.count = 0
+            
+    new_gausslets.reset_length_c(max_length)
+    return new_gausslets
+
+
+cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets, 
+                                    FaceList face_set,
+                                    int face_idx, 
+                                    list all_faces,
+                                    list decomp_faces,
+                                    double max_length):
+    cdef:
+        Face face
+        size_t i, j, n_decomp = len(decomp_faces)
+        vector_t point
+        orientation_t orient
+        int idx, nearest_idx=-1
+        gausslet_t *gausslet
+        ray_t *ray
+        GaussletCollection new_gausslets
+        RayCollection child_rays
+   
+    #need to allocate the output rays here 
+    new_gausslets = GaussletCollection(gausslets.n_rays)
+    new_gausslets.parent = gausslets
+    
+    child_rays = RayCollection(2)
+    
+    for i in range(gausslets.n_rays):
+        gausslet = gausslets.rays + i
+        ray = &gausslet.base_ray
+        ray.end_face_idx = -1
+        nearest_idx=-1
+        point = addvv_(ray.origin, 
+                            multvs_(ray.direction, 
+                                    max_length))
+        #print "points", P1, P2
+        #intersect_c returns the face idx of the intersection, or -1 otherwise
+        idx = (<FaceList>face_set).intersect_one_face_c(ray, point, face_idx)
+        if idx >= 0:
+            nearest_idx = idx
+        if nearest_idx >= 0:
+            #print "GET FACE", nearest.face_idx, len(all_faces)
+            face = all_faces[nearest_idx]
+            face.count += 1
+            #print "ray length", ray.length
+            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
             orient = face_set.compute_orientation_c(face, point)
             #print "s normal", normal
             ### Clear the child_rays structure
