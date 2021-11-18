@@ -3,6 +3,8 @@
 Implementation of a Oriented Boundary Boxx Tree (OBB Tree) spatial search algorithm.
 Somewhat copied from the vtkOBBTree implementation.
 """
+from examples.entry_ap_demo import ratio
+from test.test_obbtree import TestComputeOBB
 
 cdef extern from "math.h":
     double M_PI
@@ -14,6 +16,7 @@ cdef extern from "math.h":
 import numpy as np
 cimport numpy as np_
 from libc.float cimport DBL_MAX, DBL_MIN
+from cython cimport view
 
 from .ctracer cimport vector_t, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_
@@ -204,40 +207,44 @@ cdef class OBBTree(object):
         self.points = points
         self.cells = cells
         self.point_mask = np.zeros(points.shape[0], dtype=np.int32)
-        self.max_level = 20
-        self.number_of_cells_per_node
+        self.max_level = 12
+        self.number_of_cells_per_node = 1
         
     def build_tree(self):
         cdef:
             int n_cells = self.cells.shape[0]
             int[:] cell_ids = np.arange(n_cells)
-
-        self.root = self.c_build_tree(cell_ids, 0)
-        
-    cdef c_build_tree(self, int[:] cell_ids, int level):
-        cdef:
             OBBNode obb
-            int i, j, split_plane, icell, n_cells = cell_ids.shape[0]
-            vector_t p, n, c, pt
-            double best_ratio
-            int[:] cell
-            int negative, positive
-            
-        
+
         obb = self.compute_obb_cells(cell_ids)
+        self.root = self.c_build_tree(obb, 0)
+        
+    cdef c_build_tree(self, OBBNode obb, int level):
+        cdef:
+            OBBNode child1, child2
+            int i, j, split_plane, icell
+            vector_t p, n, c, pt
+            double best_ratio, ratio
+            int[:] cell
+            int[:] cell_ids = obb.cell_list
+            int split_acceptable=0, n_cells = cell_ids.shape[0]
+            int negative, positive, out_cells_left=0, out_cells_right=(n_cells-1)
+            view.array out_cells = view.array(shape=cell_ids.shape, 
+                                              itemsize=sizeof(int),
+                                              format="i")
         
         if (level < self.max_level) and (n_cells > self.number_of_cells_per_node):
             
-            p.x = obb.corner[0] + obb.axes[0][0]/2. + obb.axes[1][0]/2. + obb.axes[2][0]/2.
-            p.y = obb.corner[1] + obb.axes[0][1]/2. + obb.axes[1][1]/2. + obb.axes[2][1]/2.
-            p.z = obb.corner[2] + obb.axes[0][2]/2. + obb.axes[1][2]/2. + obb.axes[2][2]/2.
+            p.x = obb._corner.x + obb._axes[0][0]/2. + obb._axes[1][0]/2. + obb._axes[2][0]/2.
+            p.y = obb._corner.y + obb._axes[0][1]/2. + obb._axes[1][1]/2. + obb._axes[2][1]/2.
+            p.z = obb._corner.z + obb._axes[0][2]/2. + obb._axes[1][2]/2. + obb._axes[2][2]/2.
                  
             best_ratio = 1.0
-            found_best_split = 0
             
             for split_plane in range(3):
-                n = norm_(as_vector(obb.axes[split_plane]))
-                
+                n = norm_(as_vector(obb._axes[split_plane]))
+                out_cell_left=0
+                out_cell_right=(n_cells-1)
                 for i in range(n_cells):
                     cell = self.cells[i]
                     c.x = 0
@@ -266,7 +273,43 @@ cdef class OBBTree(object):
                         c.x /= 3
                         c.y /= 3
                         c.z /= 3
-                        ### FIXME
+                        if dotprod_(n, subvv_(c, p)) < 0:
+                            out_cells[out_cells_left] = i
+                            out_cells_left += 1
+                        else:
+                            out_cells[out_cells_right] = i
+                            out_cells_right -= 1
+                    else:
+                        if negative:
+                            out_cells[out_cells_left] = i
+                            out_cells_left += 1
+                        else:
+                            out_cells[out_cells_right] = i
+                            out_cells_right -= 1
+                            
+                ratio = fabs( <double>(n_cells - out_cells_right - out_cells_left - 1)/n_cells )
+                
+                if (ratio < 0.6):
+                    split_acceptable = 1
+                    break
+                else:
+                    if ratio < best_ratio:
+                        best_ratio = ratio
+                        best_plane = split_plane
+                        
+            if best_ratio < 0.95:
+                split_plane = best_plane
+                split_acceptable = 1
+                
+            if split_acceptable:
+                child1 = self.compute_obb_cells(out_cells[:out_cells_left])
+                child2 = self.compute_obb_cells(out_cells[out_cells_right+1:])
+                obb.child1 = child1
+                obb.child2 = child2
+                child1.parent = obb
+                child2.parent = obb
+                self.c_build_tree(child1, level+1)
+                self.c_build_tree(child2, level+1)
         
         
     def compute_obb(self, int[:] point_ids):
