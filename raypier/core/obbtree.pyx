@@ -1,10 +1,8 @@
-
+#cython: language_level=3
 """
 Implementation of a Oriented Boundary Boxx Tree (OBB Tree) spatial search algorithm.
 Somewhat copied from the vtkOBBTree implementation.
 """
-from examples.entry_ap_demo import ratio
-from test.test_obbtree import TestComputeOBB
 
 cdef extern from "math.h":
     double M_PI
@@ -16,7 +14,7 @@ cdef extern from "math.h":
 import numpy as np
 cimport numpy as np_
 from libc.float cimport DBL_MAX, DBL_MIN
-from cython cimport view
+from cython cimport view, boundscheck, cdivision, initializedcheck
 
 from .ctracer cimport vector_t, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_
@@ -28,7 +26,7 @@ cdef struct MaxElem:
     int j 
     
 
-cdef vector_t as_vector(double[3] pt):
+cdef inline vector_t as_vector(double[3] pt):
     cdef:
         vector_t v
     v.x = pt[0]
@@ -36,7 +34,10 @@ cdef vector_t as_vector(double[3] pt):
     v.z = pt[2]
     return v
     
-
+    
+@boundscheck(False)
+@initializedcheck(False)
+@cdivision(True)
 cdef MaxElem max_elem(double[:,:] A):
     """Find max off-diagonal element of square matrix A
     """
@@ -55,15 +56,19 @@ cdef MaxElem max_elem(double[:,:] A):
                 out.j = j
     return out
 
-cdef rotate(double[:,:] A, double[:,:] p, int k, int l):
+
+@boundscheck(False)
+@initializedcheck(False)
+@cdivision(True)
+cdef void rotate(double[:,:] A, double[:,:] p, int k, int l):
     """
     Rotate matrix A by transform p, such that A[k,l]==0
     """
     cdef:
         int n, i
-        double Adiff, phi, c, tau, temp
+        double Adiff, phi, c, tau, temp, t
         
-    n = len(A)
+    n = A.shape[0] #len(A)
     Adiff = A[l,l] - A[k,k]
     if fabs(A[k,l]) < fabs(Adiff)*1.0e-36: 
         t = A[k,l]/Adiff
@@ -98,8 +103,11 @@ cdef rotate(double[:,:] A, double[:,:] p, int k, int l):
         p[i,k] = temp - s*(p[i,l] + tau*p[i,k])
         p[i,l] = p[i,l] + s*(temp - tau*p[i,l])
         
-
-cdef int _jacobi(double[:,:] A, double[:] eigenvals, double[:,:] p, double tol=1e-9):
+        
+@boundscheck(False)
+@initializedcheck(False)
+@cdivision(True)
+cdef int _jacobi(double[:,:] A, double[:] eigenvals, double[:,:] p, double tol):
     cdef:
         int i, j, n = A.shape[0]
         int max_rot = 5*(n**2)
@@ -122,6 +130,33 @@ cdef int _jacobi(double[:,:] A, double[:] eigenvals, double[:,:] p, double tol=1
     return -1
 
 
+@boundscheck(False)
+@initializedcheck(False)
+@cdivision(True)
+cdef int _jacobi_no_eigenvals(double[:,:] A, double[:,:] p, double tol):
+    cdef:
+        int i, j, n = A.shape[0]
+        int max_rot = 5*(n*n)
+        MaxElem me
+        
+    for i in range(n):
+        for j in range(n):
+            if i==j:
+                p[i,j] = 1.0
+            else:
+                p[i,j] = 0.0
+        
+    for i in range(max_rot):
+        me = max_elem(A)
+        if me.Amax < tol:
+            return 0
+        rotate(A,p,me.i, me.j)
+    return -1
+
+
+@boundscheck(False)
+@initializedcheck(False)
+@cdivision(True)
 cdef inline vector_t as_vect(double[:] v_in):
     cdef:
         vector_t out
@@ -162,9 +197,12 @@ def jacobi2(double[:,:] A, double tol=1e-9):
 cdef class OBBNode(object):
     cdef:
         vector_t _corner #one corner of the box
-        double[3][3] _axes #the three primary axes of the box, ordered from longest to smallest
+        vector_t[3] _axes #the three primary axes of the box, ordered from longest to smallest
         public OBBNode parent, child1, child2 #children will be None for leaf nodes. Parent will be None for root
         public int[:] cell_list
+        
+    def __cinit__(self):
+        self._axes = np.zeros(shape=(3,3))
         
     property corner:
         def __get__(self):
@@ -178,30 +216,85 @@ cdef class OBBNode(object):
     property axes:
         def __get__(self):
             cdef:
-                int i,j
-                double[:,:] axes = np.empty((3,3), 'd')
+                int i
+            out = np.empty(shape=(3,3))
             for i in range(3):
-                for j in range(3):
-                    axes[i,j] = self._axes[i][j]
-            return np.asarray(axes)
+                out[i,0] = self._axes[i].x
+                out[i,1] = self._axes[i].y
+                out[i,2] = self._axes[i].z
+            return out
         
         def __set__(self, double[:,:] axes):
             cdef:
-                int i,j
+                int i
             for i in range(3):
-                for j in range(3):
-                    self._axes[i][j] = axes[i,j]
-        
+                self._axes[i].x = axes[i,0]
+                self._axes[i].y = axes[i,1]
+                self._axes[i].z = axes[i,2]
+                    
+    @boundscheck(False)
+    @initializedcheck(False)
+    @cdivision(True)
+    cdef int intersect_line_c(self, vector_t p1, vector_t p2):
+        cdef:
+            int i
+            double rangeAmin, rangeAmax, rangePmin, rangePmax, dotP
+            vector_t ax
+            
+        for i in range(3):
+            ax = self._axes[i]
+            
+            rangeAmin = dotprod_(self._corner, ax)
+            rangeAmax = rangeAmin + mag_sq_(ax)
+            
+            rangePmin = dotprod_(p1, ax)
+            rangePmax = rangePmin
+            dotP = dotprod_(p2, ax)
+            if dotP < rangePmin:
+                rangePmin = dotP
+            else:
+                rangePmax = dotP
+            
+            if (rangeAmax < rangePmin) or (rangePmax < rangeAmin):
+                return 0
+        return 1
+    
+    def intersect_line(self, p1, p2):
+        cdef:
+            vector_t _p1, _p2
+        _p1.x = p1[0]
+        _p1.y = p1[1]
+        _p1.z = p1[2]
+        _p2.x = p2[0]
+        _p2.y = p2[1]
+        _p2.z = p2[2]
+        return bool(self.intersect_line_c(_p1, _p2))            
+                    
+    def clear_children(self):
+        ch1 = self.child1
+        ch2 = self.child2
+        if ch1 is not None:
+            ch1.clear_children()
+            del ch1.parent
+            del self.child1
+        if ch2 is not None:
+            ch2.clear_children()
+            del ch2.parent
+            del self.child2
+            
         
 cdef class OBBTree(object):
     cdef:
         double[:,:] points
         int[:,:] cells #always triangles
         int[:] point_mask
-        OBBNode root
+        public OBBNode root
         
         public int max_level
         public int number_of_cells_per_node
+        
+        double[:,:] _covar #A workspace for obb calculation
+        double[:,:] _axes
         
     def __init__(self, double[:,:] points, int[:,:] cells):
         self.points = points
@@ -209,6 +302,12 @@ cdef class OBBTree(object):
         self.point_mask = np.zeros(points.shape[0], dtype=np.int32)
         self.max_level = 12
         self.number_of_cells_per_node = 1
+        self._covar = np.zeros(shape=(3,3))
+        self._axes = np.zeros(shape=(3,3))
+        
+    def clear_tree(self):
+        self.root.clear_children()
+        del self.root #= None
         
     def build_tree(self):
         cdef:
@@ -219,6 +318,9 @@ cdef class OBBTree(object):
         obb = self.compute_obb_cells(cell_ids)
         self.root = self.c_build_tree(obb, 0)
         
+    @boundscheck(False)
+    @initializedcheck(False)
+    @cdivision(True)
     cdef c_build_tree(self, OBBNode obb, int level):
         cdef:
             OBBNode child1, child2
@@ -232,17 +334,18 @@ cdef class OBBTree(object):
             view.array out_cells = view.array(shape=cell_ids.shape, 
                                               itemsize=sizeof(int),
                                               format="i")
+            int[:] _out_cells = out_cells
         
         if (level < self.max_level) and (n_cells > self.number_of_cells_per_node):
             
-            p.x = obb._corner.x + obb._axes[0][0]/2. + obb._axes[1][0]/2. + obb._axes[2][0]/2.
-            p.y = obb._corner.y + obb._axes[0][1]/2. + obb._axes[1][1]/2. + obb._axes[2][1]/2.
-            p.z = obb._corner.z + obb._axes[0][2]/2. + obb._axes[1][2]/2. + obb._axes[2][2]/2.
+            p.x = obb._corner.x + obb._axes[0].x/2. + obb._axes[1].x/2. + obb._axes[2].x/2.
+            p.y = obb._corner.y + obb._axes[0].y/2. + obb._axes[1].y/2. + obb._axes[2].y/2.
+            p.z = obb._corner.z + obb._axes[0].z/2. + obb._axes[1].z/2. + obb._axes[2].z/2.
                  
             best_ratio = 1.0
             
             for split_plane in range(3):
-                n = norm_(as_vector(obb._axes[split_plane]))
+                n = norm_(obb._axes[split_plane])
                 out_cell_left=0
                 out_cell_right=(n_cells-1)
                 for i in range(n_cells):
@@ -274,17 +377,17 @@ cdef class OBBTree(object):
                         c.y /= 3
                         c.z /= 3
                         if dotprod_(n, subvv_(c, p)) < 0:
-                            out_cells[out_cells_left] = i
+                            _out_cells[out_cells_left] = i
                             out_cells_left += 1
                         else:
-                            out_cells[out_cells_right] = i
+                            _out_cells[out_cells_right] = i
                             out_cells_right -= 1
                     else:
                         if negative:
-                            out_cells[out_cells_left] = i
+                            _out_cells[out_cells_left] = i
                             out_cells_left += 1
                         else:
-                            out_cells[out_cells_right] = i
+                            _out_cells[out_cells_right] = i
                             out_cells_right -= 1
                             
                 ratio = fabs( <double>(n_cells - out_cells_right - out_cells_left - 1)/n_cells )
@@ -302,8 +405,8 @@ cdef class OBBTree(object):
                 split_acceptable = 1
                 
             if split_acceptable:
-                child1 = self.compute_obb_cells(out_cells[:out_cells_left])
-                child2 = self.compute_obb_cells(out_cells[out_cells_right+1:])
+                child1 = self.compute_obb_cells(_out_cells[:out_cells_left])
+                child2 = self.compute_obb_cells(_out_cells[out_cells_right+1:])
                 obb.child1 = child1
                 obb.child2 = child2
                 child1.parent = obb
@@ -333,6 +436,7 @@ cdef class OBBTree(object):
             OBBNode node = OBBNode()
             double[3] tmin = [DBL_MAX, DBL_MAX, DBL_MAX]
             double[3] tmax = [-DBL_MAX, -DBL_MAX, -DBL_MAX]
+            double[:,:] _axes = self._axes
             double t
             vector_t ax, vpt, centre, corner
         
@@ -364,9 +468,14 @@ cdef class OBBTree(object):
             a[2][j] /= n_pts
             
         ### Find eigenvectors
-        if _jacobi(a, <double[:]>axis_lens, node._axes) < 0:
+        if _jacobi_no_eigenvals(a, _axes, 1e-9) < 0:
             raise Exception("Jacobi iteration failed.")
         ### Jacobi method outputs unit-magnitude eigenvectors so we don't need to re-normalise
+        
+        for i in range(3):
+            node._axes[i].x = _axes[i,0]
+            node._axes[i].y = _axes[i,1]
+            node._axes[i].z = _axes[i,2]
         
         ### Get bounding box by projecting onto eigenvectors
         for i in range(n_pts):
@@ -381,26 +490,30 @@ cdef class OBBTree(object):
                     tmax[j] = t
         
         print("min: ", tmin[0], tmin[1], tmin[2], "    max: ", tmax[0], tmax[1], tmax[2])
-        corner = addvv_(centre, multvs_(as_vect(node._axes[0]), tmin[0]))
-        corner = addvv_(corner, multvs_(as_vect(node._axes[1]), tmin[1]))
-        corner = addvv_(corner, multvs_(as_vect(node._axes[2]), tmin[2]))
+        corner = addvv_(centre, multvs_(node._axes[0], tmin[0]))
+        corner = addvv_(corner, multvs_(node._axes[1], tmin[1]))
+        corner = addvv_(corner, multvs_(node._axes[2], tmin[2]))
             
         for j in range(3):
-            for i in range(3):
-                node._axes[j][i] *= (tmax[j] - tmin[j])
+            node._axes[j].x *= (tmax[j] - tmin[j])
+            node._axes[j].y *= (tmax[j] - tmin[j])
+            node._axes[j].z *= (tmax[j] - tmin[j])
                 #pt0 = node.axes[i]
                 #pt0[j] *= (tmax[j] - tmin[j])
         
         node._corner = corner
         return node
     
-    cdef clear_point_mask(self):
+    cdef void clear_point_mask(self):
         cdef:
             int i, n=self.point_mask.shape[0]
         for i in range(n):
             self.point_mask[i] = 0
     
-    def compute_obb_cells(self, int[:] cell_list):
+    @boundscheck(False)
+    @initializedcheck(False)
+    @cdivision(True)
+    cpdef OBBNode compute_obb_cells(self, int[:] cell_list):
         """
         cell_list - a 1d array of indices into the cells member.
         
@@ -413,14 +526,12 @@ cdef class OBBTree(object):
             int i,j, n_pts=self.points.shape[0]
             double tot_mass=0.0, tri_mass
             int[:] tri
-            double[3] axis_lens
             double[3] _mean
             double[3] tmin = [DBL_MAX, DBL_MAX, DBL_MAX]
             double[3] tmax = [-DBL_MAX, -DBL_MAX, -DBL_MAX]
             ###co-variance matrix
-            double[3][3] a = [[0.0,0.0,0.0],
-                              [0.0,0.0,0.0],
-                              [0.0,0.0,0.0]]
+            double[:,:] a = self._covar
+            double[:,:] _axes = self._axes
             double[:] a0 = a[0]
             double[:] a1 = a[1]
             double[:] a2 = a[2]
@@ -481,12 +592,17 @@ cdef class OBBTree(object):
         ## get covariance from moments
         for i in range(3):
             for j in range(3):
-                a[i][j] = (a[i][j] / tot_mass) - (_mean[i] * _mean[j])
+                a[i,j] = (a[i,j] / tot_mass) - (_mean[i] * _mean[j])
                 
         ### Find eigenvectors
-        if _jacobi(a, <double[:]>axis_lens, node._axes) < 0:
+        if _jacobi_no_eigenvals(a, _axes, 1e-9) < 0:
             raise Exception("Jacobi iteration failed.")
         ### Jacobi method outputs unit-magnitude eigenvectors so we don't need to re-normalise
+        
+        for i in range(3):
+            node._axes[i].x = _axes[i,0]
+            node._axes[i].y = _axes[i,1]
+            node._axes[i].z = _axes[i,2]
         
         ### Get bounding box by projecting onto eigenvectors
         for i in range(n_pts):
@@ -494,7 +610,7 @@ cdef class OBBTree(object):
                 vpt = as_vect(self.points[i])
                 vpt = subvv_(vpt, mean)
                 for j in range(3): #iterate over axes
-                    ax = as_vect(node.axes[j])
+                    ax = node._axes[j]
                     t = dotprod_(ax, vpt)
                     if t < tmin[j]:
                         tmin[j] = t
@@ -502,13 +618,14 @@ cdef class OBBTree(object):
                         tmax[j] = t
         
         #print("min: ", tmin[0], tmin[1], tmin[2], "    max: ", tmax[0], tmax[1], tmax[2])
-        corner = addvv_(mean, multvs_(as_vect(node._axes[0]), tmin[0]))
-        corner = addvv_(corner, multvs_(as_vect(node._axes[1]), tmin[1]))
-        corner = addvv_(corner, multvs_(as_vect(node._axes[2]), tmin[2]))
+        corner = addvv_(mean, multvs_(node._axes[0], tmin[0]))
+        corner = addvv_(corner, multvs_(node._axes[1], tmin[1]))
+        corner = addvv_(corner, multvs_(node._axes[2], tmin[2]))
             
         for j in range(3):
-            for i in range(3):
-                node._axes[j][i] *= (tmax[j] - tmin[j])
+            node._axes[j].x *= (tmax[j] - tmin[j])
+            node._axes[j].y *= (tmax[j] - tmin[j])
+            node._axes[j].z *= (tmax[j] - tmin[j])
                 #pt0 = node.axes[i]
                 #pt0[j] *= (tmax[j] - tmin[j])
         
