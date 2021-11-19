@@ -199,10 +199,8 @@ cdef class OBBNode(object):
         vector_t _corner #one corner of the box
         vector_t[3] _axes #the three primary axes of the box, ordered from longest to smallest
         public OBBNode parent, child1, child2 #children will be None for leaf nodes. Parent will be None for root
-        public int[:] cell_list
-        
-    def __cinit__(self):
-        self._axes = np.zeros(shape=(3,3))
+        public int cell_list_idx
+        public int n_cells
         
     property corner:
         def __get__(self):
@@ -287,6 +285,7 @@ cdef class OBBTree(object):
     cdef:
         double[:,:] points
         int[:,:] cells #always triangles
+        int[:] cell_ids
         int[:] point_mask
         public OBBNode root
         
@@ -299,6 +298,8 @@ cdef class OBBTree(object):
     def __init__(self, double[:,:] points, int[:,:] cells):
         self.points = points
         self.cells = cells
+        self.cell_ids = np.arange(cells.shape[0])
+        
         self.point_mask = np.zeros(points.shape[0], dtype=np.int32)
         self.max_level = 12
         self.number_of_cells_per_node = 1
@@ -312,10 +313,9 @@ cdef class OBBTree(object):
     def build_tree(self):
         cdef:
             int n_cells = self.cells.shape[0]
-            int[:] cell_ids = np.arange(n_cells)
             OBBNode obb
 
-        obb = self.compute_obb_cells(cell_ids)
+        obb = self.compute_obb_cells(0, n_cells)
         self.root = self.c_build_tree(obb, 0)
         
     @boundscheck(False)
@@ -327,14 +327,11 @@ cdef class OBBTree(object):
             int i, j, split_plane, icell
             vector_t p, n, c, pt
             double best_ratio, ratio
+            int[:,:] cells = self.cells
             int[:] cell
-            int[:] cell_ids = obb.cell_list
-            int split_acceptable=0, n_cells = cell_ids.shape[0]
+            int[:] cell_ids = self.cell_ids
+            int split_acceptable=0, this_cell_id, next_cell_id, start_idx=obb.cell_list_idx, n_cells = obb.n_cells
             int negative, positive, out_cells_left=0, out_cells_right=(n_cells-1)
-            view.array out_cells = view.array(shape=cell_ids.shape, 
-                                              itemsize=sizeof(int),
-                                              format="i")
-            int[:] _out_cells = out_cells
         
         if (level < self.max_level) and (n_cells > self.number_of_cells_per_node):
             
@@ -346,10 +343,12 @@ cdef class OBBTree(object):
             
             for split_plane in range(3):
                 n = norm_(obb._axes[split_plane])
-                out_cell_left=0
-                out_cell_right=(n_cells-1)
-                for i in range(n_cells):
-                    cell = self.cells[i]
+                out_cells_left=0
+                out_cells_right=0 #out_cell_right + (n_cells-1)
+                
+                next_cell_id = this_cell_id = cell_ids[start_idx]
+                while (out_cells_left + out_cells_right) < n_cells:
+                    cell = cells[this_cell_id]
                     c.x = 0
                     c.y = 0
                     c.z = 0
@@ -377,20 +376,25 @@ cdef class OBBTree(object):
                         c.y /= 3
                         c.z /= 3
                         if dotprod_(n, subvv_(c, p)) < 0:
-                            _out_cells[out_cells_left] = i
+                            cell_ids[start_idx + out_cells_left] = this_cell_id
                             out_cells_left += 1
+                            next_cell_id = cell_ids[start_idx + out_cells_left] 
                         else:
-                            _out_cells[out_cells_right] = i
-                            out_cells_right -= 1
+                            next_cell_id = cell_ids[start_idx + n_cells - 1 - out_cells_right]
+                            cell_ids[start_idx + n_cells - 1 - out_cells_right] = this_cell_id
+                            out_cells_right += 1
                     else:
                         if negative:
-                            _out_cells[out_cells_left] = i
+                            cell_ids[start_idx + out_cells_left] = this_cell_id
                             out_cells_left += 1
+                            next_cell_id = cell_ids[start_idx + out_cells_left] 
                         else:
-                            _out_cells[out_cells_right] = i
-                            out_cells_right -= 1
+                            next_cell_id = cell_ids[start_idx + n_cells - 1 - out_cells_right]
+                            cell_ids[start_idx + n_cells - 1 - out_cells_right] = this_cell_id
+                            out_cells_right += 1
+                    this_cell_id = next_cell_id
                             
-                ratio = fabs( <double>(n_cells - out_cells_right - out_cells_left - 1)/n_cells )
+                ratio = fabs( <double>(out_cells_right - out_cells_left)/n_cells )
                 
                 if (ratio < 0.6):
                     split_acceptable = 1
@@ -405,8 +409,8 @@ cdef class OBBTree(object):
                 split_acceptable = 1
                 
             if split_acceptable:
-                child1 = self.compute_obb_cells(_out_cells[:out_cells_left])
-                child2 = self.compute_obb_cells(_out_cells[out_cells_right+1:])
+                child1 = self.compute_obb_cells(start_idx, out_cells_left)
+                child2 = self.compute_obb_cells(start_idx + out_cells_left, out_cells_right)
                 obb.child1 = child1
                 obb.child2 = child2
                 child1.parent = obb
@@ -513,7 +517,7 @@ cdef class OBBTree(object):
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cpdef OBBNode compute_obb_cells(self, int[:] cell_list):
+    cpdef OBBNode compute_obb_cells(self, int cell_list_idx, int n_cells):
         """
         cell_list - a 1d array of indices into the cells member.
         
@@ -522,10 +526,10 @@ cdef class OBBTree(object):
         """
         cdef:
             vector_t mean, p, q, r, dp0, dp1, c
-            int n_cells = cell_list.shape[0]
             int i,j, n_pts=self.points.shape[0]
             double tot_mass=0.0, tri_mass
             int[:] tri
+            int[:] cell_ids = self.cell_ids
             double[3] _mean
             double[3] tmin = [DBL_MAX, DBL_MAX, DBL_MAX]
             double[3] tmax = [-DBL_MAX, -DBL_MAX, -DBL_MAX]
@@ -541,10 +545,13 @@ cdef class OBBTree(object):
         mean.y=0.0
         mean.z=0.0
         
+        node.cell_list_idx = cell_list_idx
+        node.n_cells = n_cells
+        
         self.clear_point_mask()
             
         for i in range(n_cells):
-            tri = self.cells[i]
+            tri = self.cells[cell_ids[cell_list_idx + i]]
             self.point_mask[tri[0]] = 1
             self.point_mask[tri[1]] = 1
             self.point_mask[tri[2]] = 1
