@@ -36,7 +36,8 @@ cimport numpy as np_
 cimport cython
 from cython.parallel import prange
 
-# for numerical raytracing
+# for numerical raytracing 
+# for freeform shaped faces, e.g. extended polynomial
 #import scipy as sp
 from scipy.optimize import fsolve
 
