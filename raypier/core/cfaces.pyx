@@ -36,6 +36,10 @@ cimport numpy as np_
 cimport cython
 from cython.parallel import prange
 
+# for numerical raytracing
+#import scipy as sp
+from scipy.optimize import fsolve
+
 cdef struct flatvector_t:
     double x,y
     
@@ -1796,6 +1800,264 @@ cdef class AsphericFace(ShapedFace):
         out += self.z_height
         return out
     
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return z - self.eval_z_c(x,y)
+
+cdef struct extpoly_t:
+    double R #curvature
+    double beta #=1+conic const
+    
+    # ext poly coeffs up to 30rd order
+    double norm_radius               
+    double E1, E2                         # x^1y^0, x^0y^1
+    double E3, E4, E5                     # x^2y^0 , x^1y^1, x^2y^0
+    double E6, E7, E8, E9                 # x^3y^0, x^2y^1, x^1y^2, x^0y^3           # 3rd order
+    double E10, E11, E12, E13, E14        # x^4y^0, x^3y^1, x^2y^2, x^1y^3, x^0y^4   # 4th order
+    double E15, E16, E17, E18, E19, E20   # x^5y^0, x^4y^1, x^3y^2, x^2y^3, x^1y^4, x^0y^5   # 5th order
+    vector_t a       # origin of the input ray, in local coords
+    vector_t d       # input ray direction, in local coords.
+
+    
+# return the z-value
+cdef double eval_extpoly_impf(extpoly_t E, double alpha):
+    cdef: 
+        double out
+        double r2 = ((E.a.x + alpha*E.d.x)**2 + (E.a.y + alpha*E.d.y)**2)
+        # normalization 
+        double x = (E.a.x + alpha*E.d.x)/E.norm_radius
+        double y = (E.a.y + alpha*E.d.y)/E.norm_radius
+    
+    out = r2
+    out /= E.R*(1 + sqrt(1 - E.beta*r2/(E.R**2)) )
+    out -= E.a.z + alpha*E.d.z
+         
+    out += E.E1*(x)     + E.E2*(y) 
+    out += E.E3*(x**2)  + E.E4*(x*y)     + E.E5*(y**2)
+    out += E.E6*(x**3)  + E.E7*(x**2*y)  + E.E8*(x**1*y**2)  + E.E9*(y**3)
+    out += E.E10*(x**4) + E.E11*(x**3*y) + E.E12*(x**2*y**2) + E.E13*(x**1*y**3) + E.E14*(y**4)
+    out += E.E15*(x**5) + E.E16*(x**4*y) + E.E17*(x**3*y**2) + E.E18*(x**2*y**3) + E.E19*(x**1*y**4) + E.E20*(y**5)
+            
+    out += E.z_height
+
+    return out
+
+cdef class ExtendedPolynomial(ShapedFace):
+    """Extended polynomial
+    """  
+    
+    cdef:
+        public double curvature, z_height, conic_const   # base conic section, see: ConicRevolutionFace
+        public double nterms, norm_radius, E1, E2, E3     # max. number of polynomials terms, norm radius, polynomial coefficients
+        
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.conic_const = kwds.get('conic_const', 0.0)
+        self.curvature = kwds.get('curvature', 0.0)
+        
+        self.nterms = kwds.get('nterms', 0.0)
+        self.norm_radius = kwds.get('norm_radius', 100.0)        
+        self.E1 = kwds.get('E1',0.0)
+        self.E2 = kwds.get('E2',0.0)
+        self.E3 = kwds.get('E3',0.0)
+        self.E4 = kwds.get('E4',0.0)
+        self.E5 = kwds.get('E5',0.0)
+        self.E6 = kwds.get('E6',0.0)
+        self.E7 = kwds.get('E7',0.0)
+        self.E8 = kwds.get('E8',0.0)
+        self.E9 = kwds.get('E9',0.0)
+        self.E10 = kwds.get('E10',0.0)
+        self.E11 = kwds.get('E11',0.0)
+        self.E12 = kwds.get('E12',0.0)
+        self.E13 = kwds.get('E13',0.0)
+        self.E14 = kwds.get('E14',0.0)
+        self.E15 = kwds.get('E15',0.0)
+        self.E16 = kwds.get('E16',0.0)
+        self.E17 = kwds.get('E17',0.0)
+        self.E18 = kwds.get('E18',0.0)
+        self.E19 = kwds.get('E19',0.0)
+        self.E20 = kwds.get('E20',0.0)
+        
+        self.atol = kwds.get("atol", 1.0e-8)
+     
+     # a line-surface intersection   
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+         
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+           
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double a1
+            double tol = self.atol**2
+            vector_t d, a, pt1
+            extpoly_t E
+             
+        d = subvv_(p2, p1)      #the input ray direction, in local coords.
+        a = p1                  # the origin of the input ray
+        a.z -= self.z_height    # z height in local coordinates
+        
+        a1 = intersect_conic(a, d, self.curvature, self.conic_const)
+                  
+        E.R = -self.curvature
+        E.beta = 1 + self.conic_const
+        E.E1 = self.E1
+        E.E2 = self.E2
+        E.E3 = self.E3
+        E.E4 = self.E4
+        E.E5 = self.E5
+        E.E6 = self.E6
+        E.E7 = self.E7
+        E.E8 = self.E8
+        E.E9 = self.E9
+        E.E10 = self.E10
+        E.E11 = self.E11
+        E.E12 = self.E12
+        E.E13 = self.E13
+        E.E14 = self.E14
+        E.E15 = self.E15
+        E.E16 = self.E16
+        E.E17 = self.E17
+        E.E18 = self.E18
+        E.E19 = self.E19
+        E.E20 = self.E20
+         
+        E.a = a1
+        E.d = d
+         
+         
+         # see: https://github.com/mess42/pyrate/blob/master/pyrateoptics/raytracer/surface_shape.py
+         # class XYPolynomials(ExplicitShape)
+         # class ExcplicitShape is a subclass of class "FreeShape", which is a subclass of "Shape"
+         # class FreeShape has methods getGrad (uses getSag i.e. F, gradF) and getHessian (uses getSag, hessF)
+         # class ExcplicitShape uses scipy.optimize.fsolve in method "intersect"  -->  FreeFormFace class in raypier
+         # method getSag uses F
+         # class XYPolynomials defines methods: F, gradF, hessF
+         # gradF is used to compute normal in Shape.getNormal
+         # a FreeFormFace class could be defined in raypier (as a subclass of ShapedFace) with "ExtendedPolynomial"
+         # being a subclass of FreeFormFace
+         
+         # def Fwrapper(t, r0, rayDir):
+         #     return r0[2] + t*rayDir[2] - self.F(r0[0] + t*rayDir[0],       # t ... distance along ray, z-value of ray minus sag at this position
+         #                                         r0[1] + t*rayDir[1])       # should be minimized with fsolve
+         # t = fsolve(Fwrapper, t, args=(r0, rayDir),
+         #   xtol=self.annotations["tol"])
+         # https://math.stackexchange.com/questions/3642041/what-is-the-function-fsolve-in-python-doing-mathematically
+         # fsolve uses "https://en.wikipedia.org/wiki/Powell%27s_dog_leg_method" internally.
+         
+        def Fwrapper(alpha, a, d):
+            return a.z + alpha*d.z - eval_extpoly_impf(E, alpha)      # alpha ... distance along ray
+         
+        alpha = fsolve(Fwrapper, alpha, args=(a, d), xtol=tol)
+         
+        print("Converged:", alpha)
+         
+        a1 += alpha
+                  
+         
+        pt1 = addvv_(a, multvs_(d, a1))        # check if inside shape.
+
+        if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+            return INF
+             
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+         
+        return a1 * sep_(p1, p2)
+     
+        
+     # in pyrate:
+     #  gradient = self.getGrad(x, y)
+     #  absgradient = np.sqrt(np.sum(gradient**2, axis=0))
+     #  normal = gradient/absgradient   
+     
+     # def gradF(self, x, y, z):  # gradient for implicit function z - f(x, y) = 0
+        # res = np.zeros((3, len(x)))
+        # (normradius, coeffs) = self.getXYParameters()
+
+        # for (xpow, ypow, coefficient) in coeffs:
+        #     normalization = 1./normradius**(xpow+ypow)
+        #     xpm1 = np.where(xpow >= 1, x**(xpow-1), np.zeros_like(x))
+        #     ypm1 = np.where(ypow >= 1, y**(ypow-1), np.zeros_like(x))
+        #     res[0, :] += -xpow*xpm1*y**ypow*coefficient*normalization
+        #     res[1, :] += -ypow*x**xpow*ypm1*coefficient*normalization
+        # res[2, :] = 1.
+
+        # return res
+         
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            double R = -self.curvature
+            double beta = 1 + self.conic_const
+            vector_t g #output gradient vector
+            int sign = -1 if self.invert_normals else 1
+            double x = p.x/self.norm_radius
+            double y = p.y/self.norm_radius
+           
+        p.z -= self.z_height
+         
+         # compute gradient of conic
+         # in pyrate: gradient = np.vstack((-curv * x, -curv * y, 1. - curv * z * (1 + cc)))
+        g.z = 2*beta*(R-beta*p.z)
+        g.x = - p.x * 2 * beta        # why 2? --> see: notebook "Raytracing Aspheric Lens.iynb"
+        g.y = - p.y * 2 * beta
+        
+        if (R*beta) < 0:
+            sign *= -1
+            
+        g.z *= sign
+        g.y *= sign
+        g.x *= sign
+         
+         # compute gradient of extended polynomial
+        g.x += self.E1 
+        g.x += 2*self.E3*x + E4*y
+        g.x += 3*self.E6*x**2 + 2*self.E7*x*y + self.E8*y**2
+        g.x += 4*self.E10*x**3 + 3*self.E11*x**2*y + 2*self.E12*x*y**2 + self.E13*y**3
+        g.x += 5*self.E15*x**4 + 4*self.E16*x**3*y + 3*self.E17*x**2*y**2 + 2*self.E18*x*y**3 + self.E19*y**4
+         
+        g.y += self.E2
+        g.y += self.E4*x + 2*self.E5*y
+        g.y += self.E7*x**2 + 2*self.E8*x*y + 3*self.E9*y**2
+        g.y += self.E11*x**3 + 2*self.E12*x**2*y + 3*self.E13*x*y**2 + 4*self.y**3
+        g.y += self.E16*x**4 + 2*self.E17*x**3*y + 3*self.E18*x**2*y**2 + 3*self.E19*x*y**3 + 5*self.E20*y**4
+         
+        g.z += 1
+        
+        return norm_(g)  # normalized to length 1
+        
+
+        
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef: 
+            double out
+            double r2 = (x*x) + (y*y)
+            double R = self.curvature
+            double x = x/self.norm_radius
+            double y = y/self.norm_radius
+     
+        out = r2
+        if R>=0.0:
+            out /= (-R - sqrt(R*R - (1+self.conic_const)*r2) )
+        else:
+            out /= (-R + sqrt(R*R - (1+self.conic_const)*r2) )
+             
+        out += self.E1*(x)     + self.E2*(y) 
+        out += self.E3*(x**2)  + self.E4*(x*y)     + self.E5*(y**2)
+        out += self.E6*(x**3)  + self.E7*(x**2*y)  + self.E8*(x**1*y**2)  + self.E9*(y**3)
+        out += self.E10*(x**4) + self.E11*(x**3*y) + self.E12*(x**2*y**2) + self.E13*(x**1*y**3) + self.E14*(y**4)
+        out += self.E15*(x**5) + self.E16*(x**4*y) + self.E17*(x**3*y**2) + self.E18*(x**2*y**3) + self.E19*(x**1*y**4) + self.E20*(y**5)
+                
+        out += self.z_height
+        return out
+     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return z - self.eval_z_c(x,y)
     
