@@ -11,6 +11,8 @@ cdef extern from "math.h":
     double pow(double x, double y)
     double fabs(double)
     
+from libc.stdlib cimport malloc, free, realloc
+    
 import numpy as np
 cimport numpy as np_
 from libc.float cimport DBL_MAX, DBL_MIN
@@ -194,6 +196,15 @@ def jacobi2(double[:,:] A, double tol=1e-9):
 
 
 
+cdef struct obbnode_t:
+    vector_t _corner #one corner of the box
+    vector_t[3] _axes #the three primary axes of the box, ordered from longest to smallest
+    long parent, child1, child2 #children will be -1 for leaf nodes. Parent will be -1 for root
+    int cell_list_idx
+    int n_cells
+
+
+
 cdef class OBBNode(object):
     cdef:
         vector_t _corner #one corner of the box
@@ -295,7 +306,17 @@ cdef class OBBTree(object):
         double[:,:] _covar #A workspace for obb calculation
         double[:,:] _axes
         
-    def __init__(self, double[:,:] points, int[:,:] cells):
+        unsigned long n_nodes
+        unsigned long max_n_nodes
+        obbnode_t *nodes
+    
+    def __dealloc__(self):
+        free(self.nodes)
+        
+    def __cinit__(self, double[:,:] points, int[:,:] cells):
+        cdef:
+            int max_n_nodes
+            
         self.points = points
         self.cells = cells
         self.cell_ids = np.arange(cells.shape[0])
@@ -306,25 +327,51 @@ cdef class OBBTree(object):
         self._covar = np.zeros(shape=(3,3))
         self._axes = np.zeros(shape=(3,3))
         
+        max_n_nodes = 2**(int(np.ceil(np.log2(cells.shape[0]))) + 1)
+        self.max_n_nodes = max_n_nodes
+        self.nodes = <obbnode_t*>malloc(max_n_nodes*sizeof(obbnode_t))
+        self.n_nodes = 0
+        
+    cdef obbnode_t get_node_c(self, unsigned long i):
+        return self.nodes[i]
+    
+    cdef void set_node_c(self, unsigned long i, obbnode_t node):
+        self.nodes[i] = node
+        
+    cdef unsigned long add_node_c(self, obbnode_t r):
+        cdef:
+            n_nodes = self.n_nodes
+        if self.n_nodes == self.max_n_nodes:
+            if self.max_n_nodes == 0:
+                self.max_n_nodes = 1
+            else:
+                self.max_n_nodes *= 2
+            self.nodes = <obbnode_t*>realloc(self.nodes, self.max_n_nodes*sizeof(obbnode_t))
+        self.nodes[n_nodes] = r
+        self.n_nodes += 1
+        return n_nodes
+        
     def clear_tree(self):
-        self.root.clear_children()
-        del self.root #= None
+        self.n_nodes = 0
         
     def build_tree(self):
         cdef:
             int n_cells = self.cells.shape[0]
-            OBBNode obb
+            obbnode_t obb
 
-        obb = self.compute_obb_cells(0, n_cells)
+        self.n_nodes = 0
+        obb = self.compute_obb_cells_c(0, n_cells)
         self.root = self.c_build_tree(obb, 0)
         
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cdef c_build_tree(self, OBBNode obb, int level):
+    cdef int c_build_tree(self, obbnode_t obb, int level):
         cdef:
-            OBBNode child1, child2
-            int i, j, split_plane, icell
+            obbnode_t child1, child2
+            obbnode_t *parent
+            int i, j, split_plane, icell 
+            unsigned long parent_idx
             vector_t p, n, c, pt
             double best_ratio, ratio
             int[:,:] cells = self.cells
@@ -332,6 +379,11 @@ cdef class OBBTree(object):
             int[:] cell_ids = self.cell_ids
             int split_acceptable=0, this_cell_id, next_cell_id, start_idx=obb.cell_list_idx, n_cells = obb.n_cells
             int negative, positive, out_cells_left=0, out_cells_right=(n_cells-1)
+            
+        #Copy the node into the node-list
+        parent_idx = self.add_node_c(obb)
+        #Get a refrence to the node in the list 
+        parent = self.nodes + parent_idx#self.nodes[parent_idx]
         
         if (level < self.max_level) and (n_cells > self.number_of_cells_per_node):
             
@@ -409,14 +461,15 @@ cdef class OBBTree(object):
                 split_acceptable = 1
                 
             if split_acceptable:
-                child1 = self.compute_obb_cells(start_idx, out_cells_left)
-                child2 = self.compute_obb_cells(start_idx + out_cells_left, out_cells_right)
-                obb.child1 = child1
-                obb.child2 = child2
-                child1.parent = obb
-                child2.parent = obb
-                self.c_build_tree(child1, level+1)
-                self.c_build_tree(child2, level+1)
+                child1 = self.compute_obb_cells_c(start_idx, out_cells_left)
+                child2 = self.compute_obb_cells_c(start_idx + out_cells_left, out_cells_right)
+                child1.parent = parent_idx
+                child2.parent = parent_idx
+                parent.child1 = self.c_build_tree(child1, level+1)
+                parent.child2 = self.c_build_tree(child2, level+1)
+        
+        return parent_idx 
+            
         
         
     def compute_obb(self, int[:] point_ids):
@@ -517,7 +570,7 @@ cdef class OBBTree(object):
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cpdef OBBNode compute_obb_cells(self, int cell_list_idx, int n_cells):
+    cdef obbnode_t compute_obb_cells_c(self, int cell_list_idx, int n_cells):
         """
         cell_list - a 1d array of indices into the cells member.
         
@@ -539,7 +592,7 @@ cdef class OBBTree(object):
             double[:] a0 = a[0]
             double[:] a1 = a[1]
             double[:] a2 = a[2]
-            OBBNode node = OBBNode()
+            obbnode_t node
             
         mean.x=0.0
         mean.y=0.0
@@ -637,6 +690,9 @@ cdef class OBBTree(object):
                 #pt0[j] *= (tmax[j] - tmin[j])
         
         node._corner = corner
+        node.parent = -1
+        node.child1 = -1
+        node.child2 = -1
         return node
         
             
