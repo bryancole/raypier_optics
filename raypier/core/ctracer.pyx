@@ -47,6 +47,7 @@ ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('wavelength_idx', np.uint32),
                         ('parent_idx', np.uint32),
                         ('end_face_idx', np.uint32),
+                        ('ray_ident', np.uint32),
                         ('ray_type_id', np.uint32) #No point using a smaller type here as it'll probably get padded by the compiler
                         ])
                         
@@ -539,6 +540,15 @@ cdef class Ray:
         def __set__(self, unsigned int v):
             self.ray.end_face_idx = v
             
+    property ray_ident:
+        """An arbitrary identifier inherited from it's parent ray
+        """
+        def __get__(self):
+            return self.ray.ray_ident
+        
+        def __set__(self, unsigned int v):
+            self.ray.ray_ident = v
+            
     property ray_type_id:
         """Used to distinguish rays created by reflection vs transmission or some other mechanism.
         Transmission->0, Reflection->1"""
@@ -908,6 +918,18 @@ cdef class RayArrayView:
                 out[i] = v
             return out
         
+    property ray_ident:
+        def __get__(self):
+            cdef:
+                unsigned long N=self.get_n_rays()
+                np_.ndarray out = np.empty(N, dtype=np.uint32)
+                size_t i
+                unsigned int v
+            for i in xrange(N):
+                v = self.get_ray_c(i).ray_ident
+                out[i] = v
+            return out
+        
     property ray_type_id:
         def __get__(self):
             cdef:
@@ -1022,6 +1044,11 @@ cdef class RayCollection(RayArrayView):
         cdef np_.ndarray out = np.empty(self.n_rays, dtype=ray_dtype)
         memcpy(<np_.float64_t *>out.data, self.rays, self.n_rays*sizeof(ray_t))
         return out
+    
+    ### A convenience property so one can use the same api as the GaussletCollection
+    property base_rays:
+        def __get__(self):
+            return self
     
     property wavelengths:
         def __get__(self):
