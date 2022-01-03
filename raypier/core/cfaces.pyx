@@ -1608,8 +1608,11 @@ cdef class ConicRevolutionFace(ShapedFace):
             double r2 = (x*x) + (y*y)
             double R = self.curvature
             double R2 = R*R
-        
-        return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+            
+        if R>=0:
+            return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+        else:
+            return self.z_height  - (r2/(R - sqrt(R2 - (1+self.conic_const)*r2)))
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return z - self.eval_z_c(x,y)
@@ -1832,11 +1835,16 @@ cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vecto
         double x = a.x + alpha*d.x
         double y = a.y + alpha*d.y
         double r2 = x**2 + y**2
+        double R = EP.R
         double[:,:] E = coefs
         int i,j, Nx=E.shape[0], Ny=E.shape[1]
     
     out = r2
-    out /= EP.R*(1 + sqrt(1 - EP.beta*r2/(EP.R**2)) )
+    if R>=0:
+        out /= (R + sqrt(R*R - EP.beta*r2))
+    else:
+        out /= (R - sqrt(R*R - EP.beta*r2))
+        
     out -= a.z + alpha*d.z
     
     # normalization 
@@ -1848,6 +1856,7 @@ cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vecto
             out += E[i,j]*(x**i)*(y**j)
                      
     out += EP.z_height
+    #print("imp", out)
     return out
 
 
@@ -1861,30 +1870,43 @@ cdef double eval_extpoly_grad(extpoly_t EP, double[:,:] coefs, vector_t a, vecto
         double x = a.x + alpha*d.x
         double y = a.y + alpha*d.y
         double r2 = x**2 + y**2
+        double R2 = EP.R * EP.R
+        double rt = sqrt(1 - (EP.beta * r2 / R2))
+        double denom = EP.R * (rt + 1)
+        double nom = (2*d.x*x + 2*d.y*y)
+        double inv_rad = 1./EP.norm_radius
         double[:,:] E = coefs
         int i,j, Nx=E.shape[0], Ny=E.shape[1]
     
     out = -d.z 
     
-    out += 0.0 #FIXME gradient of conic surface w.r.t. alpha TODO
+    ### gradient of conic surface w.r.t. alpha
+    out += nom / denom
+    out += EP.beta * nom * r2 /(2*EP.R*rt*denom*denom)  
     
     # normalization 
-    x /= EP.norm_radius
-    y /= EP.norm_radius
+    x *= inv_rad
+    y *= inv_rad
     
-    for i in range(Nx):
+    for i in range(1,Nx):
         for j in range(Ny):
             dEdx += (i)*E[i,j]*(x**(i-1))*(y**j)
+            
+    for i in range(Nx):
+        for j in range(1,Ny):    
             dEdy += (j)*E[i,j]*(x**i)*(y**(j-1))
     
-    dEdx *= EP.norm_radius
-    dEdy *= EP.norm_radius
+    dEdx *= inv_rad
+    dEdy *= inv_rad
     
-    return out + dEdx*d.x + dEdy*d.y
+    out += dEdx*d.x
+    out += dEdy*d.y
+    #print("grad", out)
+    return out
     
 
 
-cdef class ExtendedPolynomial(ShapedFace):
+cdef class ExtendedPolynomialFace(ShapedFace):
     """Extended polynomial
     """  
     
@@ -1980,7 +2002,7 @@ cdef class ExtendedPolynomial(ShapedFace):
             dz = - f / eval_extpoly_grad(E, coefs, p1, d, a1)
         else:
             return -1     
-         
+        
         pt1 = addvv_(a, multvs_(d, a1))        # check if inside shape.
 
         if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
@@ -2001,8 +2023,9 @@ cdef class ExtendedPolynomial(ShapedFace):
             double beta = EP.beta
             vector_t g #output gradient vector
             int sign = -1 if self.invert_normals else 1
-            double x = p.x/EP.norm_radius
-            double y = p.y/EP.norm_radius
+            double inv_rad = 1./EP.norm_radius
+            double x = p.x * inv_rad
+            double y = p.y * inv_rad
             double[:,:] E = self._coefs
             int i,j, Nx=E.shape[0], Ny=E.shape[1]
            
@@ -2021,12 +2044,26 @@ cdef class ExtendedPolynomial(ShapedFace):
         g.y *= sign
         g.x *= sign
         
-        for i in range(Nx):
-            for j in range(Ny):
-                g.x += i*E[i,j]*(x**(i-1))*(y**j)
-                g.y += j*E[i,j]*(x**i)*(y**(j-1))
+        g = norm_(g)
         
-        g.z += 1
+        if self.invert_normals:
+            for i in range(1,Nx):
+                for j in range(Ny):
+                    g.x += i*E[i,j]*inv_rad*(x**(i-1))*(y**j)
+                    
+            for i in range(Nx):
+                for j in range(1,Ny):
+                    g.y += j*E[i,j]*inv_rad*(x**i)*(y**(j-1))
+        else:
+            for i in range(1,Nx):
+                for j in range(Ny):
+                    g.x -= i*E[i,j]*inv_rad*(x**(i-1))*(y**j)
+                    
+            for i in range(Nx):
+                for j in range(1,Ny):        
+                    g.y -= j*E[i,j]*inv_rad*(x**i)*(y**(j-1))
+        
+        #g.z += 1
         
         return norm_(g)  # normalized to length 1
         
@@ -2036,18 +2073,18 @@ cdef class ExtendedPolynomial(ShapedFace):
             double out
             double r2 = (x*x) + (y*y)
             extpoly_t EP = self.ext_poly
-            double R = EP.R
+            double R = -EP.R
             double[:,:] E = self._coefs
             int i,j, Nx=E.shape[0], Ny=E.shape[1]
             
         x = x/EP.norm_radius
         y = y/EP.norm_radius
      
-        out = r2
+        out = -r2
         if R>=0.0:
-            out /= (-R - sqrt(R*R - (EP.beta)*r2) )
+            out /= (R + sqrt(R*R - (EP.beta)*r2) )
         else:
-            out /= (-R + sqrt(R*R - (EP.beta)*r2) )
+            out /= (R - sqrt(R*R - (EP.beta)*r2) )
              
         for i in range(Nx):
             for j in range(Ny):
