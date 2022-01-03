@@ -1,11 +1,12 @@
 Introduction to Raypier
 =======================
 
-Raypier is a non-sequential optical ray-tracing program. It is intended as a 
+Raypier is a optical ray-tracing program. It is intended as a 
 design tools for modelling optical systems (cameras, imaging systems, telescopes etc.).
 
 The main features of ray-trace are:
  - Non-sequential tracing (no need to specify the order of optical components)
+ - Optional sequential tracing where the surface-sequence is discovered using a non-sequential initial trace. 
  - Physical optics propagation with "Gausslet" tracing and beam decomposition
  - Nice visualisation of the traced result
  - Live update to the traced result as the user adjusts the model

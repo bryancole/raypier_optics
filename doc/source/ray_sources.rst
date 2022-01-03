@@ -5,6 +5,10 @@ Ray sources generate the input rays for the model. The Ray-source objects also h
 :py:attr:`traced_rays` attribute, as a list of :py:class:`RayCollection` objects. Each item in this list represents one "generation"
 of rays. 
 
+Ray sources have a :py:attr:`sequential` attribute. When set True, the source will be traced sequentially using a pre-defined list of surfaces.
+If no list of surfaces exists, the trace will default to the usual non-sequential mode and the surface-sequence obtained by this trace
+will be stored for use in subsequent sequential traces. The stored sequence can be cleared by assigning to the :py:attr:`clear_sequence` event-trait.
+
 Ray source classes are subclasses of :py:class:`raypier.sources.BaseRaySource`. Besides generating the :py:attr:`input_rays` (a :py:class:`RayCollection`
 instance) attribute as the input to the model, and holding the trace results in the :py:attr:`traced_rays` member, the source
 objects also control the visualisation of the rays. The following visualisation-related attributes are available.
