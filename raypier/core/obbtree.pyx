@@ -3,6 +3,7 @@
 Implementation of a Oriented Boundary Boxx Tree (OBB Tree) spatial search algorithm.
 Somewhat copied from the vtkOBBTree implementation.
 """
+from PIL.TiffImagePlugin import II
 
 cdef extern from "math.h":
     double M_PI
@@ -19,7 +20,7 @@ from libc.float cimport DBL_MAX, DBL_MIN
 from cython cimport view, boundscheck, cdivision, initializedcheck
 
 from .ctracer cimport vector_t, subvv_, dotprod_, mag_sq_, norm_,\
-            addvv_, multvs_
+            addvv_, multvs_, cross_
 
 
 cdef struct MaxElem:
@@ -195,6 +196,10 @@ def jacobi2(double[:,:] A, double tol=1e-9):
     raise Exception("Jacobi method did not converge")
 
 
+cdef struct intersection:
+    double alpha
+    long cell_idx
+
 
 cdef struct obbnode_t:
     vector_t _corner #one corner of the box
@@ -204,93 +209,6 @@ cdef struct obbnode_t:
     int n_cells
 
 
-
-cdef class OBBNode(object):
-    cdef:
-        vector_t _corner #one corner of the box
-        vector_t[3] _axes #the three primary axes of the box, ordered from longest to smallest
-        public OBBNode parent, child1, child2 #children will be None for leaf nodes. Parent will be None for root
-        public int cell_list_idx
-        public int n_cells
-        
-    property corner:
-        def __get__(self):
-            return np.array([self._corner.x, self._corner.y, self._corner.z])
-        
-        def __set__(self, c):
-            self._corner.x = c[0]
-            self._corner.y = c[1]
-            self._corner.z = c[2]
-            
-    property axes:
-        def __get__(self):
-            cdef:
-                int i
-            out = np.empty(shape=(3,3))
-            for i in range(3):
-                out[i,0] = self._axes[i].x
-                out[i,1] = self._axes[i].y
-                out[i,2] = self._axes[i].z
-            return out
-        
-        def __set__(self, double[:,:] axes):
-            cdef:
-                int i
-            for i in range(3):
-                self._axes[i].x = axes[i,0]
-                self._axes[i].y = axes[i,1]
-                self._axes[i].z = axes[i,2]
-                    
-    @boundscheck(False)
-    @initializedcheck(False)
-    @cdivision(True)
-    cdef int intersect_line_c(self, vector_t p1, vector_t p2):
-        cdef:
-            int i
-            double rangeAmin, rangeAmax, rangePmin, rangePmax, dotP
-            vector_t ax
-            
-        for i in range(3):
-            ax = self._axes[i]
-            
-            rangeAmin = dotprod_(self._corner, ax)
-            rangeAmax = rangeAmin + mag_sq_(ax)
-            
-            rangePmin = dotprod_(p1, ax)
-            rangePmax = rangePmin
-            dotP = dotprod_(p2, ax)
-            if dotP < rangePmin:
-                rangePmin = dotP
-            else:
-                rangePmax = dotP
-            
-            if (rangeAmax < rangePmin) or (rangePmax < rangeAmin):
-                return 0
-        return 1
-    
-    def intersect_line(self, p1, p2):
-        cdef:
-            vector_t _p1, _p2
-        _p1.x = p1[0]
-        _p1.y = p1[1]
-        _p1.z = p1[2]
-        _p2.x = p2[0]
-        _p2.y = p2[1]
-        _p2.z = p2[2]
-        return bool(self.intersect_line_c(_p1, _p2))            
-                    
-    def clear_children(self):
-        ch1 = self.child1
-        ch2 = self.child2
-        if ch1 is not None:
-            ch1.clear_children()
-            del ch1.parent
-            del self.child1
-        if ch2 is not None:
-            ch2.clear_children()
-            del ch2.parent
-            del self.child2
-            
         
 cdef class OBBTree(object):
     cdef:
@@ -298,8 +216,10 @@ cdef class OBBTree(object):
         int[:,:] cells #always triangles
         int[:] cell_ids
         int[:] point_mask
-        public OBBNode root
         
+        long root_idx
+        
+        public int level
         public int max_level
         public int number_of_cells_per_node
         
@@ -309,6 +229,8 @@ cdef class OBBTree(object):
         unsigned long n_nodes
         unsigned long max_n_nodes
         obbnode_t *nodes
+        
+        public double tolerance
     
     def __dealloc__(self):
         free(self.nodes)
@@ -319,9 +241,10 @@ cdef class OBBTree(object):
             
         self.points = points
         self.cells = cells
-        self.cell_ids = np.arange(cells.shape[0])
+        self.cell_ids = np.arange(cells.shape[0], dtype=np.int32)
         
         self.point_mask = np.zeros(points.shape[0], dtype=np.int32)
+        self.level = 0
         self.max_level = 12
         self.number_of_cells_per_node = 1
         self._covar = np.zeros(shape=(3,3))
@@ -350,6 +273,17 @@ cdef class OBBTree(object):
         self.nodes[n_nodes] = r
         self.n_nodes += 1
         return n_nodes
+    
+    property root:
+        def __get__(self):
+            cdef:
+                long root_idx = self.root_idx
+            if root_idx<0:
+                return None
+            root = OBBNode()
+            root.owner = self
+            root.node = self.get_node_c(root_idx)
+            return root
         
     def clear_tree(self):
         self.n_nodes = 0
@@ -358,20 +292,134 @@ cdef class OBBTree(object):
         cdef:
             int n_cells = self.cells.shape[0]
             obbnode_t obb
+            long root_idx
+            OBBNode root
 
         self.n_nodes = 0
+        self.level = 0
         obb = self.compute_obb_cells_c(0, n_cells)
-        self.root = self.c_build_tree(obb, 0)
+        self.root_idx = self.c_build_tree(obb, 0)
+        
+    cdef int line_intersects_node_c(self, long node_idx, vector_t p0, vector_t p1):
+        cdef:
+            int ii
+            obbnode_t this = self.nodes[node_idx]
+            double rangeAmin, rangeAmax, rangeBmin, rangeBmax
+            double eps = self.tolerance
+            
+        for ii in range(3):
+            rangeAmin = dotprod_(this._corner, this._axes[ii])
+            rangeAmax = rangeAmin + dotprod_(this._axes[ii], this._axes[ii])
+            
+            rangeBmin = dotprod_(p0, this._axes[ii])
+            rangeBmax = rangeBmin
+            dotB = dotprod_(p1, this._axes[ii])
+            if dotB < rangeBmin:
+                rangeBmin = dotB
+            else:
+                rangeBmax = dotB
+                
+            if eps != 0:
+                eps *= sqrt(fabs(rangeAmax - rangeAmin))
+                
+            if ((rangeAmax + eps < rangeBmin) | (rangeBmax + eps < rangeAmin)):
+                return 0
+        return 1
+    
+    cdef vector_t get_point_c(self, long idx):
+        cdef:
+            vector_t p
+        p.x = self.points[idx,0]
+        p.y = self.points[idx,1]
+        p.z = self.points[idx,2]
+        return p
+    
+    cdef double line_intersects_cell_c(self, long cell_idx, vector_t o, vector_t d):
+        """ For a line defined by origin 'o' and direction 'd',
+        returns the distance form the origin to the triangle intersection.
+        If there is no intersection, returns -1
+        """
+        cdef:
+            int[:] cell=self.cells[cell_idx,:]
+            vector_t n, p1, p2, p3
+            vector_t v1, v2, a0, da0
+            double alpha, det, invdet, u,v
+            
+        p1 = self.get_point_c(cell[0])
+        p2 = self.get_point_c(cell[1])
+        p3 = self.get_point_c(cell[2])
+            
+        v1 = subvv_(p2,p1)
+        v2 = subvv_(p3,p1)
+        n = cross_(v1, v2)
+        
+        det = -dotprod_(d,n)
+        invdet = 1.0/det
+        
+        a0 = subvv_(o, p1)
+        da0 = cross_(a0, d)
+        u = dotprod_(v2, da0) * invdet
+        v = -dotprod_(v1, da0) * invdet
+        alpha = dotprod_(a0,n) * invdet
+        
+        if (u+v > 1.0) | (u<0) | (v<0) | (alpha<0) :
+            return -1.0
+        
+        return alpha
+        
+        
+#         bool intersect_triangle(
+#     in Ray R, in vec3 A, in vec3 B, in vec3 C, out float t, 
+#     out float u, out float v, out vec3 N
+# ) { 
+#    vec3 E1 = B-A;
+#    vec3 E2 = C-A;
+#          N = cross(E1,E2);
+#    float det = -dot(R.Dir, N);
+#    float invdet = 1.0/det;
+#    vec3 AO  = R.Origin - A;
+#    vec3 DAO = cross(AO, R.Dir);
+#    u =  dot(E2,DAO) * invdet;
+#    v = -dot(E1,DAO) * invdet;
+#    t =  dot(AO,N)  * invdet; 
+#    return (det >= 1e-6 && t >= 0.0 && u >= 0.0 && v >= 0.0 && (u+v) <= 1.0);
+# }
+
+    cdef intersection intersect_with_line_c(self, vector_t o, vector_t d):
+        """
+        """
+        
+        
+        
+    def intersect_with_line(self, origin, direction):
+        """
+        Find the closest intersection with the line specified by the
+        origin and direction vectors
+        """
+        cdef:
+            vector_t o,d
+            intersection its
+            
+        o.x = origin[0]
+        o.y = origin[1]
+        o.z = origin[2]
+        d.x = direction[0]
+        d.y = direction[1]
+        d.z = direction[2]
+        its = self.intersect_with_line_c(o,d)
+        
+        return (its.alpha, its.cell_idx)
+        
         
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cdef int c_build_tree(self, obbnode_t obb, int level):
+    cdef long c_build_tree(self, obbnode_t obb, int level):
         cdef:
             obbnode_t child1, child2
             obbnode_t *parent
             int i, j, split_plane, icell 
-            unsigned long parent_idx
+            long parent_idx
             vector_t p, n, c, pt
             double best_ratio, ratio
             int[:,:] cells = self.cells
@@ -384,6 +432,9 @@ cdef class OBBTree(object):
         parent_idx = self.add_node_c(obb)
         #Get a refrence to the node in the list 
         parent = self.nodes + parent_idx#self.nodes[parent_idx]
+        
+        if level > self.level:
+            self.level = level
         
         if (level < self.max_level) and (n_cells > self.number_of_cells_per_node):
             
@@ -446,9 +497,9 @@ cdef class OBBTree(object):
                             out_cells_right += 1
                     this_cell_id = next_cell_id
                             
-                ratio = fabs( <double>(out_cells_right - out_cells_left)/n_cells )
+                ratio = fabs( (<double>(out_cells_right - out_cells_left))/n_cells )
                 
-                if (ratio < 0.6):
+                if (ratio <= 0.6):
                     split_acceptable = 1
                     break
                 else:
@@ -461,6 +512,7 @@ cdef class OBBTree(object):
                 split_acceptable = 1
                 
             if split_acceptable:
+                #print(level, ratio, n_cells, out_cells_left, out_cells_right)
                 child1 = self.compute_obb_cells_c(start_idx, out_cells_left)
                 child2 = self.compute_obb_cells_c(start_idx + out_cells_left, out_cells_right)
                 child1.parent = parent_idx
@@ -602,6 +654,12 @@ cdef class OBBTree(object):
         node.n_cells = n_cells
         
         self.clear_point_mask()
+        
+        ## reset covariance matrix
+        for i in range(3):
+            a0[i] = 0.0
+            a1[i] = 0.0
+            a2[i] = 0.0
             
         for i in range(n_cells):
             tri = self.cells[cell_ids[cell_list_idx + i]]
@@ -695,4 +753,109 @@ cdef class OBBTree(object):
         node.child2 = -1
         return node
         
+        
+cdef class OBBNode(object):
+    cdef:
+        OBBTree owner
+        obbnode_t node
+        
+    property parent:
+        def __get__(self):
+            cdef:
+                long parent = self.node.parent
+            if parent<0:
+                return None
+            node = OBBNode()
+            node.owner = self.owner
+            node.node = self.owner.get_node_c(parent)
+            return node
+        
+    property child1:
+        def __get__(self):
+            cdef:
+                long child = self.node.child1
+            if child<0:
+                return None
+            node = OBBNode()
+            node.owner = self.owner
+            node.node = self.owner.get_node_c(child)
+            return node
+        
+    property child2:
+        def __get__(self):
+            cdef:
+                long child = self.node.child2
+            if child<0:
+                return None
+            node = OBBNode()
+            node.owner = self.owner
+            node.node = self.owner.get_node_c(child)
+            return node
+        
+    property corner:
+        def __get__(self):
+            return np.array([self.node._corner.x, self.node._corner.y, self.node._corner.z])
+        
+        def __set__(self, c):
+            self.node._corner.x = c[0]
+            self.node._corner.y = c[1]
+            self.node._corner.z = c[2]
             
+    property axes:
+        def __get__(self):
+            cdef:
+                int i
+            out = np.empty(shape=(3,3))
+            for i in range(3):
+                out[i,0] = self.node._axes[i].x
+                out[i,1] = self.node._axes[i].y
+                out[i,2] = self.node._axes[i].z
+            return out
+        
+        def __set__(self, double[:,:] axes):
+            cdef:
+                int i
+            for i in range(3):
+                self.node._axes[i].x = axes[i,0]
+                self.node._axes[i].y = axes[i,1]
+                self.node._axes[i].z = axes[i,2]
+                    
+    @boundscheck(False)
+    @initializedcheck(False)
+    @cdivision(True)
+    cdef int intersect_line_c(self, vector_t p1, vector_t p2):
+        cdef:
+            int i
+            double rangeAmin, rangeAmax, rangePmin, rangePmax, dotP
+            vector_t ax
+            
+        for i in range(3):
+            ax = self.node._axes[i]
+            
+            rangeAmin = dotprod_(self.node._corner, ax)
+            rangeAmax = rangeAmin + mag_sq_(ax)
+            
+            rangePmin = dotprod_(p1, ax)
+            rangePmax = rangePmin
+            dotP = dotprod_(p2, ax)
+            if dotP < rangePmin:
+                rangePmin = dotP
+            else:
+                rangePmax = dotP
+            
+            if (rangeAmax < rangePmin) or (rangePmax < rangeAmin):
+                return 0
+        return 1
+    
+    def intersect_line(self, p1, p2):
+        cdef:
+            vector_t _p1, _p2
+        _p1.x = p1[0]
+        _p1.y = p1[1]
+        _p1.z = p1[2]
+        _p2.x = p2[0]
+        _p2.y = p2[1]
+        _p2.z = p2[2]
+        return bool(self.intersect_line_c(_p1, _p2))            
+                    
+                

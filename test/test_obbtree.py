@@ -12,21 +12,30 @@ def view_obb(obb, in_points=None):
     corner = obb.corner
     axes = obb.axes
     print("Axes:", axes)
-    points = [corner,
-              corner + axes[0],
-              corner + axes[1],
-              corner + axes[2],
-              corner + axes[0] + axes[1],
-              corner + axes[0] + axes[2],
-              corner + axes[1] + axes[2],
-              corner + axes[0] + axes[1] + axes[2]]
+    points = [corner, #0
+              corner + axes[0], #1
+              corner + axes[1], #2
+              corner + axes[2], #3
+              corner + axes[0] + axes[1], #4
+              corner + axes[0] + axes[2], #5
+              corner + axes[1] + axes[2], #6
+              corner + axes[0] + axes[1] + axes[2]] #7
     points = np.array(points)
     lines = np.array([(0,1),(0,2),(0,3),(2,6),(3,6),(6,7),(1,4),(1,5),(4,7),(5,7),(2,4),(3,5)])
-    pd = tvtk.PolyData(points=points, lines=lines)
+    tris = np.array([
+            (0,1,2), (1,2,4),
+            (0,1,3), (1,3,5),
+            (0,2,3), (2,3,6),
+            (7,3,5), (7,6,3),
+            (7,5,1), (7,1,4),
+            (7,6,2), (7,2,4) 
+            ])
+    pd = tvtk.PolyData(points=points, lines=lines, polys=tris)
     
     mapper = tvtk.PolyDataMapper(color_mode=2)
     mapper.set_input_data(pd)
     act = tvtk.Actor(mapper=mapper)
+    act.property.opacity=0.3
     ren = tvtk.Renderer()
     ren.add_actor(act)
     
