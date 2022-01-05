@@ -165,12 +165,12 @@ cdef class CircularFace(Face):
         #print "CFACE", p1, p2
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
-            return out
+            return NO_INTERSECTION
         X = p1.x + h*(p2.x-p1.x) - self.offset
         Y = p1.y + h*(p2.y-p1.y)
         if is_base_ray and (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
-            return out
+            return NO_INTERSECTION
         out.dist = h * max_length
         return out
 
@@ -207,17 +207,15 @@ cdef class ShapedPlanarFace(ShapedFace):
             double max_length = sep_(p1, p2)
             double h = (self.z_height-p1.z)/(p2.z-p1.z)
             double X, Y
-            intersect_t out
-            
-        out.dist = -1
-                    
+            intersect_t out=NO_INTERSECTION
+                                
         if (h<self.tolerance) or (h>1.0):
-            return out
+            return NO_INTERSECTION
         
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         if is_base_ray and not (<Shape>self.shape).point_inside_c(X,Y):
-            return out
+            return NO_INTERSECTION
         out.dist = h*max_length
         return out
         
@@ -253,18 +251,17 @@ cdef class ElipticalPlaneFace(Face):
             double h = (self.g_x*p1.x + self.g_y*p1.y - p1.z) / \
                         ((p2.z-p1.z) - self.g_x*(p2.x-p1.x) - self.g_y*(p2.y-p1.y))
             double X,Y,Z, d=self.diameter
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         if (h<self.tolerance) or (h>1.0):
-            return out
+            return NO_INTERSECTION
         
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         Z = p1.z + h*(p2.z-p1.z)
         if is_base_ray and (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
-            return out
+            return NO_INTERSECTION
         
         out.dist = h * max_length
         return out
@@ -308,11 +305,10 @@ cdef class RectangularFace(Face):
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
             double X, Y, lngth=self.length, wdth = self.width
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist=-1
         if (h<self.tolerance) or (h>1.0):
-            return out
+            return NO_INTERSECTION
         
         if is_base_ray:
             X = p1.x + h*(p2.x-p1.x) - self.offset
@@ -320,9 +316,9 @@ cdef class RectangularFace(Face):
             
             #if x or y displacement is greater than length or width of rectangle, no intersect
             if X*X > lngth*lngth/4:
-                return out
+                return NO_INTERSECTION
             if Y*Y > wdth*wdth/4:
-                return out 
+                return NO_INTERSECTION 
         out.dist = h * max_length
         return out
 
@@ -364,9 +360,8 @@ cdef class SphericalFace(Face):
         cdef:
             double A,B,C,D, cz, a1, a2
             vector_t s, d, pt1, pt2
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         s = subvv_(p2, r)
         cz = self.z_height - self.curvature
         d = r
@@ -378,7 +373,7 @@ cdef class SphericalFace(Face):
         D = B*B - 4*A*C
         
         if D < 0: #no intersection with sphere
-            return out
+            return NO_INTERSECTION
         
         D = sqrt(D)
         
@@ -412,7 +407,7 @@ cdef class SphericalFace(Face):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return out
+            return NO_INTERSECTION
         out.dist = a1 * sep_(r, p2)
         return out
     
@@ -457,9 +452,8 @@ cdef class ShapedSphericalFace(ShapedFace):
         cdef:
             double A,B,C,D, cz, a1, a2
             vector_t s, d, pt1, pt2
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         s = subvv_(p2, r)
         cz = self.z_height - self.curvature
         d = r
@@ -471,7 +465,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         D = B*B - 4*A*C
         
         if D < 0: #no intersection with sphere
-            return out
+            return NO_INTERSECTION
         
         D = sqrt(D)
         
@@ -503,7 +497,7 @@ cdef class ShapedSphericalFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return out
+            return NO_INTERSECTION
         out.dist = a1 * sep_(r, p2)
         return out
     
@@ -598,9 +592,8 @@ cdef class ExtrudedPlanarFace(Face):
         cdef: 
             vector_t s, u, v
             double a, dz
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         u.x = self.x1_
         u.y = self.y1_
         
@@ -614,9 +607,9 @@ cdef class ExtrudedPlanarFace(Face):
             a = (s.y*(u.x-r.x) - s.x*(u.y-r.y)) / (s.x*v.y - s.y*v.x)
             
             if a<0:
-                return out
+                return NO_INTERSECTION
             if a>1:
-                return out
+                return NO_INTERSECTION
         #distance of intersection along ray (in XY plane)
         a = (v.x*(r.y-u.y) - v.y*(r.x-u.x)) / (s.x*v.y - s.y*v.x)
         
@@ -625,10 +618,11 @@ cdef class ExtrudedPlanarFace(Face):
             dz = a*(p2.z - r.z)
             if self.z1 < (r.z+dz) < self.z2:
                 out.dist = a * mag_(s) 
-            return out
+                return out
         else:
             out.dist = a * mag_(s)
             return out
+        return NO_INTERSECTION
     
     cdef vector_t compute_normal_c(self, vector_t p, int piece):
         return self.normal
@@ -800,15 +794,14 @@ cdef class ExtrudedBezierFace(Face):
             double A,B,C,D,t,a,b,c,d
             poly_roots ts
             vector_t    tempv
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
         #print "\ncalled intersection"
 
-        out.dist=-1
         origin.x = 0 
         origin.y = 0
         #first off, does ray even enter the depth of the extrusion?
         if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
-            return out    #does not
+            return NO_INTERSECTION    #does not
         #print "ray passes z test"
         #strip useless thrid dimension from ray vector
         r.x = ar.x
@@ -826,7 +819,7 @@ cdef class ExtrudedBezierFace(Face):
                 tempvector.y = self.mincorner.y
                 if not self.line_seg_overlap(r,p2,self.maxcorner,tempvector):
                     if not self.line_seg_overlap(r,p2,tempvector,self.mincorner):
-                        return out    #no intersections
+                        return NO_INTERSECTION    #no intersections
         #print "ray is in big bounding box"
         #segment intersects with gross bounding box,
         #Calc dZ and the 2D origin adjusted ray, because they will probably be used.
@@ -890,7 +883,8 @@ cdef class ExtrudedBezierFace(Face):
                                     result = b
                                     #print "b at t",b,t
 
-        if result == INF: result = 0
+        if result == INF: 
+            return NO_INTERSECTION
 
         out.dist = result
         return out
@@ -1021,12 +1015,11 @@ cdef class PolygonFace(Face):
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
             double X, Y
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
         
-        out.dist=-1
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
-            return out
+            return NO_INTERSECTION
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         #test for (X,Y) in polygon
@@ -1065,9 +1058,8 @@ cdef class OffAxisParabolicFace(Face):
             double A = 1 / (2*self.EFL), efl = self.EFL
             double a,b,c,d
             vector_t s, r, pt1, pt2
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist=-1
         s = subvv_(p2,p1)
         r = p1
         r.z += efl/2.
@@ -1079,16 +1071,16 @@ cdef class OffAxisParabolicFace(Face):
         
         ###FIXME
         if d<0: #no intersection ###BROKEN
-            return out
+            return NO_INTERSECTION
         
         if a < 1e-10: #approximate to zero if we're close to the parabolic axis
             a1 = -c/b
             pt1 = addvv_(r, multvs_(s, a1))
             pt1.x -= efl
             if (pt1.x*pt1.x + pt1.y*pt1.y) > (self.diameter/2):
-                return out
+                return NO_INTERSECTION
             if a1>1.0 or a1<self.tolerance:
-                return out
+                return NO_INTERSECTION
             out.dist = a1 * sep_(p1, p2)
             return out
         
@@ -1118,7 +1110,7 @@ cdef class OffAxisParabolicFace(Face):
                 a1 = a2
             
             if a1>1.0 or a1<self.tolerance:
-                return out
+                return NO_INTERSECTION
             out.dist = a1 * sep_(p1, p2)
             return out
 #
@@ -1173,9 +1165,8 @@ cdef class EllipsoidalFace(Face):
             vector_t S = subvv_(p2, p1)
             vector_t r = transform_c(self.trans, p1)
             vector_t s = transform_c(self.trans, p2)
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         s = subvv_(s, r)
         
         B = self.minor**2
@@ -1214,7 +1205,7 @@ cdef class EllipsoidalFace(Face):
         if root1 > root2:
             root1 = root2
         if root1 > 1:
-            return out
+            return NO_INTERSECTION
         out.dist = root1*mag_(S)
         return out
         
@@ -1266,9 +1257,8 @@ cdef class SaddleFace(ShapedFace):
         cdef:
             double A=sqrt(6.0), root, denom, a1, a2
             vector_t d,p, pt1, pt2
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         A *= self.curvature
         p = p1
         p.z -= self.z_height
@@ -1285,7 +1275,7 @@ cdef class SaddleFace(ShapedFace):
                     4*A*d.x*d.y*p.z - 2*A*d.x*d.z*p.y - 2*A*d.y*d.z*p.x + d.z**2
                     
             if root < 0:
-                return out
+                return NO_INTERSECTION
             
             root = sqrt(root)
             denom = 2*A*(d.x*d.y)
@@ -1316,7 +1306,7 @@ cdef class SaddleFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return out
+            return NO_INTERSECTION
         
         out.dist = a1 * sep_(p1, p2)
         return out
@@ -1355,9 +1345,8 @@ cdef class CylindericalFace(ShapedFace):
             double a1, a2, cz, ox2, oz2, dx2, dz2, denom, R=self.radius
             double R2 = R*R
             vector_t d,o, pt1, pt2
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         o = p1
         o.z -= self.z_height
         d = subvv_(p2,p1)
@@ -1370,7 +1359,7 @@ cdef class CylindericalFace(ShapedFace):
         root = R2*dz2 - 2*R*dx2*o.z + 2*R*d.x*d.z*o.x - dx2*oz2 + 2*d.x*d.z*o.x*o.z - dz2*ox2
         
         if root < 0:
-            return out
+            return NO_INTERSECTION
         
         root = sqrt(root)
         denom = dx2 + dz2
@@ -1407,7 +1396,7 @@ cdef class CylindericalFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return out
+            return NO_INTERSECTION
         out.dist = a1 * sep_(p1, p2)
         return out
     
@@ -1451,9 +1440,8 @@ cdef class AxiconFace(ShapedFace):
             double a1, a2, root, ox2, oy2, oz2, dx2, dy2, dz2, beta2, denom
             double beta = self.gradient
             vector_t o, d, pt1, pt2
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
-        out.dist = -1
         d = subvv_(p2, p1)
         o = p1
         o.z -= self.z_height
@@ -1471,7 +1459,7 @@ cdef class AxiconFace(ShapedFace):
         denom = (beta2*dx2 + beta2*dy2 - dz2)
                 
         if root < 0: #no intersection
-            return out
+            return NO_INTERSECTION
         
         root = beta*sqrt(root)
         
@@ -1499,7 +1487,7 @@ cdef class AxiconFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return out
+            return NO_INTERSECTION
         out.dist = a1 * sep_(p1, p2)
         return out
     
@@ -1607,7 +1595,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         cdef:
             double a1
             vector_t d, a, pt1
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
         d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
@@ -1751,7 +1739,7 @@ cdef class AsphericFace(ShapedFace):
             double tol = self.atol**2
             vector_t d, a, pt1
             aspheric_t A
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
             
         d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
@@ -2029,7 +2017,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
             vector_t d, a, pt1
             extpoly_t E = self.ext_poly
             double[:,:] coefs = self._coefs
-            intersect_t out
+            intersect_t out=NO_INTERSECTION
              
         d = subvv_(p2, p1)      #the input ray direction, in local coords.
         a = p1                  # the origin of the input ray
