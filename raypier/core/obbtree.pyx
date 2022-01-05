@@ -428,6 +428,8 @@ cdef class OBBTree(object):
                     workspace[depth+1] = node.child2
                     depth += 2
         #print("cell intersection", icount, "obb intersections", obb_count, "total", icount+obb_count)
+        if res.cell_idx < 0:
+            res.alpha = -1.0
         return res 
         
         
