@@ -70,6 +70,12 @@ cdef struct transform_t:
 
 cdef struct ray_pair_t:
     ray_t trans, refln
+    
+cdef struct intersect_t:
+    double dist
+    int face_idx
+    int piece_idx
+    
 
 ##############################
 ### Vector maths functions ###
@@ -214,10 +220,10 @@ cdef class Face(object):
         public short int invert_normal
         public unsigned int count    
 
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray)
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray)
 
-    cdef vector_t compute_normal_c(self, vector_t p)
-    cdef vector_t compute_tangent_c(self, vector_t p)
+    cdef vector_t compute_normal_c(self, vector_t p, int piece)
+    cdef vector_t compute_tangent_c(self, vector_t p, int piece)
 
 
 cdef class FaceList(object):
@@ -228,10 +234,10 @@ cdef class FaceList(object):
     cdef public object owner
 
     cpdef void sync_transforms(self)
-    cdef int intersect_c(self, ray_t *ray, vector_t end_point)
-    cdef int intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx)
+    cdef intersect_t intersect_c(self, ray_t *ray, vector_t end_point)
+    cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx)
     cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
-    cdef orientation_t compute_orientation_c(self, Face face, vector_t point)
+    cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece)
 
 
 ##################################
