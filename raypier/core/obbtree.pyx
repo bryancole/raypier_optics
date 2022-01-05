@@ -20,7 +20,7 @@ from libc.float cimport DBL_MAX, DBL_MIN
 from cython cimport view, boundscheck, cdivision, initializedcheck
 
 from .ctracer cimport vector_t, subvv_, dotprod_, mag_sq_, norm_,\
-            addvv_, multvs_, cross_
+            addvv_, multvs_, cross_, mag_
 
 
 cdef struct MaxElem:
@@ -237,7 +237,7 @@ cdef class OBBTree(object):
         
     def __cinit__(self, double[:,:] points, int[:,:] cells):
         cdef:
-            int max_n_nodes
+            unsigned long max_n_nodes
             
         self.points = points
         self.cells = cells
@@ -261,9 +261,9 @@ cdef class OBBTree(object):
     cdef void set_node_c(self, unsigned long i, obbnode_t node):
         self.nodes[i] = node
         
-    cdef unsigned long add_node_c(self, obbnode_t r):
+    cdef unsigned long add_node_c(self, obbnode_t r):       
         cdef:
-            n_nodes = self.n_nodes
+            unsigned long n_nodes = self.n_nodes     
         if self.n_nodes == self.max_n_nodes:
             if self.max_n_nodes == 0:
                 self.max_n_nodes = 1
@@ -300,10 +300,10 @@ cdef class OBBTree(object):
         obb = self.compute_obb_cells_c(0, n_cells)
         self.root_idx = self.c_build_tree(obb, 0)
         
-    cdef int line_intersects_node_c(self, long node_idx, vector_t p0, vector_t p1):
+    cdef int line_intersects_node_c(self, obbnode_t* this, vector_t p0, vector_t p1):
         cdef:
             int ii
-            obbnode_t this = self.nodes[node_idx]
+            #obbnode_t this = self.nodes[node_idx]
             double rangeAmin, rangeAmax, rangeBmin, rangeBmax
             double eps = self.tolerance
             
@@ -326,6 +326,8 @@ cdef class OBBTree(object):
                 return 0
         return 1
     
+    @boundscheck(False)
+    @initializedcheck(False)
     cdef vector_t get_point_c(self, long idx):
         cdef:
             vector_t p
@@ -334,6 +336,9 @@ cdef class OBBTree(object):
         p.z = self.points[idx,2]
         return p
     
+    @boundscheck(False)
+    @initializedcheck(False)
+    @cdivision(True)
     cdef double line_intersects_cell_c(self, long cell_idx, vector_t o, vector_t d):
         """ For a line defined by origin 'o' and direction 'd',
         returns the distance form the origin to the triangle intersection.
@@ -354,6 +359,9 @@ cdef class OBBTree(object):
         n = cross_(v1, v2)
         
         det = -dotprod_(d,n)
+        if det == 0.0:
+            return -1
+            #print(d.x,d.y,d.z,n.x,n.y,n.z)
         invdet = 1.0/det
         
         a0 = subvv_(o, p1)
@@ -385,30 +393,69 @@ cdef class OBBTree(object):
 #    return (det >= 1e-6 && t >= 0.0 && u >= 0.0 && v >= 0.0 && (u+v) <= 1.0);
 # }
 
-    cdef intersection intersect_with_line_c(self, vector_t o, vector_t d):
+    @boundscheck(False)
+    @initializedcheck(False)
+    @cdivision(True)
+    cdef intersection intersect_with_line_c(self, vector_t p1, vector_t p2, long[:] workspace):
         """
         """
+        cdef:
+            long depth=1, cell_idx
+            obbnode_t *node
+            vector_t d = subvv_(p2,p1)
+            double alpha
+            intersection res
+            int i
+            
+        res.alpha = 1.0
+        res.cell_idx = -1
+            
+        workspace[0] = self.root_idx
+        while depth > 0:
+            depth -= 1
+            node = self.nodes + workspace[depth]
+            if self.line_intersects_node_c(node, p1, p2):
+                if (node.child1 < 0) or (node.child2 < 0):
+                    for i in range(node.n_cells):
+                        cell_idx = self.cell_ids[node.cell_list_idx+i]
+                        alpha = self.line_intersects_cell_c(cell_idx, p1, d)
+                        if (alpha >= 0) and (alpha < res.alpha):
+                            res.alpha = alpha
+                            res.cell_idx = cell_idx
+                else:
+                    workspace[depth] = node.child1
+                    workspace[depth+1] = node.child2
+                    depth += 2
+        #print("cell intersection", icount, "obb intersections", obb_count, "total", icount+obb_count)
+        return res 
         
         
-        
-    def intersect_with_line(self, origin, direction):
+    def intersect_with_line(self, point1, point2):
         """
-        Find the closest intersection with the line specified by the
-        origin and direction vectors
+        Find the closest intersection to point 1 with the line specified by the
+        given points.
         """
         cdef:
             vector_t o,d
             intersection its
+            double alpha
+            vector_t ip
             
-        o.x = origin[0]
-        o.y = origin[1]
-        o.z = origin[2]
-        d.x = direction[0]
-        d.y = direction[1]
-        d.z = direction[2]
-        its = self.intersect_with_line_c(o,d)
-        
-        return (its.alpha, its.cell_idx)
+        o.x = point1[0]
+        o.y = point1[1]
+        o.z = point1[2]
+        d.x = point2[0]
+        d.y = point2[1]
+        d.z = point2[2]
+        if self.level < 1:
+            raise ValueError("OBBTree structure not yet built.")
+        workspace = np.zeros(self.level+1, dtype=np.int64)
+        its = self.intersect_with_line_c(o,d, workspace)
+        if its.cell_idx < 0:
+            return (None, -1)
+        else:
+            ip = addvv_(o, multvs_(subvv_(d,o), its.alpha))
+            return ((ip.x, ip.y, ip.z), its.cell_idx)
         
         
     @boundscheck(False)
@@ -425,7 +472,8 @@ cdef class OBBTree(object):
             int[:,:] cells = self.cells
             int[:] cell
             int[:] cell_ids = self.cell_ids
-            int split_acceptable=0, this_cell_id, next_cell_id, start_idx=obb.cell_list_idx, n_cells = obb.n_cells
+            int split_acceptable=0, found_best_split=0 
+            int this_cell_id, next_cell_id, start_idx=obb.cell_list_idx, n_cells = obb.n_cells
             int negative, positive, out_cells_left=0, out_cells_right=(n_cells-1)
             
         #Copy the node into the node-list
@@ -444,7 +492,8 @@ cdef class OBBTree(object):
                  
             best_ratio = 1.0
             
-            for split_plane in range(3):
+            split_plane = 0
+            while (split_plane < 3) and not split_acceptable:
                 n = norm_(obb._axes[split_plane])
                 out_cells_left=0
                 out_cells_right=0 #out_cell_right + (n_cells-1)
@@ -499,7 +548,7 @@ cdef class OBBTree(object):
                             
                 ratio = fabs( (<double>(out_cells_right - out_cells_left))/n_cells )
                 
-                if (ratio <= 0.6):
+                if (ratio <= 0.6) or found_best_split:
                     split_acceptable = 1
                     break
                 else:
@@ -507,9 +556,12 @@ cdef class OBBTree(object):
                         best_ratio = ratio
                         best_plane = split_plane
                         
-            if best_ratio < 0.95:
-                split_plane = best_plane
-                split_acceptable = 1
+                    split_plane += 1
+                    
+                    if (split_plane==3) and (best_ratio < 0.95):
+                        split_plane = best_plane
+                        found_best_split = 1
+                        
                 
             if split_acceptable:
                 #print(level, ratio, n_cells, out_cells_left, out_cells_right)

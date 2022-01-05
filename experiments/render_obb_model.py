@@ -38,9 +38,10 @@ def get_monkey_mesh():
 
 def get_monkey_obbtree():
     points, cells = get_monkey_mesh()
-    print(cells.dtype)
+    print(cells.dtype, cells.shape, points.shape)
     obbtree = OBBTree(points, cells)
     obbtree.max_level = 20
+    obbtree.number_of_cells_per_node = 8
     obbtree.build_tree()
     return obbtree
     
@@ -93,6 +94,8 @@ def add_subtree(obb, points, lines, polys, level=-1):
             
 def show_monkey_tree():
     obbtree = get_monkey_obbtree()
+    
+    print(obbtree.intersect_with_line([0.,0.,0.], [10.,10.,10.]))
     
     print("Level", obbtree.level)
     
