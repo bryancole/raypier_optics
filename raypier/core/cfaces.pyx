@@ -34,7 +34,8 @@ from .ctracer cimport Face, sep_, \
 import numpy as np
 cimport numpy as np_
 cimport cython
-from cython.parallel import prange
+from cython.parallel cimport prange
+
 
 cdef struct flatvector_t:
     double x,y
@@ -1607,8 +1608,11 @@ cdef class ConicRevolutionFace(ShapedFace):
             double r2 = (x*x) + (y*y)
             double R = self.curvature
             double R2 = R*R
-        
-        return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+            
+        if R>=0:
+            return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+        else:
+            return self.z_height  - (r2/(R - sqrt(R2 - (1+self.conic_const)*r2)))
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return z - self.eval_z_c(x,y)
@@ -1796,6 +1800,299 @@ cdef class AsphericFace(ShapedFace):
         out += self.z_height
         return out
     
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return z - self.eval_z_c(x,y)
+
+
+cdef struct extpoly_t:
+    double R #curvature
+    double beta #=1+conic const
+    # ext poly coeffs up to 30rd order
+    double norm_radius
+    double z_height   
+    
+    ### Annoyingly, we are not allowed to put a Cython memory-view into a C-struct.
+    #double E1, E2                         # x^1y^0, x^0y^1
+    #double E3, E4, E5                     # x^2y^0 , x^1y^1, x^2y^0
+    #double E6, E7, E8, E9                 # x^3y^0, x^2y^1, x^1y^2, x^0y^3           # 3rd order
+    #double E10, E11, E12, E13, E14        # x^4y^0, x^3y^1, x^2y^2, x^1y^3, x^0y^4   # 4th order
+    #double E15, E16, E17, E18, E19, E20   # x^5y^0, x^4y^1, x^3y^2, x^2y^3, x^1y^4, x^0y^5   # 5th order
+    
+# return the z-value
+cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha):
+    """
+    EP - polynomial definition 
+    a - origin of input ray in local coords
+    d - vector along input ray in local coords
+    alpha - fractional distance along ray 
+    
+    returns:
+        The z-separation between the ray and poly surface at the given alpha value. 
+        Should be zero at the intersection.
+    """
+    cdef: 
+        double out
+        double x = a.x + alpha*d.x
+        double y = a.y + alpha*d.y
+        double r2 = x**2 + y**2
+        double R = EP.R
+        double[:,:] E = coefs
+        int i,j, Nx=E.shape[0], Ny=E.shape[1]
+    
+    out = r2
+    if R>=0:
+        out /= (R + sqrt(R*R - EP.beta*r2))
+    else:
+        out /= (R - sqrt(R*R - EP.beta*r2))
+        
+    out -= a.z + alpha*d.z
+    
+    # normalization 
+    x /= EP.norm_radius
+    y /= EP.norm_radius
+         
+    for i in range(Nx):
+        for j in range(Ny):
+            out += E[i,j]*(x**i)*(y**j)
+                     
+    out += EP.z_height
+    #print("imp", out)
+    return out
+
+
+cdef double eval_extpoly_grad(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha):
+    """
+    1st derivative of eval_extpoly_impf w.r.t. alpha
+    """
+    ### This is too tedious to write out. Need sympy...
+    cdef: 
+        double out, dEdx=0.0, dEdy=0.0
+        double x = a.x + alpha*d.x
+        double y = a.y + alpha*d.y
+        double r2 = x**2 + y**2
+        double R2 = EP.R * EP.R
+        double rt = sqrt(1 - (EP.beta * r2 / R2))
+        double denom = EP.R * (rt + 1)
+        double nom = (2*d.x*x + 2*d.y*y)
+        double inv_rad = 1./EP.norm_radius
+        double[:,:] E = coefs
+        int i,j, Nx=E.shape[0], Ny=E.shape[1]
+    
+    out = -d.z 
+    
+    ### gradient of conic surface w.r.t. alpha
+    out += nom / denom
+    out += EP.beta * nom * r2 /(2*EP.R*rt*denom*denom)  
+    
+    # normalization 
+    x *= inv_rad
+    y *= inv_rad
+    
+    for i in range(1,Nx):
+        for j in range(Ny):
+            dEdx += (i)*E[i,j]*(x**(i-1))*(y**j)
+            
+    for i in range(Nx):
+        for j in range(1,Ny):    
+            dEdy += (j)*E[i,j]*(x**i)*(y**(j-1))
+    
+    dEdx *= inv_rad
+    dEdy *= inv_rad
+    
+    out += dEdx*d.x
+    out += dEdy*d.y
+    #print("grad", out)
+    return out
+    
+
+
+cdef class ExtendedPolynomialFace(ShapedFace):
+    """Extended polynomial
+    """  
+    
+    cdef:
+        # base conic section, see: ConicRevolutionFace
+        double nterms # max. number of polynomials terms, norm radius, polynomial coefficients
+        double atol
+        extpoly_t ext_poly
+        double[:,:] _coefs
+        
+    property curvature:
+        def __get__(self):
+            return -self.ext_poly.R
+        
+        def __set__(self, double v):
+            self.ext_poly.R = -v
+    
+    property conic_const:
+        def __get__(self):
+            return self.ext_poly.beta - 1
+        
+        def __set__(self, double v):
+            self.ext_poly.beta = v + 1.0
+    
+    property norm_radius:
+        def __get__(self):
+            return self.ext_poly.norm_radius
+        
+        def __set__(self, double v):
+            self.ext_poly.norm_radius = v
+        
+    property z_height:
+        def __get__(self):
+            return self.ext_poly.z_height
+        
+        def __set__(self, double v):
+            self.ext_poly.z_height = v
+            
+    property coefs:
+        def __get__(self):
+            return np.asarray(self._coefs)
+        
+        def __set__(self, double[:,:] coefs):
+            self._coefs = coefs
+        
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.conic_const = kwds.get('conic_const', 0.0)
+        self.curvature = kwds.get('curvature', 0.0)
+        self.nterms = kwds.get('nterms', 0.0) ###What is this? Why not integer?
+        self.norm_radius = kwds.get('norm_radius', 100.0)
+        self.coefs = kwds.get('coefs', np.array([[0.0]]))
+        self.atol = kwds.get("atol", 1.0e-8)
+     
+     # a line-surface intersection   
+    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+         
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+           
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double a1, f, dz
+            double tol = self.atol**2
+            vector_t d, a, pt1
+            extpoly_t E = self.ext_poly
+            double[:,:] coefs = self._coefs
+             
+        d = subvv_(p2, p1)      #the input ray direction, in local coords.
+        a = p1                  # the origin of the input ray
+        a.z -= E.z_height    # z height in local coordinates
+        
+        a1 = intersect_conic(a, d, -E.R, E.beta-1.0)
+         
+        ### Don't want to use fsolve or scipy.optimise. Just use Newton-Raphson...
+        f = f_last = eval_extpoly_impf(E, coefs, p1, d, a1)
+        dz = - f / eval_extpoly_grad(E, coefs, p1, d, a1)
+
+        #### If we've not converged after 100 iterations, then it ain't going converge ever.
+        for i in range(100):
+            a1 += dz
+            if dz*dz < tol:
+                break
+            f = eval_extpoly_impf(E, coefs, p1, d, a1)
+            if fabs(f) > fabs(f_last): #We're not converging
+                return -1
+            f_last = f
+            dz = - f / eval_extpoly_grad(E, coefs, p1, d, a1)
+        else:
+            return -1     
+        
+        pt1 = addvv_(a, multvs_(d, a1))        # check if inside shape.
+
+        if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+            return INF
+             
+        if a1>1.0 or a1<self.tolerance:
+            return -1
+         
+        return a1 * sep_(p1, p2)
+         
+    cdef vector_t compute_normal_c(self, vector_t p):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            extpoly_t EP = self.ext_poly
+            double R = EP.R
+            double beta = EP.beta
+            vector_t g #output gradient vector
+            int sign = -1 if self.invert_normals else 1
+            double inv_rad = 1./EP.norm_radius
+            double x = p.x * inv_rad
+            double y = p.y * inv_rad
+            double[:,:] E = self._coefs
+            int i,j, Nx=E.shape[0], Ny=E.shape[1]
+           
+        p.z -= EP.z_height
+         
+         # compute gradient of conic
+         # in pyrate: gradient = np.vstack((-curv * x, -curv * y, 1. - curv * z * (1 + cc)))
+        g.z = 2*beta*(R-beta*p.z)
+        g.x = - p.x * 2 * beta        # why 2? --> see: notebook "Raytracing Aspheric Lens.iynb"
+        g.y = - p.y * 2 * beta
+        
+        if (R*beta) < 0:
+            sign *= -1
+            
+        g.z *= sign
+        g.y *= sign
+        g.x *= sign
+        
+        g = norm_(g)
+        
+        if self.invert_normals:
+            for i in range(1,Nx):
+                for j in range(Ny):
+                    g.x += i*E[i,j]*inv_rad*(x**(i-1))*(y**j)
+                    
+            for i in range(Nx):
+                for j in range(1,Ny):
+                    g.y += j*E[i,j]*inv_rad*(x**i)*(y**(j-1))
+        else:
+            for i in range(1,Nx):
+                for j in range(Ny):
+                    g.x -= i*E[i,j]*inv_rad*(x**(i-1))*(y**j)
+                    
+            for i in range(Nx):
+                for j in range(1,Ny):        
+                    g.y -= j*E[i,j]*inv_rad*(x**i)*(y**(j-1))
+        
+        #g.z += 1
+        
+        return norm_(g)  # normalized to length 1
+        
+        
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef: 
+            double out
+            double r2 = (x*x) + (y*y)
+            extpoly_t EP = self.ext_poly
+            double R = -EP.R
+            double[:,:] E = self._coefs
+            int i,j, Nx=E.shape[0], Ny=E.shape[1]
+            
+        x = x/EP.norm_radius
+        y = y/EP.norm_radius
+     
+        out = -r2
+        if R>=0.0:
+            out /= (R + sqrt(R*R - (EP.beta)*r2) )
+        else:
+            out /= (R - sqrt(R*R - (EP.beta)*r2) )
+             
+        for i in range(Nx):
+            for j in range(Ny):
+                out += E[i,j]*(x**i)*(y**j)
+                
+        out += EP.z_height
+        return out
+     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return z - self.eval_z_c(x,y)
     
