@@ -20,7 +20,7 @@ from libc.float cimport DBL_MAX, DBL_MIN
 from cython cimport view, boundscheck, cdivision, initializedcheck
 
 from .ctracer cimport vector_t, subvv_, dotprod_, mag_sq_, norm_,\
-            addvv_, multvs_, cross_, mag_
+            addvv_, multvs_, cross_, mag_, Face, intersect_t
 
 
 cdef struct MaxElem:
@@ -287,6 +287,7 @@ cdef class OBBTree(object):
         
     def clear_tree(self):
         self.n_nodes = 0
+        self.level = 0
         
     def build_tree(self):
         cdef:
@@ -910,4 +911,74 @@ cdef class OBBNode(object):
         _p2.z = p2[2]
         return bool(self.intersect_line_c(_p1, _p2))            
                     
+                
+cdef class OBBTreeFace(Face):
+    cdef:
+        public OBBTree obbtree
+        long[:] workspace
+        double[:,:] normals
+        
+    def __cinit__(self, OBBTree tree):
+        cdef:
+            double[:,:] normals
+            int i, n_cells = tree.cells.shape[0]
+            vector_t n, p1, p2, p3
+            int[:] cell
+            
+        self.obbtree = tree
+        if tree.level <= 0:
+            tree.build_tree()
+        self.workspace = np.zeros(tree.level+1, np.int64)
+        normals = np.empty(n_cells, np.float64)
+        
+        for i in range(n_cells):
+            cell = tree.cells[i]
+            p1 = tree.get_point_c(cell[0])
+            p2 = tree.get_point_c(cell[1])
+            p3 = tree.get_point_c(cell[2])
+            n = norm_(cross_(subvv_(p2,p1), subvv_(p3,p1)))
+            normals[i,0] = n.x
+            normals[i,1] = n.y
+            normals[i,2] = n.z
+            
+        self.normals = normals 
+        
+        
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            intersection it
+            intersect_t out
+            
+        it = self.tree.intersect_with_line_c(p1, p2, self.workspace)
+        
+        out.dist = it.alpha * mag_(subvv_(p2,p1))
+        out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells
+        return out
+        
+        
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            vector_t n
+            double[:] na
+        
+        na = self.normals[piece]
+        n.x = na[0]
+        n.y = na[1]
+        n.z = na[2]
+        return n
+    
+    
                 
