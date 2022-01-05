@@ -918,8 +918,9 @@ cdef class OBBTreeFace(Face):
         long[:] workspace
         double[:,:] normals
         
-    def __cinit__(self, OBBTree tree):
+    def __cinit__(self, **kwds):
         cdef:
+            OBBTree tree = kwds['tree']
             double[:,:] normals
             int i, n_cells = tree.cells.shape[0]
             vector_t n, p1, p2, p3
@@ -929,7 +930,7 @@ cdef class OBBTreeFace(Face):
         if tree.level <= 0:
             tree.build_tree()
         self.workspace = np.zeros(tree.level+1, np.int64)
-        normals = np.empty(n_cells, np.float64)
+        normals = np.empty((n_cells,3), np.float64)
         
         for i in range(n_cells):
             cell = tree.cells[i]
@@ -959,7 +960,7 @@ cdef class OBBTreeFace(Face):
             intersection it
             intersect_t out
             
-        it = self.tree.intersect_with_line_c(p1, p2, self.workspace)
+        it = self.obbtree.intersect_with_line_c(p1, p2, self.workspace)
         
         out.dist = it.alpha * mag_(subvv_(p2,p1))
         out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells

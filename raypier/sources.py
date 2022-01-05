@@ -298,8 +298,11 @@ class BaseRaySource(BaseBase):
             if not self.show_normals:
                 return
             output = source.poly_data_output
-            points = numpy.vstack([p.origin for p in self.traced_rays[1:]])
-            normals = numpy.vstack([p.normal for p in self.traced_rays[1:]])
+            traced_rays = self.traced_rays[1:]
+            if not traced_rays:
+                return
+            points = numpy.vstack([p.origin for p in traced_rays])
+            normals = numpy.vstack([p.normal for p in traced_rays])
             output.points = points
             output.point_data.normals = normals
             #print("calc normals GLYPH")
