@@ -6,15 +6,18 @@ Traited wrappers for cfaces objects
 
 from .core.cfaces import ShapedPlanarFace, ShapedSphericalFace, ConicRevolutionFace, AsphericFace as AsphericFace_,\
             ShapedFace, AxiconFace as AxiconFace_, CylindericalFace as CylindericalFace_, DistortionFace as DistortionFace_,\
-            SaddleFace as SaddleFace_
+            SaddleFace as SaddleFace_, ExtendedPolynomialFace as ExtendedPolynomialFace_
             
 from .distortions import BaseDistortion
             
 from .shapes import BaseShape
 from .editors import NumEditor
 
-from traits.api import HasStrictTraits, Instance, Float, Bool, observe, Event, Property
-from traitsui.api import View, VGroup, Item, VGrid
+from traits.api import HasStrictTraits, Instance, Float, Bool, observe, Event, Property, CArray, Button
+from traitsui.api import View, VGroup, Item, VGrid, ArrayEditor
+from traitsui.ui_editors.array_view_editor import ArrayViewEditor
+
+import numpy as np
 
 
 class BaseFace(HasStrictTraits):
@@ -270,4 +273,44 @@ class DistortionFace(BaseFace):
     @observe("distortion.updated")
     def on_distortion_changed(self, evt):
         self.updated = True
+    
+    
+class ExtendedPolynomialFace(ConicFace):
+    
+    norm_radius = Float(1.0)
+    
+    coefs = CArray(dtype=np.float64, shape=(None, None))
+    
+    updated = Button()
+    
+    cface = Instance(ExtendedPolynomialFace_, ())
+    
+    traits_view = View(VGroup(
+            Item("z_height", editor=NumEditor, tooltip="surface height at x=0,y=0 in mm"),
+            Item("curvature", editor=NumEditor, tooltip="radius of curvature, in mm"),
+            Item("conic_const", editor=NumEditor, tooltip="conic constant for the surface"),
+            Item("norm_radius", editor=NumEditor, tooltip="reference radius for the polynomial terms"),
+            Item("invert", tooltip="Invert the outward sense for this surface"),
+            Item("coefs", editor=ArrayEditor(), style="custom"),
+            Item("updated")
+        ))
+    
+    def _cface_default(self):
+        return ExtendedPolynomialFace_(z_height=self.z_height,
+                                       curvature=self.curvature,
+                                       conic_const=self.conic_const,
+                                       norm_radius=self.norm_radius,
+                                       invert_normals=self.invert,
+                                       coefs=self.coefs)
+    
+    @observe("norm_radius")
+    def _on_norm_radius_changed(self, evt):
+        self.cface.norm_radius = evt.new
+        self.updated = True
+        
+    @observe("coefs")
+    def _on_coefs_changed(self, evt):
+        self.cface.coefs = evt.new
+        self.updated = True
+
     

@@ -7,7 +7,7 @@ from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_
 from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
 from tvtk.api import tvtk
 
-from raypier.sources import BaseRaySource, UnitTupleVector, UnitVectorTrait
+from raypier.sources import BaseRaySource, UnitTupleVector, UnitVectorTrait, sequence_grp
 from raypier.core.ctracer import GaussletCollection, gausslet_dtype, ray_dtype
 from raypier.tracer import normaliseVector
 from raypier.editors import NumEditor
@@ -55,6 +55,7 @@ class BaseGaussletSource(BaseRaySource):
                        label="Parameters")
     
     traits_view = View(Item('name', show_label=False),
+                       sequence_grp,
                        Tabbed(VGroup(Group(Item('origin', show_label=False,resizable=True), 
                                            show_border=True,
                                     label="Origin position",

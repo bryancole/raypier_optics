@@ -38,6 +38,10 @@ from raypier.bases import RaypierObject, NumEditor, BaseRayCollection
 
 Vector = Array(shape=(3,))
 
+sequence_grp = HGroup(Item('sequential'),Item("clear_sequence", editor=ButtonEditor(),
+                                              enabled_when="len(_face_sequence) > 0",
+                                              show_label=False))
+
 
 class BaseBase(HasTraits, RaypierObject):
     pass
@@ -121,9 +125,7 @@ class BaseRaySource(BaseBase):
                        label="Display")
     
     traits_view = View(Item('name', show_label=False),
-                       HGroup(Item('sequential'),Item("clear_sequence", editor=ButtonEditor(),
-                                                      enabled_when="len(_face_sequence) > 0",
-                                                      show_label=False)),
+                       sequence_grp,
                        Tabbed(Include('geom_grp'),
                               display_grp)
                        )
@@ -140,7 +142,7 @@ class BaseRaySource(BaseBase):
         face_map = {global_map[face]: (fl, face_idx) for fl in face_lists for face_idx, face in enumerate(fl.faces)}
         face_sequence = []
         for rays in traced_rays:
-            face_ids = rays.end_face_idx
+            face_ids = rays.base_rays.end_face_idx
             ids, counts = numpy.unique(face_ids, return_counts=True)
             most_common = ids[counts.argmax()]
             try:
@@ -296,8 +298,11 @@ class BaseRaySource(BaseBase):
             if not self.show_normals:
                 return
             output = source.poly_data_output
-            points = numpy.vstack([p.origin for p in self.traced_rays[1:]])
-            normals = numpy.vstack([p.normal for p in self.traced_rays[1:]])
+            traced_rays = self.traced_rays[1:]
+            if not traced_rays:
+                return
+            points = numpy.vstack([p.origin for p in traced_rays])
+            normals = numpy.vstack([p.normal for p in traced_rays])
             output.points = points
             output.point_data.normals = normals
             #print("calc normals GLYPH")
@@ -1075,7 +1080,8 @@ class HexagonalRayFieldSource(RayFieldSource):
         
         gauss = numpy.exp(-(ri[select]*(spacing**2)/((self.gauss_width)**2))) 
         
-        ray_data = numpy.zeros(offsets.shape[0], dtype=ray_dtype)
+        n_rays = offsets.shape[0]
+        ray_data = numpy.zeros(n_rays, dtype=ray_dtype)
             
         ray_data['origin'] = offsets
         ray_data['origin'] += origin
@@ -1086,6 +1092,7 @@ class HexagonalRayFieldSource(RayFieldSource):
         ray_data['E2_amp'] = self.E2_amp * gauss
         ray_data['refractive_index'] = 1.0+0.0j
         ray_data['normal'] = [[0,1,0]]
+        ray_data['ray_ident'] = numpy.arange(n_rays)
         rays = RayCollection.from_array(ray_data)
         rays.neighbours = neighbours
         return rays
