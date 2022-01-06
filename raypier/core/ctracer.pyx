@@ -30,6 +30,8 @@ import time
 import numpy as np
 cimport numpy as np_
 
+from cython.parallel import threadid, prange 
+
 cdef:
     int NPARA = 6
     
@@ -708,15 +710,15 @@ cdef class Gausslet:
                 
 cdef class RayArrayView:
     """An abstract class to provide the API for ray_t member access from python / numpy"""
-    cdef void set_ray_c(self, unsigned long i, ray_t ray):
+    cdef void set_ray_c(self, unsigned long i, ray_t ray) nogil:
         return
     
-    cdef ray_t get_ray_c(self, unsigned long i):
+    cdef ray_t get_ray_c(self, unsigned long i) nogil:
         cdef:
             ray_t r
         return r
     
-    cdef unsigned long get_n_rays(self):
+    cdef unsigned long get_n_rays(self) nogil:
         return 0
     
     def __getitem__(self, size_t idx):
@@ -961,6 +963,97 @@ cdef class RayArrayView:
             return out
     
     
+cdef class RayAggregator:
+    """
+    A specialised object for collecting new ray_t instances from multiple threads.
+    Rays are stored in separate memory buffers by thread_id.
+    Once the multi-threaded tracing is complete, the buffers are combined to output
+    a complete RayCollection object.
+    """
+    cdef:
+        ray_t **rays
+        readonly unsigned long n_threads
+        unsigned long[:] n_rays
+        unsigned long[:] max_size
+
+    def __cinit__(self, size_t max_size, int n_threads):
+        cdef:
+            int i
+        if n_threads<1:
+            raise ValueError("Can't work with fewer than 1 thread")
+
+        self.n_threads = n_threads
+        self.rays = <ray_t**>malloc(n_threads*sizeof(ray_t*))
+        for i in range(n_threads):
+            self.rays[i] = <ray_t*>malloc(max_size*sizeof(ray_t))
+
+        self.n_rays = np.zeros(n_threads, dtype=np.uint64)
+        self.max_size = np.full(n_threads, max_size, dtype=np.uint64)
+
+    def __dealloc__(self):
+        cdef:
+            int i
+
+        for i in range(self.n_threads):
+            free(self.rays[i])
+        free(self.rays)
+
+    cdef void add_ray_c(self, ray_t r) nogil:
+        cdef:
+            int tid = threadid()
+            ray_t* rays = self.rays[tid]
+            unsigned long[:] n_rays = self.n_rays
+            unsigned long[:] max_size = self.max_size
+
+        if n_rays[tid] == max_size[tid]:
+            if max_size[tid] == 0:
+                max_size[tid] = 1
+            else:
+                max_size[tid] *= 2
+            rays = <ray_t*>realloc(rays, max_size[tid]*sizeof(ray_t))
+        rays[n_rays[tid]] = r
+        n_rays[tid] += 1
+        
+    cdef clear_c(self):
+        cdef:
+            int i
+            
+        for i in range(self.n_threads):
+            self.n_rays[i] = 0
+            
+    def clear(self):
+        self.clear_c()
+        
+    cdef get_aggregated_c(self):
+        cdef:
+            int i, total=0
+            int n_threads = self.n_threads
+            unsigned long count=0
+            
+        for i in range(n_threads):
+            total += self.n_rays[i]
+            
+        rc = RayCollection(total)
+        for i in range(n_threads):
+            memcpy(rc.rays + count, self.rays[i], self.n_rays[i]*sizeof(ray_t))
+            count += self.n_rays[i]
+        rc.n_rays = total
+        return rc
+    
+    def get_aggregated(self):
+        return self.get_aggregated_c()
+    
+    def add_rays(self, RayCollection rc):
+        cdef:
+            unsigned long i, n=rc.get_n_rays()
+            ray_t r
+            
+        with nogil:
+            for i in prange(n):
+                r = rc.get_ray_c(i)
+                self.add_ray_c(r)
+        
+    
 
 cdef class RayCollection(RayArrayView):
     """A list-like collection of ray_t objects.
@@ -984,13 +1077,13 @@ cdef class RayCollection(RayArrayView):
     def __len__(self):
         return self.n_rays
     
-    cdef ray_t get_ray_c(self, unsigned long i):
+    cdef ray_t get_ray_c(self, unsigned long i) nogil:
         return self.rays[i]
     
-    cdef void set_ray_c(self, unsigned long i, ray_t ray):
+    cdef void set_ray_c(self, unsigned long i, ray_t ray) nogil:
         self.rays[i] = ray
         
-    cdef unsigned long get_n_rays(self):
+    cdef unsigned long get_n_rays(self) nogil:
         return self.n_rays
         
     cdef add_ray_c(self, ray_t r):
@@ -1150,13 +1243,13 @@ cdef class GaussletBaseRayView(RayArrayView):
     def __cinit__(self, GaussletCollection owner):
         self.owner = owner
 
-    cdef void set_ray_c(self, unsigned long i, ray_t ray):
+    cdef void set_ray_c(self, unsigned long i, ray_t ray) nogil:
         self.owner.rays[i].base_ray = ray
     
-    cdef ray_t get_ray_c(self, unsigned long i):
+    cdef ray_t get_ray_c(self, unsigned long i) nogil:
         return self.owner.rays[i].base_ray
     
-    cdef unsigned long get_n_rays(self):
+    cdef unsigned long get_n_rays(self) nogil:
         return self.owner.n_rays
     
     def __len__(self):

@@ -124,9 +124,9 @@ cdef class Gausslet:
     
     
 cdef class RayArrayView:
-    cdef void set_ray_c(self, unsigned long i, ray_t ray)
-    cdef ray_t get_ray_c(self, unsigned long i)
-    cdef unsigned long get_n_rays(self)
+    cdef void set_ray_c(self, unsigned long i, ray_t ray) nogil
+    cdef ray_t get_ray_c(self, unsigned long i) nogil
+    cdef unsigned long get_n_rays(self) nogil
     
 
 cdef class RayCollection(RayArrayView):
