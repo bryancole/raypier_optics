@@ -2,12 +2,12 @@
 cdef extern from "math.h":
     double M_PI
     double sqrt(double) nogil
-    double atan2 (double y, double x )
-    double pow(double x, double y)
-    double fabs(double)
-    double cos(double)
-    double sin(double)
-    double acos(double)
+    double atan2 (double y, double x ) nogil
+    double pow(double x, double y) nogil
+    double fabs(double) nogil
+    double cos(double) nogil
+    double sin(double) nogil
+    double acos(double) nogil
 
 
 from .ctracer cimport Shape, sep_, \
@@ -38,7 +38,7 @@ cdef class InvertShape(LogicalOpShape):
     def __cinit__(self, Shape shape):
         self.shape = shape
         
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         return 1 & (~self.shape.point_inside_c(x,y))
             
             
@@ -53,17 +53,17 @@ cdef class BooleanShape(LogicalOpShape):
         
         
 cdef class BooleanAND(BooleanShape):
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         return (<Shape>self.shape1).point_inside_c(x,y) & (<Shape>self.shape2).point_inside_c(x,y)
     
     
 cdef class BooleanOR(BooleanShape):
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         return (<Shape>self.shape1).point_inside_c(x,y) | (<Shape>self.shape2).point_inside_c(x,y)
     
     
 cdef class BooleanXOR(BooleanShape):
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         return (<Shape>self.shape1).point_inside_c(x,y) ^ (<Shape>self.shape2).point_inside_c(x,y)
     
     
@@ -106,7 +106,7 @@ cdef class CircleShape(BasicShape):
     def __cinit__(self, **kwds):
         self.radius = kwds.get("radius", 1.0)
         
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         cdef:
             double dx = x-self.centre_x
             double dy = y-self.centre_y
@@ -125,7 +125,7 @@ cdef class RectangleShape(BasicShape):
         self.width = kwds.get("width", 5.0)
         self.height = kwds.get("height", 7.0)
         
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         cdef:
             double dx = x-self.centre_x
             double dy = y-self.centre_y
@@ -147,7 +147,7 @@ cdef class PolygonShape(BasicShape):
         def __set__(self, val):
             self._coordinates = val
             
-    cdef bint point_inside_c(self, double X, double Y):
+    cdef bint point_inside_c(self, double X, double Y) nogil:
         cdef:
             int i, size, ct=0
             double y1, y2, x1, x2

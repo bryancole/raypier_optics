@@ -14,12 +14,12 @@ Cython module for Face definitions
 cdef extern from "math.h":
     double M_PI
     double sqrt(double) nogil
-    double atan2 (double y, double x )
-    double pow(double x, double y)
-    double fabs(double)
-    double cos(double)
-    double sin(double)
-    double acos(double)
+    double atan2 (double y, double x ) nogil
+    double pow(double x, double y) nogil
+    double fabs(double) nogil
+    double cos(double) nogil
+    double sin(double) nogil
+    double acos(double) nogil
 
 cdef extern from "float.h":
     double DBL_MAX
@@ -145,7 +145,7 @@ cdef class CircularFace(Face):
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
     
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -174,7 +174,7 @@ cdef class CircularFace(Face):
         out.dist = h * max_length
         return out
 
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -192,7 +192,7 @@ cdef class ShapedPlanarFace(ShapedFace):
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)
     
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -219,7 +219,7 @@ cdef class ShapedPlanarFace(ShapedFace):
         out.dist = h*max_length
         return out
         
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -245,7 +245,7 @@ cdef class ElipticalPlaneFace(Face):
         self.g_x = kwds.get('g_x', 0.0)
         self.g_y = kwds.get('g_y', 0.0)
     
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
             double max_length = sep_(p1, p2)
             double h = (self.g_x*p1.x + self.g_y*p1.y - p1.z) / \
@@ -266,7 +266,7 @@ cdef class ElipticalPlaneFace(Face):
         out.dist = h * max_length
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -288,7 +288,7 @@ cdef class RectangularFace(Face):
         self.length = kwds.get("length", 5.0)
         self.offset = kwds.get("offset", 0.0)
     
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -322,7 +322,7 @@ cdef class RectangularFace(Face):
         out.dist = h * max_length
         return out
 
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -344,7 +344,7 @@ cdef class SphericalFace(Face):
         self.z_height = kwds.get('z_height', 0.0)
         self.curvature = kwds.get('curvature', 25.0)
     
-    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -411,7 +411,7 @@ cdef class SphericalFace(Face):
         out.dist = a1 * sep_(r, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -436,7 +436,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.curvature = kwds.get("curvature", 100.0)
     
-    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -501,7 +501,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         out.dist = a1 * sep_(r, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -588,7 +588,7 @@ cdef class ExtrudedPlanarFace(Face):
         n.z = 0
         self.normal = norm_(n)
         
-    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray) nogil:
         cdef: 
             vector_t s, u, v
             double a, dz
@@ -624,7 +624,7 @@ cdef class ExtrudedPlanarFace(Face):
             return out
         return NO_INTERSECTION
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         return self.normal
 
 #
@@ -633,11 +633,11 @@ cdef class ExtrudedPlanarFace(Face):
 
 
     
-cdef double eval_bezier(double t, double cp0, double cp1, double cp2, double cp3):
+cdef double eval_bezier(double t, double cp0, double cp1, double cp2, double cp3) nogil:
     #just evaluate a cubic bezier spline
     return cp0*((1-t)**3) + 3*cp1*t*((1-t)**2) + 3*cp2*(1-t)*(t**2) + cp3*(t**3)
 
-cdef double dif_bezier(double t, double cp0, double cp1, double cp2, double cp3):
+cdef double dif_bezier(double t, double cp0, double cp1, double cp2, double cp3) nogil:
     #calc the derivative of a cubic bezier when parameter = t
     cdef long double A, B, C     #just doin this old school polynomial style
     A = cp3-3*cp2+3*cp1-cp0
@@ -651,7 +651,7 @@ cdef struct poly_roots:
     double roots[3] 
     int n
     
-cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
+cdef poly_roots roots_of_cubic(double a, double b, double c, double d) nogil:
     #this code is known not to work in the case of (x-c)^3 (triple zero)
     # **TODO ** fix this
     # TODO: cubic solution explodes with small a, co quadratic is used.
@@ -662,7 +662,12 @@ cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
         long double R = (2.0*a1*a1*a1 - 9.0*a1*a2 + 27.0*a3)/54.0
         long double R2_Q3 = R*R - Q*Q*Q
         long double theta
-        poly_roots x= ((0.0,0.0,0.0),0)
+        poly_roots x
+        
+    x.roots[0] = 0.0
+    x.roots[1] = 0.0
+    x.roots[2] = 0.0
+    x.n=0
     if fabs(a) <= 0.0000000001:
         #^this, precision is less than ideal here
         if fabs(b) <= 0.0000000001:
@@ -705,271 +710,272 @@ cdef poly_roots roots_of_cubic(double a, double b, double c, double d):
             #print "single: ",x.roots[0]
     return x
 
-cdef flatvector_t rotate2D(double phi, flatvector_t p):
+cdef flatvector_t rotate2D(double phi, flatvector_t p) nogil:
     cdef flatvector_t result
     result.x = p.x*cos(phi) - p.y*sin(phi)
     result.y = p.x*sin(phi) + p.y*cos(phi)     
     return result
 
-cdef class ExtrudedBezierFace(Face):
-
-    cdef:
-        double z_height_1, z_height_2
-        flatvector_t mincorner, maxcorner         #corners of x-y box that bounds entire spline
-        np_.ndarray curves_array        
-
-    cdef int ccw(self, flatvector_t  A, flatvector_t  B, flatvector_t  C):
-        #used by an ingenious line segment intersect algorithim I found.
-        #determines counter clockwiseness of points
-        return (C.y-A.y)*(B.x-A.x) > (B.y-A.y)*(C.x-A.x)
-
-    cdef int line_seg_overlap(self, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
-        #check if two line segments overlap eachother.  Used for rough tests of
-        #intersection before committing to much computation to the potential intersection.
-        # A and B are the begin and end of one line; C,D the other. 
-        # Code from http://www.bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
-        #AB crosses CD if ABCD are all cw or ccw.
-        return self.ccw(A,C,D) != self.ccw(B,C,D) and self.ccw(A,B,C) != self.ccw(A,B,D)
-        
-    cdef int pnt_in_hull(self,flatvector_t p, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
-        #instead of convex hull, just use xy bounding box, which is quicker to construct
-
-        cdef int i,j,k
-        cdef float w
-
-        #if p is bigger than atleast one but not all, the it is in the box
-        i = p.x > A.x or p.x>B.x or p.x>C.x or p.x>D.x
-        j = p.x > A.x and p.x>B.x and p.x>C.x and p.x>D.x
-        k = i and not j
-        i = p.y > A.y or p.y>B.y or p.y>C.y or p.y>D.y
-        j = p.y > A.y and p.y>B.y and p.y>C.y and p.y>D.y
-        i = i and not j
-
-        #maybe a bad idea, but this is incase bezier is actually a plane in x or y only:
-        w = A.x - D.x
-        w = w*w
-        if w <= .0005:
-            w = B.x - A.x
-            w=w*w
-            if w <= .0005:
-                i=k=True
-        else:
-            w = A.y - D.y
-            w = w*w
-            if w <= .0005:
-                w = B.y - A.y
-                w=w*w
-                if w <= .0005:
-                    i=k=True
-        return i and k
-
-    def __cinit__(self,np_.ndarray[np_.float64_t ,ndim=3] beziercurves,double z_height_1=0,double z_height_2=0, **kwds):
-        cdef flatvector_t temp1, temp2
-        self.curves_array = beziercurves
-        self.z_height_1 = z_height_1
-        self.z_height_2 = z_height_2
-        temp1.x = beziercurves[0,0,0]
-        temp1.y = beziercurves[0,0,1]
-        temp2.x = beziercurves[0,0,0]
-        temp2.y = beziercurves[0,0,1]
-
-        for bezierpts in beziercurves:
-            for pair in bezierpts:
-                if pair[0] < temp1.x: temp1.x=pair[0]
-                if pair[0] > temp2.x: temp2.x=pair[0]
-                if pair[1] < temp1.y: temp1.y=pair[1]
-                if pair[1] > temp2.y: temp2.y=pair[1]
-
-        self.mincorner = temp1
-        self.maxcorner = temp2
-
-    cdef intersect_t intersect_c(self, vector_t ar, vector_t pee2, int is_base_ray):
-
-        cdef: 
-            flatvector_t tempvector
-            flatvector_t r, p2, s, origin
-            flatvector_t cp0,cp1,cp2,cp3  #holds control points for spline segment under scrutiny
-            double result = INF            #length of ray before it intersects surface. 0 if no valid intersection
-            double dZ                       #rate of change of z. dZ*result+Z0 gives Z coordinate
-            double A,B,C,D,t,a,b,c,d
-            poly_roots ts
-            vector_t    tempv
-            intersect_t out=NO_INTERSECTION
-        #print "\ncalled intersection"
-
-        origin.x = 0 
-        origin.y = 0
-        #first off, does ray even enter the depth of the extrusion?
-        if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
-            return NO_INTERSECTION    #does not
-        #print "ray passes z test"
-        #strip useless thrid dimension from ray vector
-        r.x = ar.x
-        r.y = ar.y
-        p2.x = pee2.x
-        p2.y = pee2.y
-
-
-        #check if ray intersects x-y bounding box of spline at all
-        tempvector.x = self.mincorner.x
-        tempvector.y = self.maxcorner.y
-        if not self.line_seg_overlap(r,p2,self.mincorner,tempvector):
-            if not  self.line_seg_overlap(r,p2,tempvector,self.maxcorner):
-                tempvector.x = self.maxcorner.x
-                tempvector.y = self.mincorner.y
-                if not self.line_seg_overlap(r,p2,self.maxcorner,tempvector):
-                    if not self.line_seg_overlap(r,p2,tempvector,self.mincorner):
-                        return NO_INTERSECTION    #no intersections
-        #print "ray is in big bounding box"
-        #segment intersects with gross bounding box,
-        #Calc dZ and the 2D origin adjusted ray, because they will probably be used.
-        tempv = subvv_ (pee2,ar) 
-        dZ = tempv.z
-        s.x=tempv.x
-        s.y=tempv.y
-        theta = atan2(s.y,s.x)
-                
-        s = rotate2D(-theta,s)
-        # now, loop through curves and see if segment 1) intersects with individual convex hulls
-        # 2) intersects with spline (return points)
-        for curve in self.curves_array.copy():            #load up control points
-            for pt in curve:
-                pt[0]=pt[0]-ar.x
-                pt[1]=pt[1]-ar.y 
-            cp0.x,cp0.y = curve[0].copy()
-            cp1.x,cp1.y = curve[1].copy()
-            cp2.x,cp2.y = curve[2].copy()
-            cp3.x,cp3.y = curve[3].copy()
-            
-            
-            #rotate ctrl points such that ray is along the x axis
-            cp0 = rotate2D(-theta,cp0)
-            cp1 = rotate2D(-theta,cp1)
-            cp2 = rotate2D(-theta,cp2)
-            cp3 = rotate2D(-theta,cp3)
-            #test for intersection between ray (actually segment) and convex hull
-            if self.line_seg_overlap(origin,s,cp0,cp1) or self.line_seg_overlap(origin,s,cp1,cp2) or self.line_seg_overlap(origin,s,cp2,cp3) or self.line_seg_overlap(origin,s,cp3,cp0):
-                #print "inside intersect hull"
-                #Ray does intersect this convex hull.  Find solution:
-                #Setup A,B,C and D (bernstein polynomials)
-                A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
-                B = 3*cp2.y-6*cp1.y+3*cp0.y
-                C = 3*cp1.y-3*cp0.y
-                D = cp0.y
-                #solve for t
-                #print "ABCD: ",A,B,C,D
-                ts = roots_of_cubic(A,B,C,D)
-                while ts.n > 0:
-                    ts.n-=1
-                    t = ts.roots[ts.n]
-                    #print "root: ", t
-                    #make sure solution is on valid interval
-                    if 0.<t<1.:
-                        #the x value will also be the length, which is the form of result
-                        b = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
-                        #print "b at t",b,t
-                        #is x within bounds?
-                        if 0 < b < s.x:
-                            #print "in range"
-                            #is point within Z bounds?
-                            c = dZ*b/s.x   
-                            a = c+ar.z     
-                            if self.z_height_1 < a < self.z_height_2:
-                                #print "in z: ",B,result
-                                #is this the shortest length to an intersection so far?
-                                b = sqrt(c**2+b**2)
-                                #print "this: ",b
-                                if b < result and b > self.tolerance:
-                                    result = b
-                                    #print "b at t",b,t
-
-        if result == INF: 
-            return NO_INTERSECTION
-
-        out.dist = result
-        return out
-
-
-
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
-        cdef:
-            flatvector_t ray,cp0,cp1,cp2,cp3,rotated
-            double theta, tmp, t
-            poly_roots ts
-            np_.ndarray box
-        #print "called looking for normal",p.x,p.y
-        ray.x = p.x
-        ray.y = p.y
-        theta = atan2(p.y,p.x)
-        #find which curve this point is in
-        for curve in self.curves_array.copy():            #load up control points
-            cp0.x,cp0.y = curve[0].copy()
-            cp1.x,cp1.y = curve[1].copy()
-            cp2.x,cp2.y = curve[2].copy()
-            cp3.x,cp3.y = curve[3].copy()
-
-            #is point even in this hull?
-            #print "tried at least"
-            if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
-                #then, solve for t
-                #print "in hull"
-                cp0 = rotate2D(-theta,cp0)
-                cp1 = rotate2D(-theta,cp1)
-                cp2 = rotate2D(-theta,cp2)
-                cp3 = rotate2D(-theta,cp3)
-                
-                #Setup A,B,C and D (bernstein polynomials)
-                A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
-                B = 3*cp2.y-6*cp1.y+3*cp0.y
-                C = 3*cp1.y-3*cp0.y
-                D = cp0.y
-                ts = roots_of_cubic(A,B,C,D)
-                
-                #print "normal roots: ",ts.n,ts.roots[0],ts.roots[1],ts.roots[2]
-                while ts.n > 0:
-                    ts.n -=1
-                    t = ts.roots[ts.n]
-                    #make sure solution is within interval
-                    #print "normal t: ",t
-                    if 0<=t<=1:
-                        #ok, then is this the t to the same point p? 
-                        tmp = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
-                        #print "normal b at t: ",tmp,t
-                        #I will generously allow for rounding error 
-                        #print "got here with point: ",tmp,
-                        if tmp**2 - (ray.x**2+ray.y**2) < .0001:
-                            #this is the single solution. return the derivative dy/dx = dy/dt / dx/dt
-                            #print "that was it!"
-                            ray.x = dif_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
-                            ray.y = dif_bezier(t,cp0.y,cp1.y,cp2.y,cp3.y)
-                            ray = rotate2D(theta,ray)
-                            p.z = 0     #trough has no slope in z
-                            #direction of normal is to the left of the parametric curve
-                            #slope of normal is -dx/dy
-                            
-                            if ray.y==0:
-                                p.x=0
-                                p.y = (1 if ray.x>0 else -1)
-                            elif ray.y>0:
-                                p.x=-1
-                                p.y = ray.x/ray.y
-                            elif ray.y<0:
-                                p.x = 1
-                                p.y = -ray.x/ray.y    
-                            return norm_(p)
-
-
-        #how did you get here?  p was supposed to be a point on the curve!
-        print("error: Bezier normal not found, point not actually on curve!")
-        p.x=p.y=p.z = 0
-        return p
+#
+# cdef class ExtrudedBezierFace(Face):
+#
+#     cdef:
+#         double z_height_1, z_height_2
+#         flatvector_t mincorner, maxcorner         #corners of x-y box that bounds entire spline
+#         np_.ndarray curves_array        
+#
+#     cdef int ccw(self, flatvector_t  A, flatvector_t  B, flatvector_t  C):
+#         #used by an ingenious line segment intersect algorithim I found.
+#         #determines counter clockwiseness of points
+#         return (C.y-A.y)*(B.x-A.x) > (B.y-A.y)*(C.x-A.x)
+#
+#     cdef int line_seg_overlap(self, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
+#         #check if two line segments overlap eachother.  Used for rough tests of
+#         #intersection before committing to much computation to the potential intersection.
+#         # A and B are the begin and end of one line; C,D the other. 
+#         # Code from http://www.bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
+#         #AB crosses CD if ABCD are all cw or ccw.
+#         return self.ccw(A,C,D) != self.ccw(B,C,D) and self.ccw(A,B,C) != self.ccw(A,B,D)
+#
+#     cdef int pnt_in_hull(self,flatvector_t p, flatvector_t A, flatvector_t B, flatvector_t C, flatvector_t D):
+#         #instead of convex hull, just use xy bounding box, which is quicker to construct
+#
+#         cdef int i,j,k
+#         cdef float w
+#
+#         #if p is bigger than atleast one but not all, the it is in the box
+#         i = p.x > A.x or p.x>B.x or p.x>C.x or p.x>D.x
+#         j = p.x > A.x and p.x>B.x and p.x>C.x and p.x>D.x
+#         k = i and not j
+#         i = p.y > A.y or p.y>B.y or p.y>C.y or p.y>D.y
+#         j = p.y > A.y and p.y>B.y and p.y>C.y and p.y>D.y
+#         i = i and not j
+#
+#         #maybe a bad idea, but this is incase bezier is actually a plane in x or y only:
+#         w = A.x - D.x
+#         w = w*w
+#         if w <= .0005:
+#             w = B.x - A.x
+#             w=w*w
+#             if w <= .0005:
+#                 i=k=True
+#         else:
+#             w = A.y - D.y
+#             w = w*w
+#             if w <= .0005:
+#                 w = B.y - A.y
+#                 w=w*w
+#                 if w <= .0005:
+#                     i=k=True
+#         return i and k
+#
+#     def __cinit__(self,np_.ndarray[np_.float64_t ,ndim=3] beziercurves,double z_height_1=0,double z_height_2=0, **kwds):
+#         cdef flatvector_t temp1, temp2
+#         self.curves_array = beziercurves
+#         self.z_height_1 = z_height_1
+#         self.z_height_2 = z_height_2
+#         temp1.x = beziercurves[0,0,0]
+#         temp1.y = beziercurves[0,0,1]
+#         temp2.x = beziercurves[0,0,0]
+#         temp2.y = beziercurves[0,0,1]
+#
+#         for bezierpts in beziercurves:
+#             for pair in bezierpts:
+#                 if pair[0] < temp1.x: temp1.x=pair[0]
+#                 if pair[0] > temp2.x: temp2.x=pair[0]
+#                 if pair[1] < temp1.y: temp1.y=pair[1]
+#                 if pair[1] > temp2.y: temp2.y=pair[1]
+#
+#         self.mincorner = temp1
+#         self.maxcorner = temp2
+#
+#     cdef intersect_t intersect_c(self, vector_t ar, vector_t pee2, int is_base_ray) nogil:
+#
+#         cdef: 
+#             flatvector_t tempvector
+#             flatvector_t r, p2, s, origin
+#             flatvector_t cp0,cp1,cp2,cp3  #holds control points for spline segment under scrutiny
+#             double result = INF            #length of ray before it intersects surface. 0 if no valid intersection
+#             double dZ                       #rate of change of z. dZ*result+Z0 gives Z coordinate
+#             double A,B,C,D,t,a,b,c,d
+#             poly_roots ts
+#             vector_t    tempv
+#             intersect_t out=NO_INTERSECTION
+#         #print "\ncalled intersection"
+#
+#         origin.x = 0 
+#         origin.y = 0
+#         #first off, does ray even enter the depth of the extrusion?
+#         if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
+#             return NO_INTERSECTION    #does not
+#         #print "ray passes z test"
+#         #strip useless thrid dimension from ray vector
+#         r.x = ar.x
+#         r.y = ar.y
+#         p2.x = pee2.x
+#         p2.y = pee2.y
+#
+#
+#         #check if ray intersects x-y bounding box of spline at all
+#         tempvector.x = self.mincorner.x
+#         tempvector.y = self.maxcorner.y
+#         if not self.line_seg_overlap(r,p2,self.mincorner,tempvector):
+#             if not  self.line_seg_overlap(r,p2,tempvector,self.maxcorner):
+#                 tempvector.x = self.maxcorner.x
+#                 tempvector.y = self.mincorner.y
+#                 if not self.line_seg_overlap(r,p2,self.maxcorner,tempvector):
+#                     if not self.line_seg_overlap(r,p2,tempvector,self.mincorner):
+#                         return NO_INTERSECTION    #no intersections
+#         #print "ray is in big bounding box"
+#         #segment intersects with gross bounding box,
+#         #Calc dZ and the 2D origin adjusted ray, because they will probably be used.
+#         tempv = subvv_ (pee2,ar) 
+#         dZ = tempv.z
+#         s.x=tempv.x
+#         s.y=tempv.y
+#         theta = atan2(s.y,s.x)
+#
+#         s = rotate2D(-theta,s)
+#         # now, loop through curves and see if segment 1) intersects with individual convex hulls
+#         # 2) intersects with spline (return points)
+#         for curve in self.curves_array.copy():            #load up control points
+#             for pt in curve:
+#                 pt[0]=pt[0]-ar.x
+#                 pt[1]=pt[1]-ar.y 
+#             cp0.x,cp0.y = curve[0].copy()
+#             cp1.x,cp1.y = curve[1].copy()
+#             cp2.x,cp2.y = curve[2].copy()
+#             cp3.x,cp3.y = curve[3].copy()
+#
+#
+#             #rotate ctrl points such that ray is along the x axis
+#             cp0 = rotate2D(-theta,cp0)
+#             cp1 = rotate2D(-theta,cp1)
+#             cp2 = rotate2D(-theta,cp2)
+#             cp3 = rotate2D(-theta,cp3)
+#             #test for intersection between ray (actually segment) and convex hull
+#             if self.line_seg_overlap(origin,s,cp0,cp1) or self.line_seg_overlap(origin,s,cp1,cp2) or self.line_seg_overlap(origin,s,cp2,cp3) or self.line_seg_overlap(origin,s,cp3,cp0):
+#                 #print "inside intersect hull"
+#                 #Ray does intersect this convex hull.  Find solution:
+#                 #Setup A,B,C and D (bernstein polynomials)
+#                 A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
+#                 B = 3*cp2.y-6*cp1.y+3*cp0.y
+#                 C = 3*cp1.y-3*cp0.y
+#                 D = cp0.y
+#                 #solve for t
+#                 #print "ABCD: ",A,B,C,D
+#                 ts = roots_of_cubic(A,B,C,D)
+#                 while ts.n > 0:
+#                     ts.n-=1
+#                     t = ts.roots[ts.n]
+#                     #print "root: ", t
+#                     #make sure solution is on valid interval
+#                     if 0.<t<1.:
+#                         #the x value will also be the length, which is the form of result
+#                         b = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+#                         #print "b at t",b,t
+#                         #is x within bounds?
+#                         if 0 < b < s.x:
+#                             #print "in range"
+#                             #is point within Z bounds?
+#                             c = dZ*b/s.x   
+#                             a = c+ar.z     
+#                             if self.z_height_1 < a < self.z_height_2:
+#                                 #print "in z: ",B,result
+#                                 #is this the shortest length to an intersection so far?
+#                                 b = sqrt(c**2+b**2)
+#                                 #print "this: ",b
+#                                 if b < result and b > self.tolerance:
+#                                     result = b
+#                                     #print "b at t",b,t
+#
+#         if result == INF: 
+#             return NO_INTERSECTION
+#
+#         out.dist = result
+#         return out
+#
+#
+#
+#     cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
+#         cdef:
+#             flatvector_t ray,cp0,cp1,cp2,cp3,rotated
+#             double theta, tmp, t
+#             poly_roots ts
+#             np_.ndarray box
+#         #print "called looking for normal",p.x,p.y
+#         ray.x = p.x
+#         ray.y = p.y
+#         theta = atan2(p.y,p.x)
+#         #find which curve this point is in
+#         for curve in self.curves_array.copy():            #load up control points
+#             cp0.x,cp0.y = curve[0].copy()
+#             cp1.x,cp1.y = curve[1].copy()
+#             cp2.x,cp2.y = curve[2].copy()
+#             cp3.x,cp3.y = curve[3].copy()
+#
+#             #is point even in this hull?
+#             #print "tried at least"
+#             if self.pnt_in_hull(ray,cp0,cp1,cp2,cp3):
+#                 #then, solve for t
+#                 #print "in hull"
+#                 cp0 = rotate2D(-theta,cp0)
+#                 cp1 = rotate2D(-theta,cp1)
+#                 cp2 = rotate2D(-theta,cp2)
+#                 cp3 = rotate2D(-theta,cp3)
+#
+#                 #Setup A,B,C and D (bernstein polynomials)
+#                 A = cp3.y-3*cp2.y+3*cp1.y-cp0.y
+#                 B = 3*cp2.y-6*cp1.y+3*cp0.y
+#                 C = 3*cp1.y-3*cp0.y
+#                 D = cp0.y
+#                 ts = roots_of_cubic(A,B,C,D)
+#
+#                 #print "normal roots: ",ts.n,ts.roots[0],ts.roots[1],ts.roots[2]
+#                 while ts.n > 0:
+#                     ts.n -=1
+#                     t = ts.roots[ts.n]
+#                     #make sure solution is within interval
+#                     #print "normal t: ",t
+#                     if 0<=t<=1:
+#                         #ok, then is this the t to the same point p? 
+#                         tmp = eval_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+#                         #print "normal b at t: ",tmp,t
+#                         #I will generously allow for rounding error 
+#                         #print "got here with point: ",tmp,
+#                         if tmp**2 - (ray.x**2+ray.y**2) < .0001:
+#                             #this is the single solution. return the derivative dy/dx = dy/dt / dx/dt
+#                             #print "that was it!"
+#                             ray.x = dif_bezier(t,cp0.x,cp1.x,cp2.x,cp3.x)
+#                             ray.y = dif_bezier(t,cp0.y,cp1.y,cp2.y,cp3.y)
+#                             ray = rotate2D(theta,ray)
+#                             p.z = 0     #trough has no slope in z
+#                             #direction of normal is to the left of the parametric curve
+#                             #slope of normal is -dx/dy
+#
+#                             if ray.y==0:
+#                                 p.x=0
+#                                 p.y = (1 if ray.x>0 else -1)
+#                             elif ray.y>0:
+#                                 p.x=-1
+#                                 p.y = ray.x/ray.y
+#                             elif ray.y<0:
+#                                 p.x = 1
+#                                 p.y = -ray.x/ray.y    
+#                             return norm_(p)
+#
+#
+#         #how did you get here?  p was supposed to be a point on the curve!
+#         print("error: Bezier normal not found, point not actually on curve!")
+#         p.x=p.y=p.z = 0
+#         return p
 
 
     
-cdef int point_in_polygon_c(double X, double Y, object obj):
+cdef int point_in_polygon_c(double X, double Y, double[:,:] obj) nogil:
     cdef int i, size, ct=0
     cdef double y1, y2, h, x, x1, x2
-    cdef np_.ndarray[np_.float64_t, ndim=2] pts=obj
+    cdef double[:,:] pts=obj
     
     size = pts.shape[0]
     
@@ -1010,7 +1016,7 @@ cdef class PolygonFace(Face):
             data = np.ascontiguousarray(pts, dtype=np.float64).reshape(-1,2)
             self._xy_points=data
             
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
@@ -1027,7 +1033,7 @@ cdef class PolygonFace(Face):
             out.dist = h * max_length
         return out
         
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1042,7 +1048,7 @@ cdef class OffAxisParabolicFace(Face):
     cdef:
         public double EFL, diameter, height
                 
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -1114,7 +1120,7 @@ cdef class OffAxisParabolicFace(Face):
             out.dist = a1 * sep_(p1, p2)
             return out
 #
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1158,7 +1164,7 @@ cdef class EllipsoidalFace(Face):
             t.trans = self.inv_trans
             return t
             
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
             double B,A, a, b, c, d
             
@@ -1209,7 +1215,7 @@ cdef class EllipsoidalFace(Face):
         out.dist = root1*mag_(S)
         return out
         
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         cdef vector_t n
         
         p = transform_c(self.trans, p)
@@ -1253,7 +1259,7 @@ cdef class SaddleFace(ShapedFace):
         self.z_height = kwds.get("z_height", 0.0)
         self.curvature = kwds.get("curvature", 0.0)
         
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
             double A=sqrt(6.0), root, denom, a1, a2
             vector_t d,p, pt1, pt2
@@ -1311,7 +1317,7 @@ cdef class SaddleFace(ShapedFace):
         out.dist = a1 * sep_(p1, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1340,7 +1346,7 @@ cdef class CylindericalFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.radius = kwds.get("radius", 100.0)
         
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
             double a1, a2, cz, ox2, oz2, dx2, dz2, denom, R=self.radius
             double R2 = R*R
@@ -1400,7 +1406,7 @@ cdef class CylindericalFace(ShapedFace):
         out.dist = a1 * sep_(p1, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1435,7 +1441,7 @@ cdef class AxiconFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.gradient = kwds.get('gradient', 0.0)
         
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
             double a1, a2, root, ox2, oy2, oz2, dx2, dy2, dz2, beta2, denom
             double beta = self.gradient
@@ -1491,7 +1497,7 @@ cdef class AxiconFace(ShapedFace):
         out.dist = a1 * sep_(p1, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1509,7 +1515,7 @@ cdef class AxiconFace(ShapedFace):
         return self.z_height - (self.gradient * sqrt(x*x + y*y))
     
     
-cdef double intersect_conic(vector_t a, vector_t d, double curvature, double conic_const):
+cdef double intersect_conic(vector_t a, vector_t d, double curvature, double conic_const) nogil:
     cdef:
         double beta = 1 + conic_const
         double R = -curvature
@@ -1581,7 +1587,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 10.0)
     
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -1614,7 +1620,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         out.dist = a1 * sep_(p1, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1668,7 +1674,7 @@ cdef struct aspheric_t:
     vector_t d
     
     
-cdef double eval_aspheric_impf(aspheric_t A, double alpha):
+cdef double eval_aspheric_impf(aspheric_t A, double alpha) nogil:
     cdef: 
         double out
         double r2 = ((A.a.x + alpha*A.d.x)**2 + (A.a.y + alpha*A.d.y)**2)
@@ -1680,7 +1686,7 @@ cdef double eval_aspheric_impf(aspheric_t A, double alpha):
     return out
 
 
-cdef double eval_aspheric_grad(aspheric_t A, double alpha):
+cdef double eval_aspheric_grad(aspheric_t A, double alpha) nogil:
     cdef:
         double out
         double r2 = ((A.a.x + alpha*A.d.x)**2 + (A.a.y + alpha*A.d.y)**2)
@@ -1723,7 +1729,7 @@ cdef class AsphericFace(ShapedFace):
         self.A16 = kwds.get('A16',0.0)
         self.atol = kwds.get("atol", 1.0e-8)
         
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -1792,7 +1798,7 @@ cdef class AsphericFace(ShapedFace):
         out.dist = a1 * sep_(p1, p2)
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1857,7 +1863,7 @@ cdef struct extpoly_t:
     #double E15, E16, E17, E18, E19, E20   # x^5y^0, x^4y^1, x^3y^2, x^2y^3, x^1y^4, x^0y^5   # 5th order
     
 # return the z-value
-cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha):
+cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha) nogil:
     """
     EP - polynomial definition 
     a - origin of input ray in local coords
@@ -1898,7 +1904,7 @@ cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vecto
     return out
 
 
-cdef double eval_extpoly_grad(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha):
+cdef double eval_extpoly_grad(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha) nogil:
     """
     1st derivative of eval_extpoly_impf w.r.t. alpha
     """
@@ -2000,7 +2006,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
         self.atol = kwds.get("atol", 1.0e-8)
      
      # a line-surface intersection   
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
          
         params:
@@ -2053,7 +2059,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
         out.dist = a1 * sep_(p1, p2)
         return out
          
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -2153,19 +2159,16 @@ cdef class DistortionFace(ShapedFace):
         self.shape = kwds.get('shape', face.shape)
         self.accuracy = kwds.get("accuracy", 1e-6)
         
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         cdef:
-            ShapedFace face=self.base_face
             double z_shift=0.0, tolerance, a1, a2, h=sep_(p2,p1)
             vector_t dxdyz, pt1, d, n, o, q1, q2
             int i
-            Distortion dist=self.distortion
-            Shape shape = self.shape
             intersect_t fout
             
         tolerance = self.accuracy
         
-        fout = face.intersect_c(p1,p2,0) #Don't check the shape yet
+        fout = self.base_face.intersect_c(p1,p2,0) #Don't check the shape yet
         a2 = fout.dist
         if a2>h or a2<self.tolerance: #If no intersection, then, no intersection
             #print("NO intersection", a2, p1.z, p2.z)
@@ -2175,9 +2178,9 @@ cdef class DistortionFace(ShapedFace):
         #starting estimate of intersection
         d = subvv_(p2,p1)
         pt1 = addvv_(p1, multvs_(d,a2/h))
-        dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
+        dxdyz = self.distortion.z_offset_and_gradient_c(pt1.x, pt1.y)
         
-        n = face.compute_normal_c(pt1, fout.piece_idx)
+        n = self.base_face.compute_normal_c(pt1, fout.piece_idx)
         #print("base normal:", n.x, n.y, n.z)
         #print("pt1:", pt1.x, pt1.y, pt1.z)
         #print("dx:", dxdyz.x, "dy:", dxdyz.y, "z:", dxdyz.z)
@@ -2202,18 +2205,18 @@ cdef class DistortionFace(ShapedFace):
             #print("a_error:", a1-a2, i)
             if fabs(a1 - a2) < tolerance:
                 break
-            z_shift = dist.z_offset_c(pt1.x, pt1.y)
+            z_shift = self.distortion.z_offset_c(pt1.x, pt1.y)
             
             q1 = p1
             q2 = p2
             q1.z -= z_shift
             q2.z -= z_shift
-            fout = face.intersect_c(q1, q2, 0)
+            fout = self.base_face.intersect_c(q1, q2, 0)
             a2 = fout.dist
             
             pt1 = addvv_(q1, multvs_(d,a2/h)) #this point on base
-            n = face.compute_normal_c(pt1, fout.piece_idx)
-            dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
+            n = self.base_face.compute_normal_c(pt1, fout.piece_idx)
+            dxdyz = self.distortion.z_offset_and_gradient_c(pt1.x, pt1.y)
             pt1.z += dxdyz.z #move to distorted face
             
             n.x /= n.z
@@ -2226,13 +2229,13 @@ cdef class DistortionFace(ShapedFace):
             a2 = a1
             a1 = -h*dotprod_(o,n)/dotprod_(d,n)
             
-        if not shape.point_inside_c(pt1.x, pt1.y):
+        if not self.shape.point_inside_c(pt1.x, pt1.y):
             return NO_INTERSECTION
         #print("Final a1:", a1)
         fout.dist = a1
         return fout
             
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         cdef:
             vector_t n, p1, dxdyz
 

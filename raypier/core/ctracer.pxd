@@ -128,6 +128,18 @@ cdef class RayArrayView:
     cdef ray_t get_ray_c(self, unsigned long i) nogil
     cdef unsigned long get_n_rays(self) nogil
     
+    
+cdef class RayAggregator:
+    cdef:
+        ray_t **rays
+        readonly unsigned long n_threads
+        unsigned long[:] n_rays
+        unsigned long[:] max_size
+        
+    cdef void add_ray_c(self, ray_t r) nogil
+    cdef clear_c(self)
+    cdef get_aggregated_c(self)
+    
 
 cdef class RayCollection(RayArrayView):
     cdef: 
@@ -186,14 +198,14 @@ cdef class InterfaceMaterial(object):
                             unsigned int ray_idx,
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays)
+                            RayAggregator new_rays) nogil
     
     cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray,  
                                      vector_t direction, #incoming ray direction
                                    vector_t point, #position of intercept
                                    orientation_t orient,
                                    unsigned int ray_type_id, #indicates if it's a transmitted or reflected ray 
-                                   )
+                                   ) nogil
     
     cdef void eval_decomposed_rays_c(self, GaussletCollection child_rays)
 
@@ -206,7 +218,7 @@ cdef class Distortion:
     
     
 cdef class Shape:
-    cdef bint point_inside_c(self, double x, double y)
+    cdef bint point_inside_c(self, double x, double y) nogil
 
 
 cdef class Face(object):
@@ -220,10 +232,10 @@ cdef class Face(object):
         public short int invert_normal
         public unsigned int count    
 
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray)
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil
 
-    cdef vector_t compute_normal_c(self, vector_t p, int piece)
-    cdef vector_t compute_tangent_c(self, vector_t p, int piece)
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil
+    cdef vector_t compute_tangent_c(self, vector_t p, int piece) nogil
 
 
 cdef class FaceList(object):
@@ -234,8 +246,8 @@ cdef class FaceList(object):
     cdef public object owner
 
     cpdef void sync_transforms(self)
-    cdef intersect_t intersect_c(self, ray_t *ray, vector_t end_point)
-    cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx)
+    cdef intersect_t intersect_c(self, ray_t *ray, vector_t end_point) nogil
+    cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx) nogil
     cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece)
 

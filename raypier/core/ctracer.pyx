@@ -30,7 +30,8 @@ import time
 import numpy as np
 cimport numpy as np_
 
-from cython.parallel import threadid, prange 
+from cython.parallel import threadid, prange
+cimport openmp
 
 cdef:
     int NPARA = 6
@@ -970,12 +971,6 @@ cdef class RayAggregator:
     Once the multi-threaded tracing is complete, the buffers are combined to output
     a complete RayCollection object.
     """
-    cdef:
-        ray_t **rays
-        readonly unsigned long n_threads
-        unsigned long[:] n_rays
-        unsigned long[:] max_size
-
     def __cinit__(self, size_t max_size, int n_threads):
         cdef:
             int i
@@ -1667,7 +1662,7 @@ cdef class InterfaceMaterial(object):
                                 unsigned int ray_idx, 
                                 vector_t p, 
                                 orientation_t orient,
-                                RayCollection new_rays):
+                                RayAggregator new_rays) nogil:
         pass
     
     cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray, 
@@ -1675,7 +1670,7 @@ cdef class InterfaceMaterial(object):
                                    vector_t point, #position of intercept
                                    orientation_t orient,
                                    unsigned int ray_type_id, #bool, if True, it's a reflected ray
-                                   ):
+                                   ) nogil:
         cdef:
             vector_t cosThetaNormal, reflected, normal
             para_t para_out
@@ -1703,7 +1698,7 @@ cdef class InterfaceMaterial(object):
         return
     
     def eval_child_ray(self, Ray old_ray, ray_idx, point, 
-                        normal, tangent, RayCollection new_rays):
+                        normal, tangent, RayAggregator new_rays):
         cdef:
             vector_t p
             orientation_t n
@@ -1742,7 +1737,7 @@ cdef class InterfaceMaterial(object):
     
     
 cdef class Shape:        
-    cdef bint point_inside_c(self, double x, double y):
+    cdef bint point_inside_c(self, double x, double y) nogil:
         return 1
     
     def point_inside(self, double x, double y):
@@ -1817,7 +1812,7 @@ cdef class Face(object):
         self.invert_normal = int(kwds.get('invert_normal', 0))
         
     
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """returns the distance of the nearest valid intersection between 
         p1 and p2. p1 and p2 are in the local coordinate system
         """
@@ -1846,10 +1841,10 @@ cdef class Face(object):
         it = self.intersect_c(p1_, p2_, is_base_ray)
         return it.dist
 
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         return p
     
-    cdef vector_t compute_tangent_c(self, vector_t p, int piece):
+    cdef vector_t compute_tangent_c(self, vector_t p, int piece) nogil:
         cdef vector_t tangent
         tangent.x = 1.0
         tangent.y = 0.0
@@ -1924,19 +1919,19 @@ cdef class FaceList(object):
         return self.faces[intidx]
     
     
-    cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t ray_end, int face_idx):
+    cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t ray_end, int face_idx) nogil:
         """Finds the intersection with the face specified by face_idx.
         """
         cdef:
             vector_t p1 = transform_c(self.inv_trans, ray.origin)
             vector_t p2 = transform_c(self.inv_trans, ray_end)
-            list faces=self.faces
             unsigned int i
             intersect_t it
             double dist
             Face face
         
-        face = faces[face_idx]
+        with gil:
+            face = self.faces[face_idx]
         it = face.intersect_c(p1, p2, 1)
         if face.tolerance < it.dist < ray.length:
             ray.length = it.dist
@@ -1944,7 +1939,7 @@ cdef class FaceList(object):
         return it
         
      
-    cdef intersect_t intersect_c(self, ray_t *ray, vector_t ray_end):
+    cdef intersect_t intersect_c(self, ray_t *ray, vector_t ray_end) nogil:
         """Finds the face with the nearest intersection
         point, for the ray defined by the two input points,
         P1 and P2 (in global coords).
@@ -1952,14 +1947,17 @@ cdef class FaceList(object):
         cdef:
             vector_t p1 = transform_c(self.inv_trans, ray.origin)
             vector_t p2 = transform_c(self.inv_trans, ray_end)
-            list faces=self.faces
             unsigned int i
             intersect_t this, out
             Face face
+            int nf
         
         out.face_idx = -1
-        for i in range(len(faces)):
-            face = faces[i]
+        with gil:
+            nf = len(self.faces)
+        for i in range(nf):
+            with gil:
+                face = self.faces[i]
             this = face.intersect_c(p1, p2, 1)
             if face.tolerance < this.dist < ray.length:
                 ray.length = this.dist
@@ -2123,51 +2121,58 @@ cdef RayCollection trace_segment_c(RayCollection rays,
                                     list decomp_faces,
                                     float max_length):
     cdef:
-        FaceList face_set #a FaceList
         Face face
+        FaceList faceset
         size_t i, j, n_sets=len(face_sets)
         vector_t point
         orientation_t orient
         int idx, nearest_set=-1, nearest_idx=-1, nearest_piece
         ray_t *ray
-        RayCollection new_rays
+        RayCollection new_rays_out
+        RayAggregator new_rays
         intersect_t it
+        int n_threads=openmp.omp_get_num_threads()
    
     #need to allocate the output rays here 
-    new_rays = RayCollection(rays.n_rays)
+    new_rays = RayAggregator(rays.n_rays, n_threads)
     new_rays.parent = rays
     
-    for i in range(rays.n_rays):
-        ray = rays.rays + i
-        ray.length = max_length
-        ray.end_face_idx = -1
-        nearest_idx=-1
-        point = addvv_(ray.origin, 
-                            multvs_(ray.direction, 
-                                    max_length))
-        #print "points", P1, P2
-        for j in range(n_sets):
-            face_set = face_sets[j]
-            #intersect_c returns the face idx of the intersection, or -1 otherwise
-            it = (<FaceList>face_set).intersect_c(ray, point)
-            if it.face_idx >= 0:
-                nearest_set = j
-                nearest_idx = it.face_idx
-                nearest_piece = it.piece_idx
-        if nearest_idx >= 0:
-            #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_idx]
-            face.count += 1
-            #print "ray length", ray.length
-            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-            orient = (<FaceList>(face_sets[nearest_set])).compute_orientation_c(face, point, nearest_piece)
-            #print "s normal", normal
-            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
-                                                    point,
-                                                    orient,
-                                                    new_rays
-                                                    )
-    return new_rays
+    with nogil:
+        for i in range(rays.n_rays):
+            ray = rays.rays + i
+            ray.length = max_length
+            ray.end_face_idx = -1
+            nearest_idx=-1
+            point = addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        max_length))
+            #print "points", P1, P2
+            for j in range(n_sets):
+                #intersect_c returns the face idx of the intersection, or -1 otherwise
+                with gil:
+                    faceset = face_sets[j]
+                it = (<FaceList>faceset).intersect_c(ray, point)
+                if it.face_idx >= 0:
+                    nearest_set = j
+                    nearest_idx = it.face_idx
+                    nearest_piece = it.piece_idx
+            if nearest_idx >= 0:
+                #print "GET FACE", nearest.face_idx, len(all_faces)
+                with gil:
+                    face = all_faces[nearest_idx] 
+                face.count += 1
+                #print "ray length", ray.length
+                point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+                orient = (<FaceList>(face_sets[nearest_set])).compute_orientation_c(face, point, nearest_piece)
+                #print "s normal", normal
+                (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                        point,
+                                                        orient,
+                                                        new_rays
+                                                        )
+    new_rays_out = new_rays.get_aggregated_c()
+    new_rays_out.parent = rays
+    return new_rays_out
 
 
 cdef RayCollection trace_one_face_segment_c(RayCollection rays, 
@@ -2183,42 +2188,47 @@ cdef RayCollection trace_one_face_segment_c(RayCollection rays,
         orientation_t orient
         int idx, nearest_idx=-1, nearest_piece=0
         ray_t *ray
-        RayCollection new_rays
+        RayAggregator new_rays
+        RayCollection new_rays_out
         intersect_t it
+        int n_threads=openmp.omp_get_num_threads()
    
     #need to allocate the output rays here 
-    new_rays = RayCollection(rays.n_rays)
-    new_rays.parent = rays
+    new_rays = RayAggregator(rays.n_rays, n_threads)
     
-    for i in range(rays.n_rays):
-        ray = rays.rays + i
-        ray.length = max_length
-        ray.end_face_idx = -1
-        nearest_idx=-1
-        point = addvv_(ray.origin, 
-                            multvs_(ray.direction, 
-                                    max_length))
-        #print "points", P1, P2
-        #intersect_c returns the face idx of the intersection, or -1 otherwise
-        it = (<FaceList>face_set).intersect_one_face_c(ray, point, face_idx)
-        idx = it.face_idx
-        if idx >= 0:
-            nearest_idx = idx
-            nearest_piece = it.piece_idx
-        if nearest_idx >= 0:
-            #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_idx]
-            face.count += 1
-            #print "ray length", ray.length
-            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-            orient = (<FaceList>face_set).compute_orientation_c(face, point, nearest_piece)
-            #print "s normal", normal
-            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
-                                                    point,
-                                                    orient,
-                                                    new_rays
-                                                    )
-    return new_rays
+    with nogil:
+        for i in prange(rays.n_rays):
+            ray = rays.rays + i
+            ray.length = max_length
+            ray.end_face_idx = -1
+            nearest_idx=-1
+            point = addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        max_length))
+            #print "points", P1, P2
+            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            it = (<FaceList>face_set).intersect_one_face_c(ray, point, face_idx)
+            idx = it.face_idx
+            if idx >= 0:
+                nearest_idx = idx
+                nearest_piece = it.piece_idx
+            if nearest_idx >= 0:
+                #print "GET FACE", nearest.face_idx, len(all_faces)
+                with gil:
+                    face = all_faces[nearest_idx] 
+                face.count += 1
+                #print "ray length", ray.length
+                point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+                orient = (<FaceList>face_set).compute_orientation_c(face, point, nearest_piece)
+                #print "s normal", normal
+                (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                                                        point,
+                                                        orient,
+                                                        new_rays
+                                                        )
+    new_rays_out = new_rays.get_aggregated_c()
+    new_rays_out.parent = rays
+    return new_rays_out
 
 
 def trace_segment(RayCollection rays, 
