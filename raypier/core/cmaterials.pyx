@@ -1,4 +1,9 @@
 # cython: cdivision=True
+
+#cython: boundscheck=False
+#cython: nonecheck=False
+#cython: cdivision=True
+
 cimport cython
 
 cdef extern from "math.h":

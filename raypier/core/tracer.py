@@ -81,15 +81,15 @@ def trace_ray_sequence(input_rays, face_sequence, recursion_limit=100, max_lengt
         f.update() #This was a bad idea.
         f.material.wavelengths = wavelengths
         f.max_length = max_length
-    
-    face_sets = list(face_lists)
+
+    all_faces_a = np.array(all_faces)    
     decomp_faces = [f for f in all_faces if f.material.is_decomp_material()]
     
     rays = input_rays
     
     for next_face_list, next_face_idx in zip(face_lists, face_idx_list):
         rays = trace_func(rays, next_face_list, next_face_idx, 
-                          all_faces, 
+                          all_faces_a, 
                          max_length=max_length,
                          decomp_faces=decomp_faces)
         if (count > recursion_limit) or (rays.n_rays==0):

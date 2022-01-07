@@ -1262,6 +1262,92 @@ cdef class GaussletBaseRayView(RayArrayView):
         return out
     
     
+cdef class GaussletAggregator:
+    """
+    A specialised object for collecting new ray_t instances from multiple threads.
+    Rays are stored in separate memory buffers by thread_id.
+    Once the multi-threaded tracing is complete, the buffers are combined to output
+    a complete RayCollection object.
+    """
+    def __cinit__(self, size_t max_size, int n_threads):
+        cdef:
+            int i
+        if n_threads<1:
+            raise ValueError("Can't work with fewer than 1 thread")
+
+        self.n_threads = n_threads
+        self.rays = <gausslet_t**>malloc(n_threads*sizeof(gausslet_t*))
+        for i in range(n_threads):
+            self.rays[i] = <gausslet_t*>malloc(max_size*sizeof(gausslet_t))
+
+        self.n_rays = np.zeros(n_threads, dtype=np.uint64)
+        self.max_size = np.full(n_threads, max_size, dtype=np.uint64)
+
+    def __dealloc__(self):
+        cdef:
+            int i
+
+        for i in range(self.n_threads):
+            free(self.rays[i])
+        free(self.rays)
+
+    cdef void add_gausslet_c(self, gausslet_t r, int tid) nogil:
+        cdef:
+            gausslet_t* rays = self.rays[tid]
+            unsigned long[:] n_rays = self.n_rays
+            unsigned long[:] max_size = self.max_size
+        
+        if n_rays[tid] == max_size[tid]:
+            if max_size[tid] == 0:
+                max_size[tid] = 1
+            else:
+                max_size[tid] *= 2
+            rays = <gausslet_t*>realloc(rays, max_size[tid]*sizeof(gausslet_t))
+        rays[n_rays[tid]] = r
+        n_rays[tid] =  n_rays[tid] + 1
+        
+    cdef clear_c(self):
+        cdef:
+            int i
+            
+        for i in range(self.n_threads):
+            self.n_rays[i] = 0
+            
+    def clear(self):
+        self.clear_c()
+        
+    cdef GaussletCollection get_aggregated_c(self):
+        cdef:
+            int i, total=0
+            int n_threads = self.n_threads
+            unsigned long count=0
+            
+        for i in range(n_threads):
+            total += self.n_rays[i]
+            
+        rc = GaussletCollection(total)
+        for i in range(n_threads):
+            memcpy(rc.rays + count, self.rays[i], self.n_rays[i]*sizeof(gausslet_t))
+            count += self.n_rays[i]
+        rc.n_rays = total
+        return rc
+    
+    def get_aggregated(self):
+        return self.get_aggregated_c()
+    
+    def add_rays(self, GaussletCollection rc):
+        cdef:
+            unsigned long i, n=rc.get_n_rays()
+            gausslet_t r
+            int tid
+            
+        with nogil:
+            for i in prange(n):
+                tid = threadid()
+                r = rc.rays[i]
+                self.add_gausslet_c(r, tid)
+    
+    
 cdef class GaussletCollection:
     """A list-like collection of ray_t objects.
     
@@ -1982,7 +2068,7 @@ cdef class FaceList(object):
         it = self.intersect_c(&r.ray, P1_)
         return it.face_idx
     
-    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face):
+    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face) nogil:
         cdef:
             vector_t p1 = transform_c(self.inv_trans, ray.origin)
             vector_t p2 = transform_c(self.inv_trans, ray_end)
@@ -2184,11 +2270,12 @@ cdef RayCollection trace_segment_c(RayCollection rays,
 cdef RayCollection trace_one_face_segment_c(RayCollection rays, 
                                     FaceList face_set,
                                     int face_idx, 
-                                    list all_faces,
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     float max_length):
     cdef:
-        Face face
+        void** all_faces_ptr=<void**>(all_faces.data)
+        void* face
         size_t i, j
         vector_t point
         orientation_t orient
@@ -2197,7 +2284,7 @@ cdef RayCollection trace_one_face_segment_c(RayCollection rays,
         RayAggregator new_rays
         RayCollection new_rays_out
         intersect_t it
-        int n_threads=openmp.omp_get_num_threads()
+        int n_threads=openmp.omp_get_max_threads()
    
     #need to allocate the output rays here 
     new_rays = RayAggregator(rays.n_rays, n_threads)
@@ -2220,14 +2307,13 @@ cdef RayCollection trace_one_face_segment_c(RayCollection rays,
                 nearest_piece = it.piece_idx
             if nearest_idx >= 0:
                 #print "GET FACE", nearest.face_idx, len(all_faces)
-                with gil:
-                    face = all_faces[nearest_idx] 
-                face.count += 1
+                face = all_faces_ptr[nearest_idx] 
+                (<Face>face).count = (<Face>face).count + 1
                 #print "ray length", ray.length
                 point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-                orient = (<FaceList>face_set).compute_orientation_c(face, point, nearest_piece)
+                orient = (<FaceList>face_set).compute_orientation_c(<Face>face, point, nearest_piece)
                 #print "s normal", normal
-                (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                (<InterfaceMaterial>((<Face>face).material)).eval_child_ray_c(ray, i, 
                                                         point,
                                                         orient,
                                                         new_rays
@@ -2253,15 +2339,15 @@ def trace_segment(RayCollection rays,
 def trace_one_face_segment(RayCollection rays, 
                     FaceList face_set,
                     int face_idx, 
-                    list all_faces,
+                    np_.ndarray all_faces,
                     max_length=100,
                     decomp_faces=[]):
     face_set.sync_transforms()
     return trace_one_face_segment_c(rays, face_set, face_idx, all_faces, decomp_faces, max_length)
 
 def trace_gausslet(GaussletCollection rays, 
-                    list face_sets, 
-                    list all_faces,
+                    np_.ndarray face_sets, 
+                    np_.ndarray all_faces,
                     max_length=100,
                     decomp_faces=[]):
     cdef:
@@ -2281,142 +2367,161 @@ def trace_one_face_gausslet(GaussletCollection rays,
 
 
 cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
-                                    list face_sets, 
-                                    list all_faces,
+                                    np_.ndarray face_sets, 
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     double max_length):
     cdef:
-        FaceList face_set #a FaceList
-        Face face
+        void** face_sets_ptr = <void**>(face_sets.data)
+        void** all_faces_ptr = <void**>(all_faces.data)
+        void* face_set #a FaceList
+        void* face
         size_t i, j, n_sets=len(face_sets), n_decomp = len(decomp_faces)
         vector_t point
         orientation_t orient
         int idx, nearest_set=-1, nearest_idx=-1, nearest_piece=0
         gausslet_t *gausslet
         ray_t *ray
-        GaussletCollection new_gausslets
-        RayCollection child_rays
+        GaussletAggregator new_gausslets
+        GaussletCollection new_gausslets_out
+        RayAggregator child_rays
         intersect_t it
+        int n_threads=openmp.omp_get_max_threads()
+        int tid
+        Face dface
    
     #need to allocate the output rays here 
-    new_gausslets = GaussletCollection(gausslets.n_rays)
-    new_gausslets.parent = gausslets
+    new_gausslets = GaussletAggregator(gausslets.n_rays, n_threads)
     
-    child_rays = RayCollection(2)
+    child_rays = RayAggregator(2, n_threads)
     
-    for i in range(gausslets.n_rays):
-        gausslet = gausslets.rays + i
-        ray = &gausslet.base_ray
-        ray.end_face_idx = -1
-        nearest_idx=-1
-        point = addvv_(ray.origin, 
-                            multvs_(ray.direction, 
-                                    max_length))
-        #print "points", P1, P2
-        for j in range(n_sets):
-            face_set = face_sets[j]
-            #intersect_c returns the face idx of the intersection, or -1 otherwise
-            it = (<FaceList>face_set).intersect_c(ray, point)
-            if it.face_idx >= 0:
-                nearest_set = j
-                nearest_idx = it.face_idx
-                nearest_piece = it.piece_idx
-        if nearest_idx >= 0:
-            #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_idx]
-            face.count += 1
-            #print "ray length", ray.length
-            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-            face_set = (<FaceList>(face_sets[nearest_set])) 
-            orient = face_set.compute_orientation_c(face, point, nearest_piece)
-            #print "s normal", normal
-            ### Clear the child_rays structure
-            child_rays.n_rays = 0
-            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
-                                                    point,
-                                                    orient,
-                                                    child_rays
-                                                    )
-            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length, nearest_piece)
+    with nogil:
+        for i in prange(gausslets.n_rays):
+            tid = threadid()
+            gausslet = gausslets.rays + i
+            ray = &gausslet.base_ray
+            ray.end_face_idx = -1
+            nearest_idx=-1
+            point = addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        max_length))
+            #print "points", P1, P2
+            for j in range(n_sets):
+                face_set = face_sets_ptr[j]
+                #intersect_c returns the face idx of the intersection, or -1 otherwise
+                it = (<FaceList>face_set).intersect_c(ray, point)
+                if it.face_idx >= 0:
+                    nearest_set = j
+                    nearest_idx = it.face_idx
+                    nearest_piece = it.piece_idx
+            if nearest_idx >= 0:
+                #print "GET FACE", nearest.face_idx, len(all_faces)
+                face = all_faces_ptr[nearest_idx]
+                (<Face>face).count = (<Face>face).count + 1
+                #print "ray length", ray.length
+                point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+                face_set = face_sets_ptr[nearest_set] 
+                orient = (<FaceList>face_set).compute_orientation_c(<Face>face, point, nearest_piece)
+                #print "s normal", normal
+                ### Clear the child_rays structure
+                child_rays.n_rays[tid] = 0
+                (<InterfaceMaterial>((<Face>face).material)).eval_child_ray_c(ray, i, 
+                                                        point,
+                                                        orient,
+                                                        child_rays
+                                                        )
+                trace_parabasal_rays(gausslet, child_rays, <Face>face, <FaceList>face_set, 
+                                     new_gausslets, max_length, nearest_piece, tid)
+                
+    new_gausslets_out = new_gausslets.get_aggregated_c()
+    new_gausslets_out.parent = gausslets
             
     for j in range(n_decomp):
-        face = decomp_faces[j]
-        if face.count:
-            (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(new_gausslets)
-            face.count = 0
+        dface = decomp_faces[j]
+        if dface.count:
+            (<InterfaceMaterial>(dface.material)).eval_decomposed_rays_c(new_gausslets_out)
+            dface.count = 0
             
-    new_gausslets.reset_length_c(max_length)
-    return new_gausslets
+    new_gausslets_out.reset_length_c(max_length)
+    return new_gausslets_out
 
 
 cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets, 
                                     FaceList face_set,
                                     int face_idx, 
-                                    list all_faces,
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     double max_length):
     cdef:
-        Face face
+        void** all_faces_ptr=<void**>(all_faces.data)
+        void* face
         size_t i, j, n_decomp = len(decomp_faces)
         vector_t point
         orientation_t orient
         int nearest_piece, nearest_idx=-1
         gausslet_t *gausslet
         ray_t *ray
-        GaussletCollection new_gausslets
-        RayCollection child_rays
+        GaussletAggregator new_gausslets
+        GaussletCollection new_gausslets_out
+        RayAggregator child_rays
         intersect_t it
+        Face dface
+        int tid, n_threads=openmp.omp_get_max_threads()
    
     #need to allocate the output rays here 
-    new_gausslets = GaussletCollection(gausslets.n_rays)
-    new_gausslets.parent = gausslets
+    new_gausslets = GaussletAggregator(gausslets.n_rays)
     
-    child_rays = RayCollection(2)
+    child_rays = RayAggregator(2, n_threads)
     
-    for i in range(gausslets.n_rays):
-        gausslet = gausslets.rays + i
-        ray = &gausslet.base_ray
-        ray.end_face_idx = -1
-        nearest_idx=-1
-        point = addvv_(ray.origin, 
-                            multvs_(ray.direction, 
-                                    max_length))
-        #print "points", P1, P2
-        #intersect_c returns the face idx of the intersection, or -1 otherwise
-        it = (<FaceList>face_set).intersect_one_face_c(ray, point, face_idx)
-        if it.face_idx >= 0:
-            nearest_idx = it.face_idx
-            nearest_piece = it.piece_idx
-        if nearest_idx >= 0:
-            #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_idx]
-            face.count += 1
-            #print "ray length", ray.length
-            point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-            orient = face_set.compute_orientation_c(face, point, nearest_piece)
-            #print "s normal", normal
-            ### Clear the child_rays structure
-            child_rays.n_rays = 0
-            (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
-                                                    point,
-                                                    orient,
-                                                    child_rays
-                                                    )
-            trace_parabasal_rays(gausslet, child_rays, face, face_set, 
-                                 new_gausslets, max_length, nearest_piece)
+    with nogil:
+        for i in prange(gausslets.n_rays):
+            tid = threadid()
+            gausslet = gausslets.rays + i
+            ray = &gausslet.base_ray
+            ray.end_face_idx = -1
+            nearest_idx=-1
+            point = addvv_(ray.origin, 
+                                multvs_(ray.direction, 
+                                        max_length))
+            #print "points", P1, P2
+            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            it = (<FaceList>face_set).intersect_one_face_c(ray, point, face_idx)
+            if it.face_idx >= 0:
+                nearest_idx = it.face_idx
+                nearest_piece = it.piece_idx
+            if nearest_idx >= 0:
+                #print "GET FACE", nearest.face_idx, len(all_faces)
+                face = all_faces_ptr[nearest_idx]
+                (<Face>face).count = (<Face>face).count + 1
+                #print "ray length", ray.length
+                point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
+                orient = face_set.compute_orientation_c(<Face>face, point, nearest_piece)
+                #print "s normal", normal
+                ### Clear the child_rays structure
+                child_rays.n_rays[tid] = 0
+                (<InterfaceMaterial>((<Face>face).material)).eval_child_ray_c(ray, i, 
+                                                        point,
+                                                        orient,
+                                                        child_rays
+                                                        )
+                trace_parabasal_rays(gausslet, child_rays, <Face>face, face_set, 
+                                     new_gausslets, max_length, nearest_piece, tid)
+                
+    new_gausslets_out = new_gausslets.get_aggregated_c()
+    new_gausslets_out.parent = gausslets
             
     for j in range(n_decomp):
-        face = decomp_faces[j]
-        if face.count:
-            (<InterfaceMaterial>(face.material)).eval_decomposed_rays_c(new_gausslets)
-            face.count = 0
+        dface = decomp_faces[j]
+        if dface.count:
+            (<InterfaceMaterial>(dface.material)).eval_decomposed_rays_c(new_gausslets_out)
+            dface.count = 0
             
-    new_gausslets.reset_length_c(max_length)
-    return new_gausslets
+    new_gausslets_out.reset_length_c(max_length)
+    return new_gausslets_out
 
 
-cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face face, FaceList face_set, 
-                          GaussletCollection new_gausslets, double max_length, int piece):
+cdef void trace_parabasal_rays(gausslet_t *g_in, RayAggregator base_rays, Face face, FaceList face_set, 
+                          GaussletAggregator new_gausslets, double max_length, int piece, int tid) nogil:
     cdef:
         unsigned int i,j
         para_t *para_ray
@@ -2424,7 +2529,6 @@ cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face f
         vector_t ray_end
         vector_t point[6]
         orientation_t orient[6]
-        InterfaceMaterial material = (<InterfaceMaterial>(face.material))
         
     for j in range(6):
         para_ray = g_in.para + j
@@ -2436,17 +2540,17 @@ cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face f
         point[j] = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))
         orient[j] = face_set.compute_orientation_c(face, point[j], piece)
     
-    for i in range(base_rays.n_rays):
-        gausslet.base_ray = base_rays.rays[i]
+    for i in range(base_rays.n_rays[tid]):
+        gausslet.base_ray = base_rays.rays[tid][i]
         for j in range(6):
             para_ray = g_in.para + j            
-            gausslet.para[j] = material.eval_parabasal_ray_c(base_rays.rays + i,
+            gausslet.para[j] = (<InterfaceMaterial>(face.material)).eval_parabasal_ray_c(base_rays.rays[tid] + i,
                                                             para_ray.direction, #incoming ray direction
                                                             point[j], #position of intercept
                                                             orient[j],
                                                             gausslet.base_ray.ray_type_id, #indicates if it's a transmitted or reflected ray 
                                                             )
-        new_gausslets.add_gausslet_c(gausslet)
+        new_gausslets.add_gausslet_c(gausslet, tid)
             
             
 

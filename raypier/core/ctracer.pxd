@@ -160,6 +160,18 @@ cdef class RayCollection(RayArrayView):
     cdef void _eval_neighbours(self, int[:,:] pnb)
     
     
+cdef class GaussletAggregator:
+    cdef:
+        gausslet_t **rays
+        readonly unsigned long n_threads
+        unsigned long[:] n_rays
+        unsigned long[:] max_size
+        
+    cdef void add_gausslet_c(self, gausslet_t r, int tid) nogil
+    cdef clear_c(self)
+    cdef GaussletCollection get_aggregated_c(self)
+    
+    
 cdef class GaussletCollection:
     cdef: 
         gausslet_t *rays
@@ -252,7 +264,7 @@ cdef class FaceList(object):
     cpdef void sync_transforms(self)
     cdef intersect_t intersect_c(self, ray_t *ray, vector_t end_point) nogil
     cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx) nogil
-    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
+    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face) nogil
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece) nogil
 
 
@@ -269,20 +281,20 @@ cdef RayCollection trace_segment_c(RayCollection rays,
 cdef RayCollection trace_one_face_segment_c(RayCollection rays,
                                     FaceList face_set,
                                     int face_idx,
-                                    list all_faces,
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     float max_length)
 
 cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets, 
-                                    list face_sets, 
-                                    list all_faces,
+                                    np_.ndarray face_sets, 
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     double max_length)
 
 cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets, 
                                     FaceList face_set,
                                     int face_idx, 
-                                    list all_faces,
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     double max_length)
 
