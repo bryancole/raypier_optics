@@ -152,7 +152,7 @@ cdef class RayCollection(RayArrayView):
         int[:,:] _neighbours
         double _mtime        
 
-    cdef add_ray_c(self, ray_t r) nogil
+    cdef void add_ray_c(self, ray_t r) nogil
     cdef void reset_length_c(self, double max_length)
     
     cdef double get_mtime(self, unsigned long guard)
@@ -167,8 +167,8 @@ cdef class GaussletCollection:
         GaussletCollection _parent
         double[:] _wavelengths
 
-    cdef add_gausslet_c(self, gausslet_t r)
-    cdef void extend_c(self, GaussletCollection gc)
+    cdef void add_gausslet_c(self, gausslet_t r) nogil
+    cdef void extend_c(self, GaussletCollection gc) nogil
     cdef void reset_length_c(self, double max_length)
     
     
@@ -199,7 +199,7 @@ cdef class InterfaceMaterial(object):
                             unsigned int ray_idx,
                             vector_t point,
                             orientation_t orient,
-                            void* new_rays) nogil
+                            RayAggregator new_rays) nogil
     
     cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray,  
                                      vector_t direction, #incoming ray direction

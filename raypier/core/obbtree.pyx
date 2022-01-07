@@ -8,9 +8,9 @@ from PIL.TiffImagePlugin import II
 cdef extern from "math.h":
     double M_PI
     double sqrt(double) nogil
-    double atan2 (double y, double x )
-    double pow(double x, double y)
-    double fabs(double)
+    double atan2 (double y, double x ) nogil
+    double pow(double x, double y) nogil
+    double fabs(double) nogil
     
 from libc.stdlib cimport malloc, free, realloc
     
@@ -301,7 +301,7 @@ cdef class OBBTree(object):
         obb = self.compute_obb_cells_c(0, n_cells)
         self.root_idx = self.c_build_tree(obb, 0)
         
-    cdef int line_intersects_node_c(self, obbnode_t* this, vector_t p0, vector_t p1):
+    cdef int line_intersects_node_c(self, obbnode_t* this, vector_t p0, vector_t p1) nogil:
         cdef:
             int ii
             #obbnode_t this = self.nodes[node_idx]
@@ -329,7 +329,7 @@ cdef class OBBTree(object):
     
     @boundscheck(False)
     @initializedcheck(False)
-    cdef vector_t get_point_c(self, long idx):
+    cdef vector_t get_point_c(self, long idx) nogil:
         cdef:
             vector_t p
         p.x = self.points[idx,0]
@@ -340,7 +340,7 @@ cdef class OBBTree(object):
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cdef double line_intersects_cell_c(self, long cell_idx, vector_t o, vector_t d):
+    cdef double line_intersects_cell_c(self, long cell_idx, vector_t o, vector_t d) nogil:
         """ For a line defined by origin 'o' and direction 'd',
         returns the distance form the origin to the triangle intersection.
         If there is no intersection, returns -1
@@ -397,7 +397,7 @@ cdef class OBBTree(object):
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cdef intersection intersect_with_line_c(self, vector_t p1, vector_t p2, long[:] workspace):
+    cdef intersection intersect_with_line_c(self, vector_t p1, vector_t p2, long[:] workspace) nogil:
         """
         """
         cdef:
@@ -947,7 +947,7 @@ cdef class OBBTreeFace(Face):
         self.normals = normals 
         
         
-    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray) nogil:
         """Intersects the given ray with this face.
         
         params:
@@ -969,7 +969,7 @@ cdef class OBBTreeFace(Face):
         return out
         
         
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece) nogil:
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """

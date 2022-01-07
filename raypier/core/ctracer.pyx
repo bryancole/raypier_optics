@@ -1082,7 +1082,7 @@ cdef class RayCollection(RayArrayView):
     cdef unsigned long get_n_rays(self) nogil:
         return self.n_rays
         
-    cdef add_ray_c(self, ray_t r):
+    cdef void add_ray_c(self, ray_t r) nogil:
         if self.n_rays == self.max_size:
             if self.max_size == 0:
                 self.max_size = 1
@@ -1292,7 +1292,7 @@ cdef class GaussletCollection:
             self._parent = gc
             self._wavelengths = gc._wavelengths
         
-    cdef add_gausslet_c(self, gausslet_t r):
+    cdef void add_gausslet_c(self, gausslet_t r) nogil:
         if self.n_rays == self.max_size:
             if self.max_size == 0:
                 self.max_size = 1
@@ -1375,7 +1375,7 @@ cdef class GaussletCollection:
     def extend(self, GaussletCollection gc):
         self.extend_c(gc)
         
-    cdef void extend_c(self, GaussletCollection gc):
+    cdef void extend_c(self, GaussletCollection gc) nogil:
         if (self.n_rays + gc.n_rays) > self.max_size:
             self.max_size = (self.n_rays*2 + gc.n_rays)
             self.rays = <gausslet_t*>realloc(self.rays, self.max_size*sizeof(gausslet_t))
@@ -1663,7 +1663,7 @@ cdef class InterfaceMaterial(object):
                                 unsigned int ray_idx, 
                                 vector_t p, 
                                 orientation_t orient,
-                                void* new_rays) nogil:
+                                RayAggregator new_rays) nogil:
         pass
     
     cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray, 
