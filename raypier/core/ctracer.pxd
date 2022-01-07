@@ -11,6 +11,7 @@ cdef:
 
 
 from libc.stdlib cimport malloc, free
+cimport numpy as np_
 
 ############################################
 ### C type declarations for internal use ###
@@ -151,7 +152,7 @@ cdef class RayCollection(RayArrayView):
         int[:,:] _neighbours
         double _mtime        
 
-    cdef add_ray_c(self, ray_t r)
+    cdef add_ray_c(self, ray_t r) nogil
     cdef void reset_length_c(self, double max_length)
     
     cdef double get_mtime(self, unsigned long guard)
@@ -198,7 +199,7 @@ cdef class InterfaceMaterial(object):
                             unsigned int ray_idx,
                             vector_t point,
                             orientation_t orient,
-                            RayAggregator new_rays) nogil
+                            void* new_rays) nogil
     
     cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray,  
                                      vector_t direction, #incoming ray direction
@@ -240,16 +241,19 @@ cdef class Face(object):
 
 cdef class FaceList(object):
     """A group of faces which share a transform"""
-    cdef transform_t trans
-    cdef transform_t inv_trans
-    cdef public list faces
-    cdef public object owner
+    cdef:
+        transform_t trans
+        transform_t inv_trans
+        public np_.ndarray _faces
+        void** _faces_ptr
+        public object owner
+        int size
 
     cpdef void sync_transforms(self)
     cdef intersect_t intersect_c(self, ray_t *ray, vector_t end_point) nogil
     cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx) nogil
     cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
-    cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece)
+    cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece) nogil
 
 
 ##################################
@@ -257,8 +261,8 @@ cdef class FaceList(object):
 ##################################
 
 cdef RayCollection trace_segment_c(RayCollection rays,
-                                    list face_sets,
-                                    list all_faces,
+                                    np_.ndarray face_sets,
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     float max_length)
 

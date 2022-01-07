@@ -2,12 +2,12 @@
 cimport cython
 
 cdef extern from "math.h":
-    double sqrt(double arg)
-    double fabs(double arg)
-    double sin(double arg)
-    double cos(double arg)
-    double atan2(double y, double x)
-    double erf(double arg)
+    double sqrt(double arg) nogil
+    double fabs(double arg) nogil
+    double sin(double arg) nogil
+    double cos(double arg) nogil
+    double atan2(double y, double x) nogil
+    double erf(double arg) nogil
     double M_PI
     
 cdef extern from "float.h":
@@ -15,16 +15,16 @@ cdef extern from "float.h":
 
 IF UNAME_SYSNAME == "Windows":
     cdef extern from "complex.h":
-        double complex csqrt "sqrt" (double complex)
-        double cabs "abs" (double complex)
-        double complex cexp "exp" (double complex)
+        double complex csqrt "sqrt" (double complex) nogil
+        double cabs "abs" (double complex) nogil
+        double complex cexp "exp" (double complex) nogil
 	
     cdef double complex I = 1j
 ELSE:
     cdef extern from "complex.h":
-        double complex csqrt (double complex)
-        double cabs (double complex)
-        double complex cexp (double complex)
+        double complex csqrt (double complex) nogil
+        double cabs (double complex) nogil
+        double complex cexp (double complex) nogil
         double complex I
     
 cdef:
@@ -41,7 +41,7 @@ import numpy as np
 cimport numpy as np_
 
 
-cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
+cdef ray_t convert_to_sp(ray_t ray, vector_t normal) nogil:
     """Project the E-field components of a given ray
     onto the S- and P-polarisations defined by the 
     surface normal
@@ -242,7 +242,7 @@ cdef class OpaqueMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         pass
     
     
@@ -257,10 +257,11 @@ cdef class TransparentMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         cdef:
             vector_t normal
             ray_t sp_ray
+            void* ptr=<void*>new_rays
         
         normal = norm_(orient.normal)
         sp_ray = convert_to_sp(in_ray[0], normal)
@@ -270,7 +271,7 @@ cdef class TransparentMaterial(InterfaceMaterial):
         sp_ray.length = INF
         sp_ray.parent_idx = idx
         sp_ray.ray_type_id &= ~REFL_RAY
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>ptr).add_ray_c(sp_ray)
 
 
 cdef class PECMaterial(InterfaceMaterial):
@@ -282,7 +283,7 @@ cdef class PECMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -311,7 +312,7 @@ cdef class PECMaterial(InterfaceMaterial):
         #sp_ray.E2_amp.imag = -sp_ray.E2_amp.imag
         sp_ray.parent_idx = idx
         sp_ray.ray_type_id |= REFL_RAY
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
         
         
 cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
@@ -342,7 +343,7 @@ cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -378,7 +379,7 @@ cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
         sp_ray.E2_amp *= R
         sp_ray.parent_idx = idx
         sp_ray.ray_type_id |= REFL_RAY
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
             
         #Transmitted ray
         sp_ray2.origin = point
@@ -389,7 +390,7 @@ cdef class PartiallyReflectiveMaterial(InterfaceMaterial):
         sp_ray2.E2_amp *= T
         sp_ray2.parent_idx = idx
         sp_ray2.ray_type_id &= ~REFL_RAY
-        new_rays.add_ray_c(sp_ray2)
+        (<RayCollection>new_rays).add_ray_c(sp_ray2)
         
         
 cdef class LinearPolarisingMaterial(InterfaceMaterial):
@@ -401,7 +402,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -435,7 +436,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray.E2_amp.imag = 0.0
         sp_ray.parent_idx = idx
         sp_ray.ray_type_id |= REFL_RAY
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
             
         #Transmit the P-polarisation
         sp_ray2.origin = point
@@ -447,7 +448,7 @@ cdef class LinearPolarisingMaterial(InterfaceMaterial):
         sp_ray2.E1_amp.imag = 0.0
         sp_ray2.parent_idx = idx
         sp_ray2.ray_type_id &= ~REFL_RAY
-        new_rays.add_ray_c(sp_ray2)
+        (<RayCollection>new_rays).add_ray_c(sp_ray2)
         
         
 cdef class WaveplateMaterial(InterfaceMaterial):
@@ -490,7 +491,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         self.fast_axis = kwds.get("fast_axis", (1.0,0,0))
             
             
-    cdef ray_t apply_retardance_c(self, ray_t r):
+    cdef ray_t apply_retardance_c(self, ray_t r) nogil:
         cdef:
             complex_t E1=r.E1_amp, retard=self.retardance_
         r.E1_amp.real = E1.real*retard.real - E1.imag*retard.imag
@@ -517,7 +518,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -543,7 +544,7 @@ cdef class WaveplateMaterial(InterfaceMaterial):
         out_ray.ray_type_id &= ~REFL_RAY
         out_ray = self.apply_retardance_c(out_ray)
         
-        new_rays.add_ray_c(out_ray)
+        (<RayCollection>new_rays).add_ray_c(out_ray)
     
     
 cdef class DielectricMaterial(InterfaceMaterial):
@@ -584,7 +585,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -672,7 +673,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
             sp_ray.E2_amp.imag *= T_p
             sp_ray.parent_idx = idx
             sp_ray.ray_type_id &= ~REFL_RAY
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
         
         
     cdef para_t eval_parabasal_ray_c(self,
@@ -681,7 +682,7 @@ cdef class DielectricMaterial(InterfaceMaterial):
                                    vector_t point, #position of intercept
                                    orientation_t orient,
                                    unsigned int ray_type_id, #bool, if True, it's a reflected ray
-                                   ):
+                                   ) nogil:
         cdef:
             vector_t cosThetaNormal, normal, out_dir
             para_t para_out
@@ -752,7 +753,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -837,7 +838,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
             sp_ray.ray_type_id |= REFL_RAY
-            new_rays.add_ray_c(sp_ray)
+            (<RayCollection>new_rays).add_ray_c(sp_ray)
             
         #normal transmission            
         tangent = subvv_(in_direction, cosThetaNormal)
@@ -870,7 +871,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             sp_ray.refractive_index.real = n2.real
             sp_ray.refractive_index.imag = n2.imag
             sp_ray.ray_type_id &= ~REFL_RAY
-            new_rays.add_ray_c(sp_ray)
+            (<RayCollection>new_rays).add_ray_c(sp_ray)
             
             
 cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
@@ -887,7 +888,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -1010,7 +1011,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
             sp_ray.ray_type_id |= REFL_RAY
-            new_rays.add_ray_c(sp_ray)
+            (<RayCollection>new_rays).add_ray_c(sp_ray)
             
         #normal transmission            
         tangent = subvv_(in_direction, cosThetaNormal)
@@ -1038,7 +1039,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
             sp_ray.refractive_index.real = n3.real
             sp_ray.refractive_index.imag = n3.imag
             sp_ray.ray_type_id &= ~REFL_RAY
-            new_rays.add_ray_c(sp_ray)
+            (<RayCollection>new_rays).add_ray_c(sp_ray)
     
 vacuum = BaseDispersionCurve(0,np.array([1.0,]))
     
@@ -1089,7 +1090,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -1219,7 +1220,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.refractive_index.real = n1.real
             sp_ray.refractive_index.imag = n1.imag
             sp_ray.ray_type_id |= REFL_RAY
-            new_rays.add_ray_c(sp_ray)
+            (<RayCollection>new_rays).add_ray_c(sp_ray)
             
         #normal transmission            
         tangent = subvv_(in_direction, cosThetaNormal)
@@ -1247,7 +1248,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             sp_ray.refractive_index.real = n3.real
             sp_ray.refractive_index.imag = n3.imag
             sp_ray.ray_type_id &= ~REFL_RAY
-            new_rays.add_ray_c(sp_ray)
+            (<RayCollection>new_rays).add_ray_c(sp_ray)
             
     cdef para_t eval_parabasal_ray_c(self,
                                      ray_t *base_ray, 
@@ -1255,7 +1256,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
                                    vector_t point, #position of intercept
                                    orientation_t orient,
                                    unsigned int ray_type_id, #bool, if True, it's a reflected ray
-                                   ):
+                                   ) nogil:
         cdef:
             vector_t cosThetaNormal, normal, out_dir
             para_t para_out
@@ -1333,7 +1334,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
            ray - the ingoing ray
            idx - the index of ray in it's RayCollection
@@ -1398,7 +1399,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         #Need to convert origin offset to microns since line-spacing is in microns
         sp_ray.phase += 1000.0*dotprod_(subvv_(self.origin_, point), tangent)*self.order*2*M_PI/line_spacing
         
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
         
     cdef para_t eval_parabasal_ray_c(self,
                                      ray_t *base_ray, 
@@ -1406,7 +1407,7 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
                                    vector_t point, #position of intercept
                                    orientation_t orient,
                                    unsigned int ray_type_id, #bool, if True, it's a reflected ray
-                                   ):        
+                                   ) nogil:        
         cdef:
             para_t para_out
             vector_t reflected, normal, tangent, tangent2
@@ -1441,7 +1442,8 @@ cdef class DiffractionGratingMaterial(InterfaceMaterial):
         
         k_z = 1 - (k_x*k_x) - (k_y*k_y) #Apply Pythagoras to get z-component
         if k_z < 0: #diffracted ray is evanescent
-            print("Error. Parabasal reflection is imaginary!")
+            with gil:
+                print("Error. Parabasal reflection is imaginary!")
             #return #Then we're in trouble!
         k_z = sign * sqrt(k_z) 
         
@@ -1502,7 +1504,7 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         cdef:
             vector_t normal
             ray_t sp_ray
@@ -1530,7 +1532,7 @@ cdef class CircularApertureMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real *= atten
         sp_ray.E2_amp.imag *= atten
         
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
 
 
 cdef class RectangularApertureMaterial(InterfaceMaterial):
@@ -1579,7 +1581,7 @@ cdef class RectangularApertureMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         cdef:
             vector_t normal, p
             ray_t sp_ray
@@ -1619,7 +1621,7 @@ cdef class RectangularApertureMaterial(InterfaceMaterial):
         sp_ray.E2_amp.real *= atten
         sp_ray.E2_amp.imag *= atten
         
-        new_rays.add_ray_c(sp_ray)
+        (<RayCollection>new_rays).add_ray_c(sp_ray)
         
         
 cdef class ResampleGaussletMaterial(InterfaceMaterial):
@@ -1664,7 +1666,7 @@ cdef class ResampleGaussletMaterial(InterfaceMaterial):
                             unsigned int idx, 
                             vector_t point,
                             orientation_t orient,
-                            RayCollection new_rays):
+                            void* new_rays) nogil:
         """
         Capture each incident ray in an internal GaussletCollection.
         """

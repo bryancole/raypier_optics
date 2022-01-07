@@ -1,4 +1,5 @@
 #!/bin/env python
+from raypier.broken.parabolics import oap
 
 #cython: boundscheck=False
 #cython: nonecheck=False
@@ -1662,7 +1663,7 @@ cdef class InterfaceMaterial(object):
                                 unsigned int ray_idx, 
                                 vector_t p, 
                                 orientation_t orient,
-                                RayAggregator new_rays) nogil:
+                                void* new_rays) nogil:
         pass
     
     cdef para_t eval_parabasal_ray_c(self, ray_t *base_ray, 
@@ -1878,6 +1879,15 @@ cdef class FaceList(object):
         self.inverse_transform = Transform()
         self.owner = owner
         
+    property faces:
+        def __get__(self):
+            return self._faces
+        
+        def __set__(self, np_.ndarray oa):
+            self._faces = oa
+            self.size = len(oa)
+            self._faces_ptr = <void**>(oa.data)
+        
     cpdef void sync_transforms(self):
         """sets the transforms from the owner's VTKTransform
         """
@@ -1928,12 +1938,11 @@ cdef class FaceList(object):
             unsigned int i
             intersect_t it
             double dist
-            Face face
+            void* face
         
-        with gil:
-            face = self.faces[face_idx]
-        it = face.intersect_c(p1, p2, 1)
-        if face.tolerance < it.dist < ray.length:
+        face = self._faces_ptr[face_idx]
+        it = (<Face>face).intersect_c(p1, p2, 1)
+        if (<Face>face).tolerance < it.dist < ray.length:
             ray.length = it.dist
             ray.end_face_idx = it.face_idx
         return it
@@ -1949,20 +1958,17 @@ cdef class FaceList(object):
             vector_t p2 = transform_c(self.inv_trans, ray_end)
             unsigned int i
             intersect_t this, out
-            Face face
-            int nf
+            void* face
+            int nf=self.size
         
         out.face_idx = -1
-        with gil:
-            nf = len(self.faces)
         for i in range(nf):
-            with gil:
-                face = self.faces[i]
-            this = face.intersect_c(p1, p2, 1)
-            if face.tolerance < this.dist < ray.length:
+            face = self._faces_ptr[i]
+            this = (<Face>face).intersect_c(p1, p2, 1)
+            if (<Face>face).tolerance < this.dist < ray.length:
                 ray.length = this.dist
                 out = this
-                out.face_idx = face.idx
+                out.face_idx = (<Face>face).idx
                 ray.end_face_idx = this.face_idx
         return out
     
@@ -1998,7 +2004,7 @@ cdef class FaceList(object):
         idx = self.intersect_para_c(&r.ray, P1_, face)
         return idx
     
-    cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece):
+    cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece) nogil:
         cdef orientation_t out
         
         point = transform_c(self.inv_trans, point)
@@ -2116,13 +2122,15 @@ def select_gausslet_intersections(FaceList face_set, list ray_col_list):
 
 
 cdef RayCollection trace_segment_c(RayCollection rays, 
-                                    list face_sets, 
-                                    list all_faces,
+                                    np_.ndarray face_sets, 
+                                    np_.ndarray all_faces,
                                     list decomp_faces,
                                     float max_length):
     cdef:
-        Face face
-        FaceList faceset
+        void** face_sets_ptr = <void**>(face_sets.data)
+        void** all_faces_ptr = <void**>(all_faces.data)
+        void* face
+        void* faceset
         size_t i, j, n_sets=len(face_sets)
         vector_t point
         orientation_t orient
@@ -2149,23 +2157,22 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             #print "points", P1, P2
             for j in range(n_sets):
                 #intersect_c returns the face idx of the intersection, or -1 otherwise
-                with gil:
-                    faceset = face_sets[j]
+                faceset = face_sets_ptr[j]
                 it = (<FaceList>faceset).intersect_c(ray, point)
                 if it.face_idx >= 0:
                     nearest_set = j
                     nearest_idx = it.face_idx
                     nearest_piece = it.piece_idx
             if nearest_idx >= 0:
-                #print "GET FACE", nearest.face_idx, len(all_faces)
-                with gil:
-                    face = all_faces[nearest_idx] 
-                face.count += 1
-                #print "ray length", ray.length
+                face = all_faces_ptr[nearest_idx] 
+                #(<Face>face).count += 1
+                (<Face>face).count = (<Face>face).count + 1 #a test
                 point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
-                orient = (<FaceList>(face_sets[nearest_set])).compute_orientation_c(face, point, nearest_piece)
+                orient = (<FaceList>(face_sets_ptr[nearest_set])).compute_orientation_c((<Face>face), 
+                                                                                        point, 
+                                                                                        nearest_piece)
                 #print "s normal", normal
-                (<InterfaceMaterial>(face.material)).eval_child_ray_c(ray, i, 
+                (<InterfaceMaterial>((<Face>face).material)).eval_child_ray_c(ray, i, 
                                                         point,
                                                         orient,
                                                         new_rays
