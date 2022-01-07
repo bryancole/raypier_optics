@@ -26,9 +26,8 @@ from raypier.bases import Traceable, normaliseVector, NumEditor,\
      ComplexEditor, VectorEditor, Optic, ShapedTraceable
      
 from raypier.utils import transformPoints, dotprod
-from raypier.sources import RayCollection
 from raypier.core.cfaces import CircularFace, RectangularFace, ShapedSphericalFace
-from raypier.core.ctracer import FaceList
+from raypier.core.ctracer import FaceList, RayCollection
 from raypier.core.cmaterials import DielectricMaterial, \
         CoatedDispersiveMaterial, PECMaterial
 from raypier.dispersion import BaseDispersionCurve, NondispersiveCurve

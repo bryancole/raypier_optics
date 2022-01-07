@@ -1,5 +1,4 @@
 #!/bin/env python
-from raypier.broken.parabolics import oap
 
 #cython: boundscheck=False
 #cython: nonecheck=False
@@ -1000,7 +999,7 @@ cdef class RayAggregator:
             ray_t* rays = self.rays[tid]
             unsigned long[:] n_rays = self.n_rays
             unsigned long[:] max_size = self.max_size
-
+        
         if n_rays[tid] == max_size[tid]:
             if max_size[tid] == 0:
                 max_size[tid] = 1
@@ -1008,7 +1007,7 @@ cdef class RayAggregator:
                 max_size[tid] *= 2
             rays = <ray_t*>realloc(rays, max_size[tid]*sizeof(ray_t))
         rays[n_rays[tid]] = r
-        n_rays[tid] += 1
+        n_rays[tid] =  n_rays[tid] + 1
         
     cdef clear_c(self):
         cdef:
@@ -1883,7 +1882,9 @@ cdef class FaceList(object):
         def __get__(self):
             return self._faces
         
-        def __set__(self, np_.ndarray oa):
+        def __set__(self, oa_in):
+            cdef:
+                np_.ndarray oa=np.ascontiguousarray(oa_in)
             self._faces = oa
             self.size = len(oa)
             self._faces_ptr = <void**>(oa.data)
@@ -2139,14 +2140,12 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         RayCollection new_rays_out
         RayAggregator new_rays
         intersect_t it
-        int n_threads=openmp.omp_get_num_threads()
+        int n_threads=openmp.omp_get_max_threads()
    
     #need to allocate the output rays here 
     new_rays = RayAggregator(rays.n_rays, n_threads)
-    new_rays.parent = rays
-    
     with nogil:
-        for i in range(rays.n_rays):
+        for i in prange(rays.n_rays):
             ray = rays.rays + i
             ray.length = max_length
             ray.end_face_idx = -1
@@ -2239,15 +2238,17 @@ cdef RayCollection trace_one_face_segment_c(RayCollection rays,
 
 
 def trace_segment(RayCollection rays, 
-                    list face_sets, 
-                    list all_faces,
+                    np_.ndarray face_sets, 
+                    np_.ndarray all_faces,
                     max_length=100,
                     decomp_faces=[]):
     cdef:
         FaceList fs
     for fs in face_sets:
         fs.sync_transforms()
-    return trace_segment_c(rays, face_sets, all_faces, decomp_faces, max_length)
+    return trace_segment_c(rays, face_sets, 
+                           all_faces, 
+                           decomp_faces, max_length)
 
 def trace_one_face_segment(RayCollection rays, 
                     FaceList face_set,

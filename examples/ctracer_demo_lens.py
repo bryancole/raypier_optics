@@ -15,8 +15,8 @@ from raypier.lenses import PlanoConvexLens
 source = ConfocalRaySource(focus=(0,0,0),
                             direction=(0,1,0),
                             working_dist = 100.,
-                            number=4,
-                            rings=1,
+                            number=50,
+                            rings=16,
                             detail_resolution=5,
                             theta=10.)
                             

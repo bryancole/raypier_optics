@@ -33,13 +33,14 @@ def trace_rays(input_rays, face_lists, recursion_limit=100, max_length=100.0):
         f.material.wavelengths = wavelengths
         f.max_length = max_length
     
-    face_sets = list(face_lists)
+    face_sets = numpy.array(face_lists)
+    all_faces_a = numpy.array(all_faces)
     decomp_faces = [f for f in all_faces if f.material.is_decomp_material()]
     
     rays = input_rays
     while rays.n_rays>0 and count<recursion_limit:
         traced_rays.append(rays)
-        rays = trace_func(rays, face_sets, all_faces, 
+        rays = trace_func(rays, face_sets, all_faces_a, 
                                      max_length=max_length,
                                      decomp_faces=decomp_faces)
         count += 1
