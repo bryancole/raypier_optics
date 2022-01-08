@@ -6,11 +6,12 @@ Raypier is a non-sequential ray-tracing framework for modelling optical systems.
 
 #. It's pretty fast. The tracing algorithms are written in Cython (i.e. C) and use efficient data-structures for handling many thousands of rays.
 #. Correctly handles polarisation
+#. Sequential and non-sequential tracing.
 #. Support for dispersion including a comprehensive library of glass-types (taken from refractive-index.info)
    and diffraction-gratings
 #. Point Spread Function (PSF) and E-Field evaluation by summation of of Gaussian modes.
 #. Paraxial Gaussian mode evaluation covers generally astigmatic modes.
-#. Tracing support for conics section and general aspherics (conic + polnomial)
+#. Tracing support for conics section, general aspherics (conic + polnomial) and 2D polynomial surfaces. 
 #. Zurnike polynomial surface distortions.
 #. An interactive user-interface with 3D model/ray rendering through VTK. Tracing is performed "live".
 #. A modest selection of optic-types including singlet and achromatic doublet lenses (with AR coating), plane-mirrors, 

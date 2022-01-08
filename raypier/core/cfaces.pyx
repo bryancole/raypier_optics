@@ -29,12 +29,19 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, Shape, Distortion
+                rotate_c, Shape, Distortion, intersect_t
 
 import numpy as np
 cimport numpy as np_
 cimport cython
-from cython.parallel import prange
+from cython.parallel cimport prange
+
+
+cdef intersect_t NO_INTERSECTION
+
+NO_INTERSECTION.dist = -1
+NO_INTERSECTION.face_idx = -1
+NO_INTERSECTION.piece_idx = 0
 
 cdef struct flatvector_t:
     double x,y
@@ -138,7 +145,7 @@ cdef class CircularFace(Face):
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -153,20 +160,21 @@ cdef class CircularFace(Face):
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
             double X, Y, d=self.diameter
+            intersect_t out=NO_INTERSECTION
             
         #print "CFACE", p1, p2
-        
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
-            return 0
+            return NO_INTERSECTION
         X = p1.x + h*(p2.x-p1.x) - self.offset
         Y = p1.y + h*(p2.y-p1.y)
         if is_base_ray and (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
-            return 0
-        return h * max_length
+            return NO_INTERSECTION
+        out.dist = h * max_length
+        return out
 
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -184,7 +192,7 @@ cdef class ShapedPlanarFace(ShapedFace):
     def __cinit__(self, **kwds):
         self.z_height = kwds.get('z_height', 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -199,17 +207,19 @@ cdef class ShapedPlanarFace(ShapedFace):
             double max_length = sep_(p1, p2)
             double h = (self.z_height-p1.z)/(p2.z-p1.z)
             double X, Y
-                    
+            intersect_t out=NO_INTERSECTION
+                                
         if (h<self.tolerance) or (h>1.0):
-            return -1
+            return NO_INTERSECTION
         
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         if is_base_ray and not (<Shape>self.shape).point_inside_c(X,Y):
-            return -1
-        return h*max_length
+            return NO_INTERSECTION
+        out.dist = h*max_length
+        return out
         
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -235,25 +245,28 @@ cdef class ElipticalPlaneFace(Face):
         self.g_x = kwds.get('g_x', 0.0)
         self.g_y = kwds.get('g_y', 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double max_length = sep_(p1, p2)
             double h = (self.g_x*p1.x + self.g_y*p1.y - p1.z) / \
                         ((p2.z-p1.z) - self.g_x*(p2.x-p1.x) - self.g_y*(p2.y-p1.y))
             double X,Y,Z, d=self.diameter
+            intersect_t out=NO_INTERSECTION
             
         if (h<self.tolerance) or (h>1.0):
-            return 0
+            return NO_INTERSECTION
         
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         Z = p1.z + h*(p2.z-p1.z)
         if is_base_ray and (X*X + Y*Y) > (d*d/4):
             #print "X", X, "Y", Y
-            return 0
-        return h * max_length
+            return NO_INTERSECTION
+        
+        out.dist = h * max_length
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -275,7 +288,7 @@ cdef class RectangularFace(Face):
         self.length = kwds.get("length", 5.0)
         self.offset = kwds.get("offset", 0.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -292,9 +305,10 @@ cdef class RectangularFace(Face):
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
             double X, Y, lngth=self.length, wdth = self.width
+            intersect_t out=NO_INTERSECTION
             
         if (h<self.tolerance) or (h>1.0):
-            return 0
+            return NO_INTERSECTION
         
         if is_base_ray:
             X = p1.x + h*(p2.x-p1.x) - self.offset
@@ -302,12 +316,13 @@ cdef class RectangularFace(Face):
             
             #if x or y displacement is greater than length or width of rectangle, no intersect
             if X*X > lngth*lngth/4:
-                return 0
+                return NO_INTERSECTION
             if Y*Y > wdth*wdth/4:
-                return 0 
-        return h * max_length
+                return NO_INTERSECTION 
+        out.dist = h * max_length
+        return out
 
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -329,7 +344,7 @@ cdef class SphericalFace(Face):
         self.z_height = kwds.get('z_height', 0.0)
         self.curvature = kwds.get('curvature', 25.0)
     
-    cdef double intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -345,6 +360,7 @@ cdef class SphericalFace(Face):
         cdef:
             double A,B,C,D, cz, a1, a2
             vector_t s, d, pt1, pt2
+            intersect_t out=NO_INTERSECTION
             
         s = subvv_(p2, r)
         cz = self.z_height - self.curvature
@@ -357,7 +373,7 @@ cdef class SphericalFace(Face):
         D = B*B - 4*A*C
         
         if D < 0: #no intersection with sphere
-            return 0
+            return NO_INTERSECTION
         
         D = sqrt(D)
         
@@ -391,10 +407,11 @@ cdef class SphericalFace(Face):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return 0
-        return a1 * sep_(r, p2)
+            return NO_INTERSECTION
+        out.dist = a1 * sep_(r, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -419,7 +436,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.curvature = kwds.get("curvature", 100.0)
     
-    cdef double intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -435,6 +452,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         cdef:
             double A,B,C,D, cz, a1, a2
             vector_t s, d, pt1, pt2
+            intersect_t out=NO_INTERSECTION
             
         s = subvv_(p2, r)
         cz = self.z_height - self.curvature
@@ -447,7 +465,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         D = B*B - 4*A*C
         
         if D < 0: #no intersection with sphere
-            return 0
+            return NO_INTERSECTION
         
         D = sqrt(D)
         
@@ -479,10 +497,11 @@ cdef class ShapedSphericalFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return 0
-        return a1 * sep_(r, p2)
+            return NO_INTERSECTION
+        out.dist = a1 * sep_(r, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -569,10 +588,11 @@ cdef class ExtrudedPlanarFace(Face):
         n.z = 0
         self.normal = norm_(n)
         
-    cdef double intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t r, vector_t p2, int is_base_ray):
         cdef: 
             vector_t s, u, v
             double a, dz
+            intersect_t out=NO_INTERSECTION
             
         u.x = self.x1_
         u.y = self.y1_
@@ -587,9 +607,9 @@ cdef class ExtrudedPlanarFace(Face):
             a = (s.y*(u.x-r.x) - s.x*(u.y-r.y)) / (s.x*v.y - s.y*v.x)
             
             if a<0:
-                return 0
+                return NO_INTERSECTION
             if a>1:
-                return 0
+                return NO_INTERSECTION
         #distance of intersection along ray (in XY plane)
         a = (v.x*(r.y-u.y) - v.y*(r.x-u.x)) / (s.x*v.y - s.y*v.x)
         
@@ -597,13 +617,14 @@ cdef class ExtrudedPlanarFace(Face):
             #distance in 3D
             dz = a*(p2.z - r.z)
             if self.z1 < (r.z+dz) < self.z2:
-                return a * mag_(s)
-            else:
-                return 0
+                out.dist = a * mag_(s) 
+                return out
         else:
-            return a * mag_(s)
+            out.dist = a * mag_(s)
+            return out
+        return NO_INTERSECTION
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         return self.normal
 
 #
@@ -762,7 +783,7 @@ cdef class ExtrudedBezierFace(Face):
         self.mincorner = temp1
         self.maxcorner = temp2
 
-    cdef double intersect_c(self, vector_t ar, vector_t pee2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t ar, vector_t pee2, int is_base_ray):
 
         cdef: 
             flatvector_t tempvector
@@ -773,13 +794,14 @@ cdef class ExtrudedBezierFace(Face):
             double A,B,C,D,t,a,b,c,d
             poly_roots ts
             vector_t    tempv
+            intersect_t out=NO_INTERSECTION
         #print "\ncalled intersection"
 
         origin.x = 0 
         origin.y = 0
         #first off, does ray even enter the depth of the extrusion?
         if (ar.z < self.z_height_1 and pee2.z <self.z_height_1) or (ar.z > self.z_height_2 and pee2.z > self.z_height_2):
-            return 0    #does not
+            return NO_INTERSECTION    #does not
         #print "ray passes z test"
         #strip useless thrid dimension from ray vector
         r.x = ar.x
@@ -797,7 +819,7 @@ cdef class ExtrudedBezierFace(Face):
                 tempvector.y = self.mincorner.y
                 if not self.line_seg_overlap(r,p2,self.maxcorner,tempvector):
                     if not self.line_seg_overlap(r,p2,tempvector,self.mincorner):
-                        return 0    #no intersections
+                        return NO_INTERSECTION    #no intersections
         #print "ray is in big bounding box"
         #segment intersects with gross bounding box,
         #Calc dZ and the 2D origin adjusted ray, because they will probably be used.
@@ -861,13 +883,15 @@ cdef class ExtrudedBezierFace(Face):
                                     result = b
                                     #print "b at t",b,t
 
-        if result == INF: result = 0
+        if result == INF: 
+            return NO_INTERSECTION
 
-        return result
+        out.dist = result
+        return out
 
 
 
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         cdef:
             flatvector_t ray,cp0,cp1,cp2,cp3,rotated
             double theta, tmp, t
@@ -986,24 +1010,24 @@ cdef class PolygonFace(Face):
             data = np.ascontiguousarray(pts, dtype=np.float64).reshape(-1,2)
             self._xy_points=data
             
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double max_length = sep_(p1, p2)
             double h = (self.z_plane-p1.z)/(p2.z-p1.z)
             double X, Y
+            intersect_t out=NO_INTERSECTION
         
         if (h<self.tolerance) or (h>1.0):
             #print "H", h
-            return 0
+            return NO_INTERSECTION
         X = p1.x + h*(p2.x-p1.x)
         Y = p1.y + h*(p2.y-p1.y)
         #test for (X,Y) in polygon
         if is_base_ray and point_in_polygon_c(X,Y, self._xy_points)==1:
-            return h * max_length
-        else:
-            return 0.0
+            out.dist = h * max_length
+        return out
         
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1018,7 +1042,7 @@ cdef class OffAxisParabolicFace(Face):
     cdef:
         public double EFL, diameter, height
                 
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -1034,7 +1058,7 @@ cdef class OffAxisParabolicFace(Face):
             double A = 1 / (2*self.EFL), efl = self.EFL
             double a,b,c,d
             vector_t s, r, pt1, pt2
-            
+            intersect_t out=NO_INTERSECTION
             
         s = subvv_(p2,p1)
         r = p1
@@ -1047,17 +1071,18 @@ cdef class OffAxisParabolicFace(Face):
         
         ###FIXME
         if d<0: #no intersection ###BROKEN
-            return 0
+            return NO_INTERSECTION
         
         if a < 1e-10: #approximate to zero if we're close to the parabolic axis
             a1 = -c/b
             pt1 = addvv_(r, multvs_(s, a1))
             pt1.x -= efl
             if (pt1.x*pt1.x + pt1.y*pt1.y) > (self.diameter/2):
-                return 0
+                return NO_INTERSECTION
             if a1>1.0 or a1<self.tolerance:
-                return 0
-            return a1 * sep_(p1, p2)
+                return NO_INTERSECTION
+            out.dist = a1 * sep_(p1, p2)
+            return out
         
         else:
             d = sqrt(d)
@@ -1085,10 +1110,11 @@ cdef class OffAxisParabolicFace(Face):
                 a1 = a2
             
             if a1>1.0 or a1<self.tolerance:
-                return 0
-            return a1 * sep_(p1, p2)
+                return NO_INTERSECTION
+            out.dist = a1 * sep_(p1, p2)
+            return out
 #
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1132,13 +1158,14 @@ cdef class EllipsoidalFace(Face):
             t.trans = self.inv_trans
             return t
             
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double B,A, a, b, c, d
             
             vector_t S = subvv_(p2, p1)
             vector_t r = transform_c(self.trans, p1)
             vector_t s = transform_c(self.trans, p2)
+            intersect_t out=NO_INTERSECTION
             
         s = subvv_(s, r)
         
@@ -1178,10 +1205,11 @@ cdef class EllipsoidalFace(Face):
         if root1 > root2:
             root1 = root2
         if root1 > 1:
-            return 0
-        return root1*mag_(S)
+            return NO_INTERSECTION
+        out.dist = root1*mag_(S)
+        return out
         
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         cdef vector_t n
         
         p = transform_c(self.trans, p)
@@ -1225,10 +1253,11 @@ cdef class SaddleFace(ShapedFace):
         self.z_height = kwds.get("z_height", 0.0)
         self.curvature = kwds.get("curvature", 0.0)
         
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double A=sqrt(6.0), root, denom, a1, a2
             vector_t d,p, pt1, pt2
+            intersect_t out=NO_INTERSECTION
             
         A *= self.curvature
         p = p1
@@ -1246,7 +1275,7 @@ cdef class SaddleFace(ShapedFace):
                     4*A*d.x*d.y*p.z - 2*A*d.x*d.z*p.y - 2*A*d.y*d.z*p.x + d.z**2
                     
             if root < 0:
-                return -1
+                return NO_INTERSECTION
             
             root = sqrt(root)
             denom = 2*A*(d.x*d.y)
@@ -1277,10 +1306,12 @@ cdef class SaddleFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return -1
-        return a1 * sep_(p1, p2)
+            return NO_INTERSECTION
+        
+        out.dist = a1 * sep_(p1, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1309,11 +1340,12 @@ cdef class CylindericalFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.radius = kwds.get("radius", 100.0)
         
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double a1, a2, cz, ox2, oz2, dx2, dz2, denom, R=self.radius
             double R2 = R*R
             vector_t d,o, pt1, pt2
+            intersect_t out=NO_INTERSECTION
             
         o = p1
         o.z -= self.z_height
@@ -1327,7 +1359,7 @@ cdef class CylindericalFace(ShapedFace):
         root = R2*dz2 - 2*R*dx2*o.z + 2*R*d.x*d.z*o.x - dx2*oz2 + 2*d.x*d.z*o.x*o.z - dz2*ox2
         
         if root < 0:
-            return -1
+            return NO_INTERSECTION
         
         root = sqrt(root)
         denom = dx2 + dz2
@@ -1364,10 +1396,11 @@ cdef class CylindericalFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return -1
-        return a1 * sep_(p1, p2)
+            return NO_INTERSECTION
+        out.dist = a1 * sep_(p1, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1402,11 +1435,12 @@ cdef class AxiconFace(ShapedFace):
         self.z_height = kwds.get('z_height', 0.0)
         self.gradient = kwds.get('gradient', 0.0)
         
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             double a1, a2, root, ox2, oy2, oz2, dx2, dy2, dz2, beta2, denom
             double beta = self.gradient
             vector_t o, d, pt1, pt2
+            intersect_t out=NO_INTERSECTION
             
         d = subvv_(p2, p1)
         o = p1
@@ -1425,7 +1459,7 @@ cdef class AxiconFace(ShapedFace):
         denom = (beta2*dx2 + beta2*dy2 - dz2)
                 
         if root < 0: #no intersection
-            return -1
+            return NO_INTERSECTION
         
         root = beta*sqrt(root)
         
@@ -1453,10 +1487,11 @@ cdef class AxiconFace(ShapedFace):
             a1 = a2
         
         if a1>1.0 or a1<self.tolerance:
-            return -1
-        return a1 * sep_(p1, p2)
+            return NO_INTERSECTION
+        out.dist = a1 * sep_(p1, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1546,7 +1581,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         self.conic_const = kwds.get('conic_const', 0.0)
         self.curvature = kwds.get('curvature', 10.0)
     
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -1560,6 +1595,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         cdef:
             double a1
             vector_t d, a, pt1
+            intersect_t out=NO_INTERSECTION
             
         d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
@@ -1570,14 +1606,15 @@ cdef class ConicRevolutionFace(ShapedFace):
         pt1 = addvv_(a, multvs_(d, a1))
             
         if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
-            return INF
+            return NO_INTERSECTION
             
         if a1>1.0 or a1<self.tolerance:
-            return -1
+            return NO_INTERSECTION
         
-        return a1 * sep_(p1, p2)
+        out.dist = a1 * sep_(p1, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1607,8 +1644,11 @@ cdef class ConicRevolutionFace(ShapedFace):
             double r2 = (x*x) + (y*y)
             double R = self.curvature
             double R2 = R*R
-        
-        return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+            
+        if R>=0:
+            return self.z_height  - (r2/(R + sqrt(R2 - (1+self.conic_const)*r2)))
+        else:
+            return self.z_height  - (r2/(R - sqrt(R2 - (1+self.conic_const)*r2)))
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return z - self.eval_z_c(x,y)
@@ -1683,7 +1723,7 @@ cdef class AsphericFace(ShapedFace):
         self.A16 = kwds.get('A16',0.0)
         self.atol = kwds.get("atol", 1.0e-8)
         
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
         params:
@@ -1699,6 +1739,7 @@ cdef class AsphericFace(ShapedFace):
             double tol = self.atol**2
             vector_t d, a, pt1
             aspheric_t A
+            intersect_t out=NO_INTERSECTION
             
         d = subvv_(p2, p1) #the input ray direction, in local coords.
         a = p1
@@ -1731,26 +1772,27 @@ cdef class AsphericFace(ShapedFace):
                 break
             f = eval_aspheric_impf(A, a1)
             if fabs(f) > fabs(f_last): #We're not converging
-                return -1
+                return NO_INTERSECTION
             f_last = f
             dz = - f / eval_aspheric_grad(A, a1)
         else:
-            return -1     
+            return NO_INTERSECTION     
         
         #print("Converged:", dz, a1, i)
         
         pt1 = addvv_(a, multvs_(d, a1))
 
         if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
-            return INF
+            return NO_INTERSECTION
             
         if a1>1.0 or a1<self.tolerance:
-            return -1
+            return NO_INTERSECTION
         
         #print("Ret:", a1 * sep_(p1, p2))
-        return a1 * sep_(p1, p2)
+        out.dist = a1 * sep_(p1, p2)
+        return out
     
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         """Compute the surface normal in local coordinates,
         given a point on the surface (also in local coords).
         """
@@ -1798,6 +1840,301 @@ cdef class AsphericFace(ShapedFace):
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return z - self.eval_z_c(x,y)
+
+
+cdef struct extpoly_t:
+    double R #curvature
+    double beta #=1+conic const
+    # ext poly coeffs up to 30rd order
+    double norm_radius
+    double z_height   
+    
+    ### Annoyingly, we are not allowed to put a Cython memory-view into a C-struct.
+    #double E1, E2                         # x^1y^0, x^0y^1
+    #double E3, E4, E5                     # x^2y^0 , x^1y^1, x^2y^0
+    #double E6, E7, E8, E9                 # x^3y^0, x^2y^1, x^1y^2, x^0y^3           # 3rd order
+    #double E10, E11, E12, E13, E14        # x^4y^0, x^3y^1, x^2y^2, x^1y^3, x^0y^4   # 4th order
+    #double E15, E16, E17, E18, E19, E20   # x^5y^0, x^4y^1, x^3y^2, x^2y^3, x^1y^4, x^0y^5   # 5th order
+    
+# return the z-value
+cdef double eval_extpoly_impf(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha):
+    """
+    EP - polynomial definition 
+    a - origin of input ray in local coords
+    d - vector along input ray in local coords
+    alpha - fractional distance along ray 
+    
+    returns:
+        The z-separation between the ray and poly surface at the given alpha value. 
+        Should be zero at the intersection.
+    """
+    cdef: 
+        double out
+        double x = a.x + alpha*d.x
+        double y = a.y + alpha*d.y
+        double r2 = x**2 + y**2
+        double R = EP.R
+        double[:,:] E = coefs
+        int i,j, Nx=E.shape[0], Ny=E.shape[1]
+    
+    out = r2
+    if R>=0:
+        out /= (R + sqrt(R*R - EP.beta*r2))
+    else:
+        out /= (R - sqrt(R*R - EP.beta*r2))
+        
+    out -= a.z + alpha*d.z
+    
+    # normalization 
+    x /= EP.norm_radius
+    y /= EP.norm_radius
+         
+    for i in range(Nx):
+        for j in range(Ny):
+            out += E[i,j]*(x**i)*(y**j)
+                     
+    out += EP.z_height
+    #print("imp", out)
+    return out
+
+
+cdef double eval_extpoly_grad(extpoly_t EP, double[:,:] coefs, vector_t a, vector_t d, double alpha):
+    """
+    1st derivative of eval_extpoly_impf w.r.t. alpha
+    """
+    ### This is too tedious to write out. Need sympy...
+    cdef: 
+        double out, dEdx=0.0, dEdy=0.0
+        double x = a.x + alpha*d.x
+        double y = a.y + alpha*d.y
+        double r2 = x**2 + y**2
+        double R2 = EP.R * EP.R
+        double rt = sqrt(1 - (EP.beta * r2 / R2))
+        double denom = EP.R * (rt + 1)
+        double nom = (2*d.x*x + 2*d.y*y)
+        double inv_rad = 1./EP.norm_radius
+        double[:,:] E = coefs
+        int i,j, Nx=E.shape[0], Ny=E.shape[1]
+    
+    out = -d.z 
+    
+    ### gradient of conic surface w.r.t. alpha
+    out += nom / denom
+    out += EP.beta * nom * r2 /(2*EP.R*rt*denom*denom)  
+    
+    # normalization 
+    x *= inv_rad
+    y *= inv_rad
+    
+    for i in range(1,Nx):
+        for j in range(Ny):
+            dEdx += (i)*E[i,j]*(x**(i-1))*(y**j)
+            
+    for i in range(Nx):
+        for j in range(1,Ny):    
+            dEdy += (j)*E[i,j]*(x**i)*(y**(j-1))
+    
+    dEdx *= inv_rad
+    dEdy *= inv_rad
+    
+    out += dEdx*d.x
+    out += dEdy*d.y
+    #print("grad", out)
+    return out
+    
+
+
+cdef class ExtendedPolynomialFace(ShapedFace):
+    """Extended polynomial
+    """  
+    
+    cdef:
+        # base conic section, see: ConicRevolutionFace
+        double nterms # max. number of polynomials terms, norm radius, polynomial coefficients
+        double atol
+        extpoly_t ext_poly
+        double[:,:] _coefs
+        
+    property curvature:
+        def __get__(self):
+            return -self.ext_poly.R
+        
+        def __set__(self, double v):
+            self.ext_poly.R = -v
+    
+    property conic_const:
+        def __get__(self):
+            return self.ext_poly.beta - 1
+        
+        def __set__(self, double v):
+            self.ext_poly.beta = v + 1.0
+    
+    property norm_radius:
+        def __get__(self):
+            return self.ext_poly.norm_radius
+        
+        def __set__(self, double v):
+            self.ext_poly.norm_radius = v
+        
+    property z_height:
+        def __get__(self):
+            return self.ext_poly.z_height
+        
+        def __set__(self, double v):
+            self.ext_poly.z_height = v
+            
+    property coefs:
+        def __get__(self):
+            return np.asarray(self._coefs)
+        
+        def __set__(self, double[:,:] coefs):
+            self._coefs = coefs
+        
+    def __cinit__(self, **kwds):
+        self.z_height = kwds.get('z_height', 0.0)
+        self.conic_const = kwds.get('conic_const', 0.0)
+        self.curvature = kwds.get('curvature', 0.0)
+        self.nterms = kwds.get('nterms', 0.0) ###What is this? Why not integer?
+        self.norm_radius = kwds.get('norm_radius', 100.0)
+        self.coefs = kwds.get('coefs', np.array([[0.0]]))
+        self.atol = kwds.get("atol", 1.0e-8)
+     
+     # a line-surface intersection   
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+         
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+           
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            double a1, f, dz
+            double tol = self.atol**2
+            vector_t d, a, pt1
+            extpoly_t E = self.ext_poly
+            double[:,:] coefs = self._coefs
+            intersect_t out=NO_INTERSECTION
+             
+        d = subvv_(p2, p1)      #the input ray direction, in local coords.
+        a = p1                  # the origin of the input ray
+        a.z -= E.z_height    # z height in local coordinates
+        
+        a1 = intersect_conic(a, d, -E.R, E.beta-1.0)
+         
+        ### Don't want to use fsolve or scipy.optimise. Just use Newton-Raphson...
+        f = f_last = eval_extpoly_impf(E, coefs, p1, d, a1)
+        dz = - f / eval_extpoly_grad(E, coefs, p1, d, a1)
+
+        #### If we've not converged after 100 iterations, then it ain't going converge ever.
+        for i in range(100):
+            a1 += dz
+            if dz*dz < tol:
+                break
+            f = eval_extpoly_impf(E, coefs, p1, d, a1)
+            if fabs(f) > fabs(f_last): #We're not converging
+                return NO_INTERSECTION
+            f_last = f
+            dz = - f / eval_extpoly_grad(E, coefs, p1, d, a1)
+        else:
+            return NO_INTERSECTION     
+        
+        pt1 = addvv_(a, multvs_(d, a1))        # check if inside shape.
+
+        if is_base_ray and not (<Shape>(self.shape)).point_inside_c(pt1.x, pt1.y):
+            return NO_INTERSECTION
+             
+        if a1>1.0 or a1<self.tolerance:
+            return NO_INTERSECTION
+         
+        out.dist = a1 * sep_(p1, p2)
+        return out
+         
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            extpoly_t EP = self.ext_poly
+            double R = EP.R
+            double beta = EP.beta
+            vector_t g #output gradient vector
+            int sign = -1 if self.invert_normals else 1
+            double inv_rad = 1./EP.norm_radius
+            double x = p.x * inv_rad
+            double y = p.y * inv_rad
+            double[:,:] E = self._coefs
+            int i,j, Nx=E.shape[0], Ny=E.shape[1]
+           
+        p.z -= EP.z_height
+         
+         # compute gradient of conic
+         # in pyrate: gradient = np.vstack((-curv * x, -curv * y, 1. - curv * z * (1 + cc)))
+        g.z = 2*beta*(R-beta*p.z)
+        g.x = - p.x * 2 * beta        # why 2? --> see: notebook "Raytracing Aspheric Lens.iynb"
+        g.y = - p.y * 2 * beta
+        
+        if (R*beta) < 0:
+            sign *= -1
+            
+        g.z *= sign
+        g.y *= sign
+        g.x *= sign
+        
+        g = norm_(g)
+        
+        if self.invert_normals:
+            for i in range(1,Nx):
+                for j in range(Ny):
+                    g.x += i*E[i,j]*inv_rad*(x**(i-1))*(y**j)
+                    
+            for i in range(Nx):
+                for j in range(1,Ny):
+                    g.y += j*E[i,j]*inv_rad*(x**i)*(y**(j-1))
+        else:
+            for i in range(1,Nx):
+                for j in range(Ny):
+                    g.x -= i*E[i,j]*inv_rad*(x**(i-1))*(y**j)
+                    
+            for i in range(Nx):
+                for j in range(1,Ny):        
+                    g.y -= j*E[i,j]*inv_rad*(x**i)*(y**(j-1))
+        
+        #g.z += 1
+        
+        return norm_(g)  # normalized to length 1
+        
+        
+    cdef double eval_z_c(self, double x, double y) nogil:
+        cdef: 
+            double out
+            double r2 = (x*x) + (y*y)
+            extpoly_t EP = self.ext_poly
+            double R = -EP.R
+            double[:,:] E = self._coefs
+            int i,j, Nx=E.shape[0], Ny=E.shape[1]
+            
+        x = x/EP.norm_radius
+        y = y/EP.norm_radius
+     
+        out = -r2
+        if R>=0.0:
+            out /= (R + sqrt(R*R - (EP.beta)*r2) )
+        else:
+            out /= (R - sqrt(R*R - (EP.beta)*r2) )
+             
+        for i in range(Nx):
+            for j in range(Ny):
+                out += E[i,j]*(x**i)*(y**j)
+                
+        out += EP.z_height
+        return out
+     
+    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+        return z - self.eval_z_c(x,y)
     
     
 cdef class DistortionFace(ShapedFace):
@@ -1816,7 +2153,7 @@ cdef class DistortionFace(ShapedFace):
         self.shape = kwds.get('shape', face.shape)
         self.accuracy = kwds.get("accuracy", 1e-6)
         
-    cdef double intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         cdef:
             ShapedFace face=self.base_face
             double z_shift=0.0, tolerance, a1, a2, h=sep_(p2,p1)
@@ -1824,13 +2161,15 @@ cdef class DistortionFace(ShapedFace):
             int i
             Distortion dist=self.distortion
             Shape shape = self.shape
+            intersect_t fout
             
         tolerance = self.accuracy
         
-        a2 = face.intersect_c(p1,p2,0) #Don't check the shape yet
+        fout = face.intersect_c(p1,p2,0) #Don't check the shape yet
+        a2 = fout.dist
         if a2>h or a2<self.tolerance: #If no intersection, then, no intersection
             #print("NO intersection", a2, p1.z, p2.z)
-            return -1.0
+            return NO_INTERSECTION
         
         #print("start estimate:", a2)
         #starting estimate of intersection
@@ -1838,7 +2177,7 @@ cdef class DistortionFace(ShapedFace):
         pt1 = addvv_(p1, multvs_(d,a2/h))
         dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
         
-        n = face.compute_normal_c(pt1)
+        n = face.compute_normal_c(pt1, fout.piece_idx)
         #print("base normal:", n.x, n.y, n.z)
         #print("pt1:", pt1.x, pt1.y, pt1.z)
         #print("dx:", dxdyz.x, "dy:", dxdyz.y, "z:", dxdyz.z)
@@ -1856,7 +2195,7 @@ cdef class DistortionFace(ShapedFace):
         #print("better estimate", a1)
         if a1 < fabs(dxdyz.z):
             #print("self-intersection. bailing.")
-            return -1.0
+            return NO_INTERSECTION
         
         for i in range(20):
             pt1 = addvv_(p1, multvs_(d,a1/h))
@@ -1869,10 +2208,11 @@ cdef class DistortionFace(ShapedFace):
             q2 = p2
             q1.z -= z_shift
             q2.z -= z_shift
-            a2 = face.intersect_c(q1, q2, 0)
+            fout = face.intersect_c(q1, q2, 0)
+            a2 = fout.dist
             
             pt1 = addvv_(q1, multvs_(d,a2/h)) #this point on base
-            n = face.compute_normal_c(pt1)
+            n = face.compute_normal_c(pt1, fout.piece_idx)
             dxdyz = dist.z_offset_and_gradient_c(pt1.x, pt1.y)
             pt1.z += dxdyz.z #move to distorted face
             
@@ -1887,18 +2227,19 @@ cdef class DistortionFace(ShapedFace):
             a1 = -h*dotprod_(o,n)/dotprod_(d,n)
             
         if not shape.point_inside_c(pt1.x, pt1.y):
-            return -1.0
+            return NO_INTERSECTION
         #print("Final a1:", a1)
-        return a1
+        fout.dist = a1
+        return fout
             
-    cdef vector_t compute_normal_c(self, vector_t p):
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
         cdef:
             vector_t n, p1, dxdyz
 
         dxdyz = self.distortion.z_offset_and_gradient_c(p.x, p.y)
         p1 = p
         p1.z -= dxdyz.z
-        n = self.base_face.compute_normal_c(p1)
+        n = self.base_face.compute_normal_c(p1, piece)
         n.x /= n.z
         n.y /= n.z
         n.z = 1.0
