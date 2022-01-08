@@ -1847,7 +1847,8 @@ cdef class FaceList(object):
         it = face.intersect_c(p1, p2, 1)
         if face.tolerance < it.dist < ray.length:
             ray.length = it.dist
-            ray.end_face_idx = it.face_idx
+            ray.end_face_idx = face.idx
+            it.face_idx = face.idx
         return it
         
      
@@ -1870,8 +1871,8 @@ cdef class FaceList(object):
             this = face.intersect_c(p1, p2, 1)
             if face.tolerance < this.dist < ray.length:
                 ray.length = this.dist
+                this.face_idx = face.idx
                 out = this
-                out.face_idx = face.idx
                 ray.end_face_idx = this.face_idx
         return out
     
