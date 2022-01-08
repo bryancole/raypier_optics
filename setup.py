@@ -41,6 +41,8 @@ ext_modules = cythonize("raypier/core/*.pyx",
 
 for module in ext_modules:
     module.extra_compile_args.append(openmp)
+    if not Win64:
+        module.extra_compile_args.append('-march=native')
     module.extra_link_args.append(openmp)
     
 with open("README.rst", 'r', encoding="utf-8") as fh:
