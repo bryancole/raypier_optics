@@ -82,7 +82,7 @@ def trace_ray_sequence(input_rays, face_sequence, recursion_limit=100, max_lengt
         f.material.wavelengths = wavelengths
         f.max_length = max_length
 
-    all_faces_a = np.array(all_faces)    
+    all_faces_a = numpy.array(all_faces)    
     decomp_faces = [f for f in all_faces if f.material.is_decomp_material()]
     
     rays = input_rays

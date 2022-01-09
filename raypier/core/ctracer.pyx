@@ -2031,8 +2031,8 @@ cdef class FaceList(object):
         it = (<Face>face).intersect_c(p1, p2, 1)
         if (<Face>face).tolerance < it.dist < ray.length:
             ray.length = it.dist
-            ray.end_face_idx = face.idx
-            it.face_idx = face.idx
+            it.face_idx = (<Face>face).idx
+            ray.end_face_idx = it.face_idx
         return it
         
      
@@ -2055,9 +2055,9 @@ cdef class FaceList(object):
             this = (<Face>face).intersect_c(p1, p2, 1)
             if (<Face>face).tolerance < this.dist < ray.length:
                 ray.length = this.dist
-                this.face_idx = face.idx
+                this.face_idx = (<Face>face).idx
                 out = this
-                ray.end_face_idx = out.face_idx
+                ray.end_face_idx = this.face_idx
         return out
     
     def intersect(self, Ray r):
@@ -2360,7 +2360,7 @@ def trace_gausslet(GaussletCollection rays,
 def trace_one_face_gausslet(GaussletCollection rays, 
                     FaceList face_set,
                     int face_idx, 
-                    list all_faces,
+                    np_.ndarray all_faces,
                     max_length=100,
                     decomp_faces=[]):
     face_set.sync_transforms()
@@ -2470,7 +2470,7 @@ cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets,
         int tid, n_threads=openmp.omp_get_max_threads()
    
     #need to allocate the output rays here 
-    new_gausslets = GaussletAggregator(gausslets.n_rays)
+    new_gausslets = GaussletAggregator(gausslets.n_rays, n_threads)
     
     child_rays = RayAggregator(2, n_threads)
     
