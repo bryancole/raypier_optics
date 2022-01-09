@@ -2031,7 +2031,8 @@ cdef class FaceList(object):
         it = (<Face>face).intersect_c(p1, p2, 1)
         if (<Face>face).tolerance < it.dist < ray.length:
             ray.length = it.dist
-            ray.end_face_idx = it.face_idx
+            ray.end_face_idx = face.idx
+            it.face_idx = face.idx
         return it
         
      
@@ -2054,9 +2055,9 @@ cdef class FaceList(object):
             this = (<Face>face).intersect_c(p1, p2, 1)
             if (<Face>face).tolerance < this.dist < ray.length:
                 ray.length = this.dist
+                this.face_idx = face.idx
                 out = this
-                out.face_idx = (<Face>face).idx
-                ray.end_face_idx = this.face_idx
+                ray.end_face_idx = out.face_idx
         return out
     
     def intersect(self, Ray r):
