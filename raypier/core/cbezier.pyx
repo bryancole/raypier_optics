@@ -1,4 +1,8 @@
 
+#cython: boundscheck=False
+#cython: nonecheck=False
+#cython: cdivision=True
+
 import numpy as np
 cimport numpy as cnp
 
@@ -51,12 +55,15 @@ cdef class BezierPatch():
         def __get__(self):
             return np.asarray(self._control_pts)
         
-        def __set__(self, double[:,:,:] ctrl_pts):
-            if ctrl_pts.shape != (self.order_n, self.order_m, 3):
-                raise ValueError("Control points array must have shape (%d,%d,3)."%(self.order_n, self.order_m))
-            self._control_pts = ctrl_pts.copy()
+        def __set__(self, pts_in):
+            cdef:
+                double[:,:,:] ctrl_pts=pts_in
+            print("Got shape", ctrl_pts.shape, pts_in.shape)
+            if pts_in.shape != (self.order_n+1, self.order_m+1, 3):
+                raise ValueError("Control points array must have shape (%d,%d,3). Got %r"%(self.order_n+1, self.order_m+1, ctrl_pts.shape))
+            self._control_pts = ctrl_pts #.copy()
         
-    cdef vector_t _eval_pt(self, double u, double v):
+    cdef vector_t _eval_pt(self, double u, double v) nogil:
         cdef:
             int i,j, N=self.order_n, M=self.order_m
             vector_t out
@@ -91,5 +98,37 @@ cdef class BezierPatch():
         
         returns : tuple(double[:,:] points, int[:,:] triangles)
         """
+        cdef:
+            double du=1./(N-1), dv=1./(M-1)
+            vector_t pt
+            double[:,:,:] out
+            long[:,:] pt_ids
+            long[:,:] cells
+            int i,j, ct=0
+            
+        points = np.empty((N,M,3), dtype=np.float64)
+        out = points
+        pt_ids = np.arange(N*M).reshape(N,M)
+        cells = np.empty(((N-1)*(M-1)*2,3), np.int64)
         
+        with nogil:
+            for i in range(N):
+                for j in range(M):
+                    pt = self._eval_pt(i*du, j*dv)
+                    out[i,j,0] = pt.x
+                    out[i,j,1] = pt.y
+                    out[i,j,2] = pt.z
+                    
+            for i in range(N-1):
+                for j in range(M-1):
+                    cells[ct,0] = pt_ids[i,j]
+                    cells[ct,1] = pt_ids[i,j+1]
+                    cells[ct,2] = pt_ids[i+1,j+1]
+                    ct += 1
+                    cells[ct,0] = pt_ids[i,j]
+                    cells[ct,1] = pt_ids[i+1,j+1]
+                    cells[ct,2] = pt_ids[i+1,j]
+                    ct += 1
+                    
+        return (points.reshape(-1,3), np.asarray(cells))
     
