@@ -495,10 +495,8 @@ class RayTraceModel(HasQueue):
         windowToImageFilter.input = renderWindow
         windowToImageFilter.update()
 #          
-        filename = "/dev/shm/temp_vtk_put.png"
         writer = tvtk.PNGWriter()
-        writer.file_name = filename
-        writer.write_to_memory = False
+        writer.write_to_memory = True
         writer.input_connection = windowToImageFilter.output_port
         writer.write()
         
@@ -513,10 +511,11 @@ class RayTraceModel(HasQueue):
             windowToImageFilter.modified()
             windowToImageFilter.update()
             writer.write()
+            data = writer.result.to_array()
             view_out.update({"position": tuple(camera.position), 
                              "view_up": tuple(camera.view_up),
                              "focal_point": tuple(camera.focal_point)})
-            return display(Image(filename), grp)
+            return display(Image(data=data), grp)
         
         def r_up(arg):
             camera.orthogonalize_view_up()
