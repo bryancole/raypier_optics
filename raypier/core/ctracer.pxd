@@ -207,6 +207,10 @@ cdef class Distortion:
     
 cdef class Shape:
     cdef bint point_inside_c(self, double x, double y)
+    
+    
+cdef class ImplicitSurface:
+    cdef double evaluate_c(self, vector_t p) nogil
 
 
 cdef class Face(object):

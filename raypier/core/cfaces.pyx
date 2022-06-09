@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from distribute_setup import _no_sandbox
 
 #cython: boundscheck=False
 #cython: nonecheck=False
@@ -29,7 +30,7 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, Shape, Distortion, intersect_t
+                rotate_c, Shape, ImplicitSurface, Distortion, intersect_t
 
 import numpy as np
 cimport numpy as np_
@@ -234,6 +235,58 @@ cdef class ShapedPlanarFace(ShapedFace):
     
     cdef double eval_implicit_c(self, double x, double y, double z) nogil:
         return (z - self.z_height)
+    
+    
+cdef class ImplicitBoundedFace(Face):
+    cdef:
+        public ImplicitSurface boundary
+        public ImplicitSurface target
+        
+        
+cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):        
+    def __cinit__(self, **kwds):
+        target = kwds.get('target', None)
+        from raypier.core.cimplicit_surfs import Plane, NullSurface
+        if target is None:
+            target = Plane()
+        if 'origin' in kwds:
+            target.origin = kwds['origin']
+        if 'normal' in kwds:
+            target.normal = kwds['normal']
+        self.target = target
+        self.boundary = kwds.get('boundary', NullSurface())
+        
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            vector_t normal=self.target.normal
+            vector_t origin=self.target.origin
+            vector_t dp = subvv_(p2, p1)
+            vector_t po = subvv_(origin, p1)
+            double h = dotprod_(po, normal) / dotprod_(dp, normal)
+            double max_length = mag_(dp)
+            intersect_t out=NO_INTERSECTION
+                                
+        if (h<self.tolerance) or (h>1.0):
+            return NO_INTERSECTION
+        
+        po = addvv_(p1, multvs_(dp, h))
+        if is_base_ray and (<ImplicitSurface>self.boundary).evaluate_c(po) > 0.0:
+            return NO_INTERSECTION
+        out.dist = h*max_length
+        return out
+        
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+        return self.target.normal
     
     
 cdef class ElipticalPlaneFace(Face):

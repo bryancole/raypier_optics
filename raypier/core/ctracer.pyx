@@ -1656,6 +1656,21 @@ cdef class Shape:
         return self.point_inside_c(x,y) 
     
     
+cdef class ImplicitSurface:
+    """Positions 'outside' the surface evaluate > 0.0
+    """
+    cdef double evaluate_c(self, vector_t p) nogil:
+        return 0.0 
+    
+    def evaluate(self, double x, double y, double z):
+        cdef:
+            vector_t p
+        p.x=x
+        p.y=y
+        p.z=z
+        return self.evaluate_c(p)
+    
+    
 cdef class Distortion:
     """A abstract base class to represents distortions on a face, a z-offset 
     as a function of (x,y).
