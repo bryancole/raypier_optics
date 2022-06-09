@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from distribute_setup import _no_sandbox
 
 #cython: boundscheck=False
 #cython: nonecheck=False
@@ -8,6 +7,9 @@ from distribute_setup import _no_sandbox
 """
 Cython module for Face definitions
 """
+
+from distribute_setup import _no_sandbox
+from scipy.ndimage._ni_docstrings import _origin_doc
 
 #maybe this is a cython .15 thing?
 #from libc.math import INFINITY, M_PI, sqrt, pow, fabs, cos, sin, acos, atan2
@@ -243,7 +245,11 @@ cdef class ImplicitBoundedFace(Face):
         public ImplicitSurface target
         
         
-cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):        
+cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):
+    cdef:
+        vector_t _origin
+        vector_t _normal
+        
     def __cinit__(self, **kwds):
         target = kwds.get('target', None)
         from raypier.core.cimplicit_surfs import Plane, NullSurface
@@ -255,6 +261,18 @@ cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):
             target.normal = kwds['normal']
         self.target = target
         self.boundary = kwds.get('boundary', NullSurface())
+        
+    def update(self):
+        super().update()
+        n = self.target.normal
+        self._normal.x = n[0]
+        self._normal.y = n[1]
+        self._normal.z = n[2]
+        
+        o = self.target.origin
+        self._origin.x = o[0]
+        self._origin.y = o[1]
+        self._origin.z = o[2]
         
     cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
@@ -268,8 +286,8 @@ cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):
           intersection can be indicated by a negative value.
         """
         cdef:
-            vector_t normal=self.target.normal
-            vector_t origin=self.target.origin
+            vector_t normal=self._normal
+            vector_t origin=self._origin
             vector_t dp = subvv_(p2, p1)
             vector_t po = subvv_(origin, p1)
             double h = dotprod_(po, normal) / dotprod_(dp, normal)
@@ -286,7 +304,7 @@ cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):
         return out
         
     cdef vector_t compute_normal_c(self, vector_t p, int piece):
-        return self.target.normal
+        return self._normal
     
     
 cdef class ElipticalPlaneFace(Face):

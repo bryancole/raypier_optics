@@ -17,6 +17,8 @@ from .ctracer cimport ImplicitSurface, sep_, \
 import numpy as np
 cimport numpy as np_
 
+from .ctracer import ImplicitSurface
+
 
 cdef class NullSurface(ImplicitSurface):
     cdef double evaluate_c(self, vector_t p) nogil:
