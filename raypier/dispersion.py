@@ -38,6 +38,7 @@ class NondispersiveCurve(BaseDispersionCurve):
     def __repr__(self):
         return f"<Nondispersion Curve: ri={self._refractive_index}, absorption={self._absorption}>"
         
+        
 class FusedSilica(BaseDispersionCurve):
     """
     A Dispersion curve for fused silica.

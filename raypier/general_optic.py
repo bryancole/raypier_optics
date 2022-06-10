@@ -15,7 +15,7 @@ from raypier.shapes import BaseShape
 from raypier.lenses import BaseLens
 from raypier.core.ctracer import FaceList
 from . import faces
-from .materials import OpticalMaterial, air
+from .materials import BaseOpticalMaterial, OpticalMaterial, air
 
 
 alist_editor = ListEditor(use_notebook=True,
@@ -40,7 +40,7 @@ class GeneralLens(BaseLens):
     #: A list of :py:class:`raypier.materials.OpticalMaterial` objects describing 
     #: the materials properties of the dielectrics between the previously given
     #: surfaces. For a list of N surfaces, you should provide (N-1) materials.
-    materials = List(OpticalMaterial, comparison_mode=ComparisonMode.identity)
+    materials = List(BaseOpticalMaterial, comparison_mode=ComparisonMode.identity)
     
     _grid = Instance(tvtk.PlaneSource, ())
     _clip = Instance(tvtk.ClipPolyData, ())
@@ -48,7 +48,7 @@ class GeneralLens(BaseLens):
     #: A :py:class:`raypier.materials.OpticalMaterial` object to define the 
     #: characteristics of a single-layer dielectric coating applied to the outer
     #: surfaces of the object.
-    coating_material = Instance(OpticalMaterial, ())
+    coating_material = Instance(BaseOpticalMaterial)
     
     #: The thickness, in microns, of the coating on the outer surfaces.
     coating_thickness = Float(0.25, desc="Thickness of the AR coating, in microns")
@@ -83,6 +83,9 @@ class GeneralLens(BaseLens):
                 layout="tabbed"
             )
         )
+    
+    def _coating_material_default(self):
+        return OpticalMaterial()
     
     def _actors_default(self):
         pipeline = self.pipeline
