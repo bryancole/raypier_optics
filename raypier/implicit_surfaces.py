@@ -2,7 +2,7 @@
 
 from raypier.core import cimplicit_surfs as csurfs
 from raypier.core.ctracer import ImplicitSurface
-from raypier.core.cimplicit_surfs import Intersection, Union, Difference
+from raypier.core.cimplicit_surfs import Intersection, Union, Difference, Invert
 
 from tvtk.api import tvtk
 

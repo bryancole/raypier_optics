@@ -122,6 +122,17 @@ cdef class Cylinder(ImplicitSurface):
     cdef double evaluate_c(self, vector_t p) nogil:
         return mag_(cross_(subvv_(p, self._origin), self._axis)) - self.radius
     
+    
+cdef class Invert(ImplicitSurface):
+    cdef:
+        public ImplicitSurface surf
+        
+    def __cinit__(self, ImplicitSurface surf):
+        self.surf = surf
+        
+    cdef double evaluate_c(self, vector_t p) nogil:
+        return -self.surf.evaluate_c(p)
+    
 
 cdef class Union(ImplicitSurface):
     cdef:
