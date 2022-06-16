@@ -58,6 +58,9 @@ class GeneralLens(BaseLens):
     glass_colour = Tuple((204,204,255,102))
     mirror_colour = Tuple((104,64,104,255))
     
+    ###These are ignored for Mirror faces.
+    reflection_threshold = Float(0.1)
+    transmission_threshold = Float(0.1)
     
     
     traits_view = View(Group(
@@ -221,7 +224,8 @@ class GeneralLens(BaseLens):
                 if face.mirror:
                     cface.material = PECMaterial()
                 else:
-                    mat = CoatedDispersiveMaterial()
+                    mat = CoatedDispersiveMaterial(reflection_threshold=self.reflection_threshold,
+                                                   transmission_threshold=self.transmission_threshold)
                     mat.dispersion_inside = mats[i].dispersion_curve
                     mat.dispersion_outside = mats[i+1].dispersion_curve
                     if i in {0, len(surfaces)-1}:
@@ -233,7 +237,8 @@ class GeneralLens(BaseLens):
                 cfaces.append(face.cface)
         self.faces.faces = cfaces
     
-    @observe("materials.items.dispersion_curve, coating_material.dispersion_curve, coating_thickness")
+    @observe("materials.items.dispersion_curve, coating_material.dispersion_curve, " 
+                "coating_thickness, reflection_threshold, transmission_threshold")
     def on_material_change(self, evt):
         self.config_cfaces()
         self.update = True
