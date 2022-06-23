@@ -8,9 +8,6 @@
 Cython module for Face definitions
 """
 
-from distribute_setup import _no_sandbox
-from scipy.ndimage._ni_docstrings import _origin_doc
-
 #maybe this is a cython .15 thing?
 #from libc.math import INFINITY, M_PI, sqrt, pow, fabs, cos, sin, acos, atan2
 
