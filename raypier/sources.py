@@ -88,7 +88,7 @@ class BaseRaySource(BaseBase):
     show_direction = Bool(False)
     show_normals = Bool(False)
     opacity = Range(0.0,1.0,1.0)
-    color = Tuple(Range(0.0,1.0,1.0),Range(0.0,1.0,1.0),Range(0.0,1.0,1.0))
+    color = Tuple(Range(0.0,1.0,1.0),Range(0.0,1.0,0.5),Range(0.0,1.0,0.0))
     
     ### A dict which maps each RayCollection instance in the traced_rays
     ### list to a list/array of bools of the same length as the RayCollection
@@ -115,7 +115,7 @@ class BaseRaySource(BaseBase):
     
     actors = Property(List, transient=True)
     
-    vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0), 'opacity': 1.0}, transient=True)
+    vtkproperty = Instance(tvtk.Property, transient=True)
     
     display_grp = VGroup(Item('display'),
                        Item('show_start'),
@@ -376,6 +376,9 @@ class BaseRaySource(BaseBase):
         if prop:
             act.property = prop
         return act
+    
+    def _vtkproperty_default(self):
+        return tvtk.Property(color=self.color, opacity=self.opacity)
     
     def _display_changed(self, vnew):
         actors = self.actors
