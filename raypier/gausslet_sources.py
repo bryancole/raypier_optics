@@ -5,6 +5,8 @@ import time
 from traits.api import Instance, Title, Float, Tuple, Complex, Property, cached_property, \
         observe, Bool, Range, Int
 from traitsui.api import View, Item, VGroup, Tabbed, Include, Group
+from traitsui.editors.api import TupleEditor
+
 from tvtk.api import tvtk
 
 from raypier.sources import BaseRaySource, UnitTupleVector, UnitVectorTrait, sequence_grp
@@ -46,6 +48,7 @@ class BaseGaussletSource(BaseRaySource):
                        Item('scale_factor'),
                        Item('export_pipes',label="export as pipes"),
                        Item('opacity', editor=NumEditor),
+                       Item('color', editor=TupleEditor(labels=['R','G','B'])),
                        label="Display")
     
     params_grp = VGroup(
@@ -82,7 +85,12 @@ class BaseGaussletSource(BaseRaySource):
         self.vtkproperty.opacity = self.opacity
         self.para_property.opacity = self.opacity
         self.render = True
-        
+    
+    def _color_changed(self):
+        self.vtkproperty.color = self.color
+        self.para_property.color = self.color
+        self.render = True
+
     def _get_actors(self):
         actors = [self.ray_actor, self.para_ray_actor, self.start_actor, self.normals_actor]
         return actors

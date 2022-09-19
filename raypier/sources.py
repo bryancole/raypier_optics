@@ -27,7 +27,7 @@ from traits.api import HasTraits, Int, Float, \
 
 from traitsui.api import View, Item, Tabbed, VGroup, Include, \
     Group, HGroup
-from traitsui.editors.api import ButtonEditor
+from traitsui.editors.api import ButtonEditor, TupleEditor
 
 from tvtk.api import tvtk
 
@@ -88,6 +88,7 @@ class BaseRaySource(BaseBase):
     show_direction = Bool(False)
     show_normals = Bool(False)
     opacity = Range(0.0,1.0,1.0)
+    color = Tuple(Range(0.0,1.0,1.0),Range(0.0,1.0,1.0),Range(0.0,1.0,1.0))
     
     ### A dict which maps each RayCollection instance in the traced_rays
     ### list to a list/array of bools of the same length as the RayCollection
@@ -122,6 +123,7 @@ class BaseRaySource(BaseBase):
                        Item('scale_factor'),
                        Item('export_pipes',label="export as pipes"),
                        Item('opacity', editor=NumEditor),
+                       Item('color', editor=TupleEditor(labels=['R','G','B'])),
                        label="Display")
     
     traits_view = View(Item('name', show_label=False),
@@ -279,6 +281,10 @@ class BaseRaySource(BaseBase):
         
     def _opacity_changed(self):
         self.vtkproperty.opacity = self.opacity
+        self.render = True
+
+    def _color_changed(self):
+        self.vtkproperty.color = self.color
         self.render = True
     
     def _get_actors(self):
