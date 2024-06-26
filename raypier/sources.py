@@ -97,7 +97,7 @@ class BaseRaySource(BaseBase):
     
     #idx selector for the input ways which should be visualised
     #making this transient because pyYAML fails to serialise arrays
-    view_ray_ids = Trait(None, Array(dtype=numpy.int), transient=True)
+    view_ray_ids = Trait(None, Array(dtype=int), transient=True)
     
     tube = Instance(tvtk.TubeFilter, (), transient=True)
     sphere = Instance(tvtk.SphereSource, (), transient=True)
@@ -906,7 +906,7 @@ class ConfocalRaySource(SingleRaySource):
         offsets = offsets[in_rad,:]
         
         #now cull cells with points outside the radius
-        map = numpy.ones(in_rad.shape, numpy.int) * -1
+        map = numpy.ones(in_rad.shape, int) * -1
         map[in_rad] = numpy.arange(in_rad.sum())
         
         mask = in_rad[cells].all(axis=-1)
