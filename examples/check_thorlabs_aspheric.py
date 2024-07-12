@@ -6,7 +6,7 @@ from raypier.mirrors import PlanarDispersiveWindow, PlanarWindow
 
 from raypier.dispersion import NamedDispersionCurve
 
-from raypier.find_focus import find_ray_focus
+from raypier.core.find_focus import find_ray_focus
 
 import numpy
 import time
@@ -48,7 +48,7 @@ def find_rms_spread(ray_set, x_offset):
     return numpy.sqrt((y_vals**2 + z_vals**2).mean())
 
 model.trace_all()
-start = time.clock()
+start = time.process_time()
 for x in x1:
     source.focus = (-x,0,0)
     #window.centre = (-x + 0.5, 0.0, 0.0)
@@ -63,7 +63,7 @@ for x in x1:
     spr.append( rms )
     
     #print(x, source.theta,  x2[-1] , rms)
-end = time.clock()
+end = time.process_time()
 print("Took:", end-start)
 
 from matplotlib import pyplot as pp
