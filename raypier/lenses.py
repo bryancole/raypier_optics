@@ -313,9 +313,10 @@ class PlanoConicLens(SurfaceOfRotationLens):
                     )
     
     def make_faces(self):
+        shape = cCircleShape(radius=self.diameter/2)
         fl = [CircularFace(owner=self, diameter=self.diameter,
                                 material = self.material), 
-                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                ConicRevolutionFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.conic_const,
                                 z_height=self.CT, curvature=self.curvature)]
