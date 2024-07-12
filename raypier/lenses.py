@@ -373,12 +373,13 @@ class BiConicLens(PlanoConicLens):
         self.faces.faces[0].conic_const = new_conic
     
     def make_faces(self):
-        fl = [ConicRevolutionFace(owner=self, diameter=self.diameter,
+        shape = cCircleShape(radius=self.diameter/2)
+        fl = [ConicRevolutionFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.conic_const2,
                                 z_height=0.0, curvature=self.curvature2,
                                 invert_normals=True), 
-                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                ConicRevolutionFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.conic_const,
                                 z_height=self.CT, curvature=self.curvature)]
