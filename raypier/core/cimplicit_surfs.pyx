@@ -2,7 +2,7 @@ from scipy.ndimage._ni_docstrings import _origin_doc
 
 cdef extern from "math.h":
     double M_PI
-    double sqrt(double) nogil
+    double sqrt(double) noexcept nogil
     double atan2 (double y, double x )
     double pow(double x, double y)
     double fabs(double)
@@ -21,7 +21,7 @@ from .ctracer import ImplicitSurface
 
 
 cdef class NullSurface(ImplicitSurface):
-    cdef double evaluate_c(self, vector_t p) nogil:
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
         return -1.0
 
 
@@ -57,7 +57,7 @@ cdef class Plane(ImplicitSurface):
             cdef vector_t n=self._normal
             return (n.x, n.y, n.z)
         
-    cdef double evaluate_c(self, vector_t p) nogil:
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
         return dotprod_(self._normal, subvv_(p, self._origin))
     
 
@@ -80,7 +80,7 @@ cdef class Sphere(ImplicitSurface):
             cdef vector_t o=self._centre
             return (o.x, o.y, o.z)
         
-    cdef double evaluate_c(self, vector_t p) nogil:
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
         return sep_(p, self._centre) - self.radius
     
     
@@ -119,7 +119,7 @@ cdef class Cylinder(ImplicitSurface):
             o.z = v[2]
             self._axis = norm_(o)
             
-    cdef double evaluate_c(self, vector_t p) nogil:
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
         return mag_(cross_(subvv_(p, self._origin), self._axis)) - self.radius
     
     
@@ -130,7 +130,7 @@ cdef class Invert(ImplicitSurface):
     def __cinit__(self, ImplicitSurface surf):
         self.surf = surf
         
-    cdef double evaluate_c(self, vector_t p) nogil:
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
         return -self.surf.evaluate_c(p)
     
 
@@ -162,7 +162,7 @@ cdef class Union(ImplicitSurface):
 #         def __get__(self):
 #             return self._surfaces
         
-    cdef double evaluate_c(self, vector_t p) nogil:
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
         cdef:
             void* surf
             int i
@@ -176,20 +176,20 @@ cdef class Union(ImplicitSurface):
             out = self.apply_op(out, v)
         return out
     
-    cdef double apply_op(self, double out, double v) nogil:
+    cdef double apply_op(self, double out, double v) noexcept nogil:
         if v < out:
             out = v
         return out
     
     
 cdef class Intersection(Union):
-    cdef double apply_op(self, double out, double v) nogil:
+    cdef double apply_op(self, double out, double v) noexcept nogil:
         if v > out:
             out = v
         return out
     
 
 cdef class Difference(Union):
-    cdef double apply_op(self, double out, double v) nogil:
+    cdef double apply_op(self, double out, double v) noexcept nogil:
         out -= v
         return out

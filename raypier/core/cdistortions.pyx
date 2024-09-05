@@ -1,16 +1,16 @@
 
 cdef extern from "math.h":
     double M_PI
-    double sqrt(double) nogil
-    double atan2 (double y, double x ) nogil
-    double pow(double x, double y) nogil
-    double fabs(double) nogil
-    double cos(double) nogil
-    double sin(double) nogil
-    double acos(double) nogil
-    double floor(double) nogil
-    int isnan(double) nogil
-    int abs(int) nogil
+    double sqrt(double) noexcept nogil
+    double atan2 (double y, double x ) noexcept nogil
+    double pow(double x, double y) noexcept nogil
+    double fabs(double) noexcept nogil
+    double cos(double) noexcept nogil
+    double sin(double) noexcept nogil
+    double acos(double) noexcept nogil
+    double floor(double) noexcept nogil
+    int isnan(double) noexcept nogil
+    int abs(int) noexcept nogil
 
 cdef extern from "float.h":
     double DBL_MAX
@@ -47,7 +47,7 @@ cdef class SimpleTestZernikeJ7(Distortion):
         self.unit_radius = kwds.get("unit_radius", 1.0)
         self.amplitude = kwds.get("amplitude", 1.0)
         
-    cdef double z_offset_c(self, double x, double y) nogil:
+    cdef double z_offset_c(self, double x, double y) noexcept nogil:
 #         cdef:
 #             double rho, Z
             
@@ -58,7 +58,7 @@ cdef class SimpleTestZernikeJ7(Distortion):
         Z = sqrt(8.0)*(3*(x*x + y*y) - 2)*y
         return Z * self.amplitude
     
-    cdef vector_t z_offset_and_gradient_c(self, double x, double y) nogil:
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y) noexcept nogil:
         """The z-axis surface sag is returned as the z-component 
         of the output vector. The x- and y-components of the surface
         gradient are placed in the x- and y- components of vector.
@@ -146,7 +146,7 @@ def eval_nmk(int j):
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double zernike_R_c(double r, int k, int n, int m, double[:,:] workspace) nogil:
+cdef double zernike_R_c(double r, int k, int n, int m, double[:,:] workspace) noexcept nogil:
     cdef:
         int kA, kB, kC, nA, nB, nC, mA, mB, mC , half_n
         double val
@@ -186,7 +186,7 @@ def zernike_R(double r, int k, int n, int m, double[:,:] workspace):
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:,:] workspace) nogil:
+cdef double zernike_Rprime_c(double r, int k, int n, int m, double[:,:] workspace) noexcept nogil:
     cdef:
         int kA, kB, kC, nA, nB, nC, mA, mB, mC, half_n
         double val
@@ -227,7 +227,7 @@ def zernike_Rprime(double r, int k, int n, int m, double[:,:] workspace):
 # @cython.wraparound(False)   # Deactivate negative indexing.
 # @cython.nonecheck(False)
 # @cython.cdivision(True)
-# cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:] workspace) nogil:
+# cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:] workspace) noexcept nogil:
 #     cdef:
 #         int kA, kB, kC, nA, nB, nC, mA, mB, mC , half_n
 #         double val, val1, val2, t1,t2,t3,t4
@@ -285,7 +285,7 @@ def zernike_Rprime(double r, int k, int n, int m, double[:,:] workspace):
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:,:] workspace) nogil:
+cdef double zernike_R_over_r_c(double r, int k, int n, int m, double[:,:] workspace) noexcept nogil:
     """
     Results is undefined for m==0.
     """
@@ -413,7 +413,7 @@ cdef class ZernikeDistortion(Distortion):
     @cython.wraparound(False)   # Deactivate negative indexing.
     @cython.nonecheck(False)
     @cython.cdivision(True)
-    cdef double z_offset_c(self, double x, double y) nogil:
+    cdef double z_offset_c(self, double x, double y) noexcept nogil:
         cdef:
             double r, theta, Z=0.0, N, PH, R
             int i
@@ -453,7 +453,7 @@ cdef class ZernikeDistortion(Distortion):
     @cython.wraparound(False)   # Deactivate negative indexing.
     @cython.nonecheck(False)
     @cython.cdivision(True)
-    cdef vector_t z_offset_and_gradient_c(self, double x, double y) nogil:
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y) noexcept nogil:
         """The z-axis surface sag is returned as the z-component 
         of the output vector. The x- and y-components of the surface
         gradient are placed in the x- and y- components of vector.

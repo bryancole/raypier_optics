@@ -13,7 +13,7 @@ Cython module for Face definitions
 
 cdef extern from "math.h":
     double M_PI
-    double sqrt(double) nogil
+    double sqrt(double) noexcept nogil
     double atan2 (double y, double x )
     double pow(double x, double y)
     double fabs(double)
@@ -56,10 +56,10 @@ cdef class ShapedFace(Face):
         self.shape = kwds.get("shape", Shape())
         self.invert_normals = int(kwds.get('invert_normals', 0))
         
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return 0.0
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
     
     @cython.boundscheck(False)  # Deactivate bounds checking
@@ -229,10 +229,10 @@ cdef class ShapedPlanarFace(ShapedFace):
         normal.z=1
         return normal
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return self.z_height
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return (z - self.z_height)
     
     
@@ -581,7 +581,7 @@ cdef class ShapedSphericalFace(ShapedFace):
             p.x = -p.x
         return norm_(p)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double r2 = x*x + y*y
             double c = self.curvature
@@ -590,7 +590,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         else:
             return self.z_height - sqrt(c*c - r2) - c
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         cdef:
             double cz, c=self.curvature
 
@@ -1392,7 +1392,7 @@ cdef class SaddleFace(ShapedFace):
         n.y = -rt6*p.x
         return norm_(n)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return sqrt(6) * self.curvature * x * y
         
         
@@ -1480,7 +1480,7 @@ cdef class CylindericalFace(ShapedFace):
         p.y = 0
         return norm_(p)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double R = self.radius
         if R>=0:
@@ -1573,7 +1573,7 @@ cdef class AxiconFace(ShapedFace):
         p.y = beta * p.y/r
         return p
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return self.z_height - (self.gradient * sqrt(x*x + y*y))
     
     
@@ -1707,7 +1707,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         
         return norm_(g)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double r2 = (x*x) + (y*y)
             double R = self.curvature
@@ -1718,7 +1718,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         else:
             return self.z_height  - (r2/(R - sqrt(R2 - (1+self.conic_const)*r2)))
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
     
     
@@ -1891,7 +1891,7 @@ cdef class AsphericFace(ShapedFace):
         
         return norm_(g)
 
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef: 
             double out
             double r2 = (x*x) + (y*y)
@@ -1906,7 +1906,7 @@ cdef class AsphericFace(ShapedFace):
         out += self.z_height
         return out
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
 
 
@@ -2176,7 +2176,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
         return norm_(g)  # normalized to length 1
         
         
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef: 
             double out
             double r2 = (x*x) + (y*y)
@@ -2201,7 +2201,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
         out += EP.z_height
         return out
      
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
     
     
@@ -2315,7 +2315,7 @@ cdef class DistortionFace(ShapedFace):
         n.y -= dxdyz.y
         return norm_(n)
             
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double z
         z = self.base_face.eval_z_c(x,y)
