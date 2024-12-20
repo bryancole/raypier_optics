@@ -3,8 +3,9 @@ Created on 23 Nov 2018
 
 :author: bryan
 '''
-import pyximport
-pyximport.install()
+### pyximport broken on py3.12 due to depreciated imp module. I'm not sure we need it here though.
+#import pyximport
+#pyximport.install()
 
 from raypier.core.cmaterials import BaseDispersionCurve
 
@@ -37,6 +38,7 @@ class NondispersiveCurve(BaseDispersionCurve):
         
     def __repr__(self):
         return f"<Nondispersion Curve: ri={self._refractive_index}, absorption={self._absorption}>"
+        
         
 class FusedSilica(BaseDispersionCurve):
     """

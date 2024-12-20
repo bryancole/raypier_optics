@@ -29,6 +29,7 @@ from raypier.bases import Optic, normaliseVector, NumEditor,\
     
 from raypier.core.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
 from raypier.core.ctracer import FaceList
+from raypier.core.cshapes import CircleShape as cCircleShape
 from raypier.core.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial, SingleLayerCoatedMaterial
 from raypier.vtk_algorithms import EmptyGridSource
 from raypier.shapes import CircleShape, BaseShape
@@ -312,9 +313,10 @@ class PlanoConicLens(SurfaceOfRotationLens):
                     )
     
     def make_faces(self):
+        shape = cCircleShape(radius=self.diameter/2)
         fl = [CircularFace(owner=self, diameter=self.diameter,
                                 material = self.material), 
-                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                ConicRevolutionFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.conic_const,
                                 z_height=self.CT, curvature=self.curvature)]
@@ -371,12 +373,13 @@ class BiConicLens(PlanoConicLens):
         self.faces.faces[0].conic_const = new_conic
     
     def make_faces(self):
-        fl = [ConicRevolutionFace(owner=self, diameter=self.diameter,
+        shape = cCircleShape(radius=self.diameter/2)
+        fl = [ConicRevolutionFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.conic_const2,
                                 z_height=0.0, curvature=self.curvature2,
                                 invert_normals=True), 
-                ConicRevolutionFace(owner=self, diameter=self.diameter,
+                ConicRevolutionFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.conic_const,
                                 z_height=self.CT, curvature=self.curvature)]
@@ -472,7 +475,8 @@ class AsphericLens(SurfaceOfRotationLens):
 #         return fl
     
     def make_faces(self):
-        fl = [AsphericFace(owner=self, diameter=self.diameter,
+        shape = cCircleShape(radius=self.diameter/2)
+        fl = [AsphericFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.A_conic,
                                 z_height=0.0, curvature=self.A_curvature,
@@ -480,7 +484,7 @@ class AsphericLens(SurfaceOfRotationLens):
                                 A12=-self.A12, A14=-self.A14, A16=-self.A16,
                                 invert_normals=True,
                                 atol=1e-16), 
-                AsphericFace(owner=self, diameter=self.diameter,
+                AsphericFace(owner=self, shape=shape,
                                 material=self.material,
                                 conic_const=self.B_conic,
                                 z_height=self.CT, curvature=self.B_curvature,

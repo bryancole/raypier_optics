@@ -198,12 +198,12 @@ cdef class BaseDispersionCurve(object):
         self.wavelength_min = wavelength_min
         self.wavelength_max = wavelength_max
         
-    cdef np_.npy_complex128[:] c_evaluate_n(self, double[:] wavelen):
+    cdef np_.complex128_t[:] c_evaluate_n(self, double[:] wavelen):
         cdef:
             dispersion_curve curve=self.curve
             double[:] coefs=self.coefs
             int i
-            np_.npy_complex128[:] n_out
+            np_.complex128_t[:] n_out
             double n_imag #imaginary part of n due to absorption
             double wvl
         
@@ -1061,7 +1061,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
     :param double transmission_threshold: Sets the amplitude threshold for generating a transmitted ray.
     """
     cdef:
-        public np_.npy_complex128[:] n_inside, n_outside, n_coating
+        public np_.complex128_t[:] n_inside, n_outside, n_coating
         public BaseDispersionCurve dispersion_inside
         public BaseDispersionCurve dispersion_outside
         public BaseDispersionCurve dispersion_coating
@@ -1109,7 +1109,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
             double Two_n1_cos1, aspect
             double wavelength
             int flip
-            np_.npy_complex128 ctemp
+            np_.complex128_t ctemp
             
         wavelength = self._wavelengths[in_ray.wavelength_idx]
         normal = norm_(orient.normal)

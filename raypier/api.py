@@ -9,7 +9,7 @@ from .faces import PlanarFace, SphericalFace, CylindericalFace, AsphericFace, Co
         
 from .lenses import PlanoConvexLens, PlanoConicLens, AsphericLens, BiConicLens
         
-from .materials import OpticalMaterial, air
+from .materials import OpticalMaterial, air, OpticalMaterialFromFormula
         
 from .sources import ConfocalRaySource, ConfocalRayFieldSource, ParallelRaySource,\
         GaussianBeamRaySource, SingleRaySource, HexagonalRayFieldSource, AdHocSource,\

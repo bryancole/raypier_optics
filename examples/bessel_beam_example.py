@@ -2,7 +2,7 @@
 from raypier.api import GeneralLens, AxiconFace, PlanarFace, OpticalMaterial, CircleShape,\
             RayTraceModel, CollimatedGaussletSource, EFieldPlane, GaussletCapturePlane, IntensitySurface
             
-from raypier.intensity_image import IntensityImageView
+#from raypier.intensity_image import IntensityImageView
 
 
 shape = CircleShape(radius=2.0)
@@ -45,12 +45,12 @@ field = EFieldPlane(centre=(0,0,13),
                     width=2,
                     height=2)
 
-image = IntensityImageView(field_probe=field)
+#image = IntensityImageView(field_probe=field)
 surf = IntensitySurface(field_probe=field)
 
 
 model = RayTraceModel(optics=[axicon], 
                       sources=[src], 
                       probes=[capture,field],
-                      results=[image,surf])
+                      results=[surf]) #[image,surf])
 model.configure_traits()

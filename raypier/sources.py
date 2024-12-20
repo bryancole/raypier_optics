@@ -27,7 +27,7 @@ from traits.api import HasTraits, Int, Float, \
 
 from traitsui.api import View, Item, Tabbed, VGroup, Include, \
     Group, HGroup
-from traitsui.editors.api import ButtonEditor
+from traitsui.editors.api import ButtonEditor, TupleEditor
 
 from tvtk.api import tvtk
 
@@ -88,6 +88,7 @@ class BaseRaySource(BaseBase):
     show_direction = Bool(False)
     show_normals = Bool(False)
     opacity = Range(0.0,1.0,1.0)
+    color = Tuple(Range(0.0,1.0,1.0),Range(0.0,1.0,0.5),Range(0.0,1.0,0.0))
     
     ### A dict which maps each RayCollection instance in the traced_rays
     ### list to a list/array of bools of the same length as the RayCollection
@@ -96,7 +97,7 @@ class BaseRaySource(BaseBase):
     
     #idx selector for the input ways which should be visualised
     #making this transient because pyYAML fails to serialise arrays
-    view_ray_ids = Trait(None, Array(dtype=numpy.int), transient=True)
+    view_ray_ids = Trait(None, Array(dtype=int), transient=True)
     
     tube = Instance(tvtk.TubeFilter, (), transient=True)
     sphere = Instance(tvtk.SphereSource, (), transient=True)
@@ -114,7 +115,7 @@ class BaseRaySource(BaseBase):
     
     actors = Property(List, transient=True)
     
-    vtkproperty = Instance(tvtk.Property, (), {'color':(1,0.5,0), 'opacity': 1.0}, transient=True)
+    vtkproperty = Instance(tvtk.Property, transient=True)
     
     display_grp = VGroup(Item('display'),
                        Item('show_start'),
@@ -122,6 +123,7 @@ class BaseRaySource(BaseBase):
                        Item('scale_factor'),
                        Item('export_pipes',label="export as pipes"),
                        Item('opacity', editor=NumEditor),
+                       Item('color', editor=TupleEditor(labels=['R','G','B'])),
                        label="Display")
     
     traits_view = View(Item('name', show_label=False),
@@ -280,6 +282,10 @@ class BaseRaySource(BaseBase):
     def _opacity_changed(self):
         self.vtkproperty.opacity = self.opacity
         self.render = True
+
+    def _color_changed(self):
+        self.vtkproperty.color = self.color
+        self.render = True
     
     def _get_actors(self):
         actors = [self.ray_actor, self.start_actor, self.normals_actor]
@@ -370,6 +376,9 @@ class BaseRaySource(BaseBase):
         if prop:
             act.property = prop
         return act
+    
+    def _vtkproperty_default(self):
+        return tvtk.Property(color=self.color, opacity=self.opacity)
     
     def _display_changed(self, vnew):
         actors = self.actors
@@ -897,7 +906,7 @@ class ConfocalRaySource(SingleRaySource):
         offsets = offsets[in_rad,:]
         
         #now cull cells with points outside the radius
-        map = numpy.ones(in_rad.shape, numpy.int) * -1
+        map = numpy.ones(in_rad.shape, int) * -1
         map[in_rad] = numpy.arange(in_rad.sum())
         
         mask = in_rad[cells].all(axis=-1)

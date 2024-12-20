@@ -266,7 +266,7 @@ class Traceable(ModelObject):
     
     intersections = List([], transient=True)
     
-    material = Instance(ctracer.InterfaceMaterial)
+    material = Instance(ctracer.InterfaceMaterial, transient=True)
     
     faces = Instance(ctracer.FaceList, 
                 desc="Container of traceable faces (Face instances)",
@@ -474,7 +474,7 @@ class Optic(Traceable):
     
     all_rays = Bool(False, desc="trace all reflected rays")
     
-    vtkproperty = Instance(tvtk.Property, (), {'opacity': 0.4, 'color': (0.8,0.8,1.0)})
+    vtkproperty = Instance(tvtk.Property, (), {'opacity': 0.4, 'color': (0.8,0.8,1.0)}, transient=True)
                              
     def _material_default(self):
         m = cmaterials.FullDielectricMaterial(n_inside = self.n_inside,

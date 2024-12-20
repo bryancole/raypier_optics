@@ -125,7 +125,7 @@ cdef double complex calc_mode_U(double complex A,
                                 vector_t direction,
                                 double complex k,
                                 double phase, 
-                                double inv_root_area) nogil:
+                                double inv_root_area) nogil noexcept:
     cdef:
         double complex denom, AA, CC, U
         double x,y,z
@@ -153,8 +153,8 @@ cdef double complex calc_mode_U(double complex A,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void evaluate_one_mode(np_.npy_complex128[:] out, double[:] x, double[:] y, 
-                            double[:] dx, double[:] dy, double blending, int size) nogil:
+cdef void evaluate_one_mode(np_.complex128_t[:] out, double[:] x, double[:] y, 
+                            double[:] dx, double[:] dy, double blending, int size) nogil noexcept:
     ### Brute force evaluation of the linear least squares fit to the x,y,dx,dy coefs
     ### We solve A.T*A x = A.T b which (by magical means) gives the least squares fit to A x = b
     ### A.T*A and A.T b have 3 rows i.e. we just need to solve 3 equations for 3 unknowns.
@@ -219,7 +219,7 @@ def evaluate_modes(double[:,:] x, double[:,:] y, double[:,:] dx, double[:,:] dy,
     cdef:
         int n_rays=x.shape[0], row_size=x.shape[1]
         int i
-        np_.npy_complex128[:,:] out = np.zeros((n_rays,3), dtype=np.complex128)        
+        np_.complex128_t[:,:] out = np.zeros((n_rays,3), dtype=np.complex128)        
     
     with nogil:
         for i in prange(n_rays):

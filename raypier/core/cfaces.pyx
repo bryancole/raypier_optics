@@ -13,7 +13,7 @@ Cython module for Face definitions
 
 cdef extern from "math.h":
     double M_PI
-    double sqrt(double) nogil
+    double sqrt(double) noexcept nogil
     double atan2 (double y, double x )
     double pow(double x, double y)
     double fabs(double)
@@ -29,7 +29,7 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, Shape, Distortion, intersect_t
+                rotate_c, Shape, ImplicitSurface, Distortion, intersect_t
 
 import numpy as np
 cimport numpy as np_
@@ -56,10 +56,10 @@ cdef class ShapedFace(Face):
         self.shape = kwds.get("shape", Shape())
         self.invert_normals = int(kwds.get('invert_normals', 0))
         
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return 0.0
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
     
     @cython.boundscheck(False)  # Deactivate bounds checking
@@ -229,11 +229,79 @@ cdef class ShapedPlanarFace(ShapedFace):
         normal.z=1
         return normal
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return self.z_height
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return (z - self.z_height)
+    
+    
+cdef class ImplicitBoundedFace(Face):
+    cdef:
+        public ImplicitSurface boundary
+        public ImplicitSurface target
+        
+        
+cdef class ImplicitBoundedPlanarFace(ImplicitBoundedFace):
+    cdef:
+        vector_t _origin
+        vector_t _normal
+        
+    def __cinit__(self, **kwds):
+        target = kwds.get('target', None)
+        from raypier.core.cimplicit_surfs import Plane, NullSurface
+        if target is None:
+            target = Plane()
+        if 'origin' in kwds:
+            target.origin = kwds['origin']
+        if 'normal' in kwds:
+            target.normal = kwds['normal']
+        self.target = target
+        self.boundary = kwds.get('boundary', NullSurface())
+        
+    def update(self):
+        super().update()
+        n = self.target.normal
+        self._normal.x = n[0]
+        self._normal.y = n[1]
+        self._normal.z = n[2]
+        
+        o = self.target.origin
+        self._origin.x = o[0]
+        self._origin.y = o[1]
+        self._origin.z = o[2]
+        
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            vector_t normal=self._normal
+            vector_t origin=self._origin
+            vector_t dp = subvv_(p2, p1)
+            vector_t po = subvv_(origin, p1)
+            double h = dotprod_(po, normal) / dotprod_(dp, normal)
+            double max_length = mag_(dp)
+            intersect_t out=NO_INTERSECTION
+                                
+        if (h<self.tolerance) or (h>1.0):
+            return NO_INTERSECTION
+        
+        po = addvv_(p1, multvs_(dp, h))
+        if is_base_ray and (<ImplicitSurface>self.boundary).evaluate_c(po) > 0.0:
+            return NO_INTERSECTION
+        out.dist = h*max_length
+        return out
+        
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+        return self._normal
     
     
 cdef class ElipticalPlaneFace(Face):
@@ -513,7 +581,7 @@ cdef class ShapedSphericalFace(ShapedFace):
             p.x = -p.x
         return norm_(p)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double r2 = x*x + y*y
             double c = self.curvature
@@ -522,7 +590,7 @@ cdef class ShapedSphericalFace(ShapedFace):
         else:
             return self.z_height - sqrt(c*c - r2) - c
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         cdef:
             double cz, c=self.curvature
 
@@ -1324,7 +1392,7 @@ cdef class SaddleFace(ShapedFace):
         n.y = -rt6*p.x
         return norm_(n)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return sqrt(6) * self.curvature * x * y
         
         
@@ -1412,7 +1480,7 @@ cdef class CylindericalFace(ShapedFace):
         p.y = 0
         return norm_(p)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double R = self.radius
         if R>=0:
@@ -1505,7 +1573,7 @@ cdef class AxiconFace(ShapedFace):
         p.y = beta * p.y/r
         return p
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         return self.z_height - (self.gradient * sqrt(x*x + y*y))
     
     
@@ -1639,7 +1707,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         
         return norm_(g)
     
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double r2 = (x*x) + (y*y)
             double R = self.curvature
@@ -1650,7 +1718,7 @@ cdef class ConicRevolutionFace(ShapedFace):
         else:
             return self.z_height  - (r2/(R - sqrt(R2 - (1+self.conic_const)*r2)))
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
     
     
@@ -1823,7 +1891,7 @@ cdef class AsphericFace(ShapedFace):
         
         return norm_(g)
 
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef: 
             double out
             double r2 = (x*x) + (y*y)
@@ -1838,7 +1906,7 @@ cdef class AsphericFace(ShapedFace):
         out += self.z_height
         return out
     
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
 
 
@@ -2108,7 +2176,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
         return norm_(g)  # normalized to length 1
         
         
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef: 
             double out
             double r2 = (x*x) + (y*y)
@@ -2133,7 +2201,7 @@ cdef class ExtendedPolynomialFace(ShapedFace):
         out += EP.z_height
         return out
      
-    cdef double eval_implicit_c(self, double x, double y, double z) nogil:
+    cdef double eval_implicit_c(self, double x, double y, double z) noexcept nogil:
         return z - self.eval_z_c(x,y)
     
     
@@ -2247,7 +2315,7 @@ cdef class DistortionFace(ShapedFace):
         n.y -= dxdyz.y
         return norm_(n)
             
-    cdef double eval_z_c(self, double x, double y) nogil:
+    cdef double eval_z_c(self, double x, double y) noexcept nogil:
         cdef:
             double z
         z = self.base_face.eval_z_c(x,y)

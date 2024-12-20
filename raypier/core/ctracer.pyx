@@ -6,12 +6,12 @@
 
 cdef extern from "math.h":
     double M_PI
-    double sqrt(double arg) nogil
-    double fabs(double arg) nogil
-    double atan2(double y, double x) nogil
-    double atan(double arg) nogil
-    double sin(double arg) nogil
-    double cos(double arg) nogil
+    double sqrt(double arg) noexcept nogil
+    double fabs(double arg) noexcept nogil
+    double atan2(double y, double x) noexcept nogil
+    double atan(double arg) noexcept nogil
+    double sin(double arg) noexcept nogil
+    double cos(double arg) noexcept nogil
     #double INFINITY
 
 cdef:
@@ -72,14 +72,14 @@ gausslet_dtype = np.dtype([
 ### Vector maths functions ###
 ##############################
 
-cdef inline vector_t transform_c(transform_t t, vector_t p) nogil:
+cdef inline vector_t transform_c(transform_t t, vector_t p) noexcept nogil:
     cdef vector_t out
     out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02 + t.tx
     out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12 + t.ty
     out.z = p.x*t.m20 + p.y*t.m21 + p.z*t.m22 + t.tz
     return out
 
-cdef inline vector_t rotate_c(transform_t t, vector_t p) nogil:
+cdef inline vector_t rotate_c(transform_t t, vector_t p) noexcept nogil:
     cdef vector_t out
     out.x = p.x*t.m00 + p.y*t.m01 + p.z*t.m02
     out.y = p.x*t.m10 + p.y*t.m11 + p.z*t.m12
@@ -98,7 +98,7 @@ def py_set_v(O):
     v_ = set_v(O)
     return (v_.x, v_.y, v_.z)
 
-cdef inline double sep_(vector_t p1, vector_t p2) nogil:
+cdef inline double sep_(vector_t p1, vector_t p2) noexcept nogil:
     cdef double a,b
     a = (p2.x-p1.x)
     b = (p2.y-p1.y)
@@ -109,7 +109,7 @@ def sep(a, b):
     cdef vector_t a_ = set_v(a), b_ = set_v(b)
     return sep_(a_, b_)
 
-cdef inline vector_t invert_(vector_t v) nogil:
+cdef inline vector_t invert_(vector_t v) noexcept nogil:
     v.x = -v.x
     v.y = -v.y
     v.z = -v.z
@@ -120,7 +120,7 @@ def invert(v):
     v_ = invert_(v_)
     return (v_.x, v_.y, v_.z)
 
-cdef inline vector_t multvv_(vector_t a, vector_t b) nogil:
+cdef inline vector_t multvv_(vector_t a, vector_t b) noexcept nogil:
     cdef vector_t out
     out.x = a.x*b.x
     out.y = a.y*b.y
@@ -134,7 +134,7 @@ def multvv(a, b):
     c_ = multvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t multvs_(vector_t a, double b) nogil:
+cdef inline vector_t multvs_(vector_t a, double b) noexcept nogil:
     cdef vector_t out
     out.x = a.x*b
     out.y = a.y*b
@@ -147,7 +147,7 @@ def multvs(a, b):
     c_ = multvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t addvv_(vector_t a, vector_t b) nogil:
+cdef inline vector_t addvv_(vector_t a, vector_t b) noexcept nogil:
     cdef vector_t out
     out.x = a.x+b.x
     out.y = a.y+b.y
@@ -161,7 +161,7 @@ def addvv(a, b):
     c_ = addvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
     
-cdef inline vector_t addvs_(vector_t a, double b) nogil:
+cdef inline vector_t addvs_(vector_t a, double b) noexcept nogil:
     cdef vector_t out
     out.x = a.x+b
     out.y = a.y+b
@@ -174,7 +174,7 @@ def addvs(a, b):
     c_ = addvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t subvv_(vector_t a, vector_t b) nogil:
+cdef inline vector_t subvv_(vector_t a, vector_t b) noexcept nogil:
     cdef vector_t out
     out.x = a.x-b.x
     out.y = a.y-b.y
@@ -188,7 +188,7 @@ def subvv(a, b):
     c_ = subvv_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef inline vector_t subvs_(vector_t a, double b) nogil:
+cdef inline vector_t subvs_(vector_t a, double b) noexcept nogil:
     cdef vector_t out
     out.x = a.x-b
     out.y = a.y-b
@@ -201,7 +201,7 @@ def subvs(a, b):
     c_ = subvs_(a_, b)
     return (c_.x, c_.y, c_.z)
 
-cdef inline double mag_(vector_t a) nogil:
+cdef inline double mag_(vector_t a) noexcept nogil:
     return sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
 
 def mag(a):
@@ -209,7 +209,7 @@ def mag(a):
     a_ = set_v(a)
     return mag_(a_)
 
-cdef inline double mag_sq_(vector_t a) nogil:
+cdef inline double mag_sq_(vector_t a) noexcept nogil:
     return a.x*a.x + a.y*a.y + a.z*a.z
 
 def mag_sq(a):
@@ -217,7 +217,7 @@ def mag_sq(a):
     a_ = set_v(a)
     return mag_sq_(a_)
 
-cdef inline double dotprod_(vector_t a, vector_t b) nogil:
+cdef inline double dotprod_(vector_t a, vector_t b) noexcept nogil:
     return a.x*b.x + a.y*b.y + a.z*b.z
 
 def dotprod(a, b):
@@ -226,7 +226,7 @@ def dotprod(a, b):
     b_ = set_v(b)
     return dotprod_(a_,b_)
 
-cdef inline vector_t cross_(vector_t a, vector_t b) nogil:
+cdef inline vector_t cross_(vector_t a, vector_t b) noexcept nogil:
     cdef vector_t c
     c.x = a.y*b.z - a.z*b.y
     c.y = a.z*b.x - a.x*b.z
@@ -240,7 +240,7 @@ def cross(a, b):
     c_ = cross_(a_, b_)
     return (c_.x, c_.y, c_.z)
 
-cdef vector_t norm_(vector_t a) nogil:
+cdef vector_t norm_(vector_t a) noexcept nogil:
     cdef double mag=sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
     a.x /= mag
     a.y /= mag
@@ -1057,7 +1057,7 @@ cdef class RayCollection(RayArrayView):
         def __set__(self, wl_list):
             self._wavelengths = np.ascontiguousarray(wl_list, dtype=np.double)
     
-    cdef double get_mtime(self, unsigned long guard):
+    cdef double get_mtime(self, unsigned long long guard):
         cdef:
             double pmtime
             
@@ -1656,11 +1656,26 @@ cdef class Shape:
         return self.point_inside_c(x,y) 
     
     
+cdef class ImplicitSurface:
+    """Positions 'outside' the surface evaluate > 0.0
+    """
+    cdef double evaluate_c(self, vector_t p) noexcept nogil:
+        return 0.0 
+    
+    def evaluate(self, double x, double y, double z):
+        cdef:
+            vector_t p
+        p.x=x
+        p.y=y
+        p.z=z
+        return self.evaluate_c(p)
+    
+    
 cdef class Distortion:
     """A abstract base class to represents distortions on a face, a z-offset 
     as a function of (x,y).
     """
-    cdef vector_t z_offset_and_gradient_c(self, double x, double y) nogil:
+    cdef vector_t z_offset_and_gradient_c(self, double x, double y) noexcept nogil:
         """The z-axis surface sag is returned as the z-component 
         of the output vector. The x- and y-components of the surface
         gradient are placed in the x- and y- components of vector.
@@ -1674,7 +1689,7 @@ cdef class Distortion:
         p.z=0.0
         return p
     
-    cdef double z_offset_c(self, double x, double y) nogil:
+    cdef double z_offset_c(self, double x, double y) noexcept nogil:
         return 0.0
     
     def z_offset_and_gradient(self, double[:] x, double[:] y):
