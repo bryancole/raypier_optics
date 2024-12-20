@@ -397,7 +397,7 @@ cdef class OBBTree(object):
     @boundscheck(False)
     @initializedcheck(False)
     @cdivision(True)
-    cdef intersection intersect_with_line_c(self, vector_t p1, vector_t p2, long[:] workspace):
+    cdef intersection intersect_with_line_c(self, vector_t p1, vector_t p2, long long[:] workspace):
         """
         """
         cdef:
@@ -917,7 +917,7 @@ cdef class OBBNode(object):
 cdef class OBBTreeFace(Face):
     cdef:
         public OBBTree obbtree
-        long[:] workspace
+        long long[:] workspace
         double[:,:] normals
         
     def __cinit__(self, **kwds):

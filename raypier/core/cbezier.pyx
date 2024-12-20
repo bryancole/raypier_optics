@@ -103,7 +103,7 @@ cdef class BezierPatch():
             vector_t pt
             double[:,:,:] out
             long[:,:] pt_ids
-            long[:,:] cells
+            long long[:,:] cells
             int i,j, ct=0
             
         points = np.empty((N,M,3), dtype=np.float64)
