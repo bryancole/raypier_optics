@@ -142,7 +142,7 @@ cdef class RayCollection(RayArrayView):
     cdef add_ray_c(self, ray_t r)
     cdef void reset_length_c(self, double max_length)
     
-    cdef double get_mtime(self, unsigned long guard)
+    cdef double get_mtime(self, unsigned  long long guard)
     
     cdef void _eval_neighbours(self, int[:,:] pnb)
     

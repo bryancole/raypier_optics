@@ -1,7 +1,9 @@
-numpy>=1.19
-cython>=0.29
+numpy<2
+cython<3
 vtk>=9.0
 traits>=6.0
 mayavi>=4.7
 traitsui>=7.0
 pyyaml
+scipy
+chaco

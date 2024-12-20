@@ -1057,7 +1057,7 @@ cdef class RayCollection(RayArrayView):
         def __set__(self, wl_list):
             self._wavelengths = np.ascontiguousarray(wl_list, dtype=np.double)
     
-    cdef double get_mtime(self, unsigned long guard):
+    cdef double get_mtime(self, unsigned long long guard):
         cdef:
             double pmtime
             
