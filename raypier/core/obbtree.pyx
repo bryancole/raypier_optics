@@ -196,42 +196,8 @@ def jacobi2(double[:,:] A, double tol=1e-9):
     raise Exception("Jacobi method did not converge")
 
 
-cdef struct intersection:
-    double alpha
-    long cell_idx
-
-
-cdef struct obbnode_t:
-    vector_t _corner #one corner of the box
-    vector_t[3] _axes #the three primary axes of the box, ordered from longest to smallest
-    long parent, child1, child2 #children will be -1 for leaf nodes. Parent will be -1 for root
-    int cell_list_idx
-    int n_cells
-
-
         
 cdef class OBBTree(object):
-    cdef:
-        double[:,:] points
-        int[:,:] cells #always triangles
-        int[:] cell_ids
-        int[:] point_mask
-        
-        long root_idx
-        
-        public int level
-        public int max_level
-        public int number_of_cells_per_node
-        
-        double[:,:] _covar #A workspace for obb calculation
-        double[:,:] _axes
-        
-        unsigned long n_nodes
-        unsigned long max_n_nodes
-        obbnode_t *nodes
-        
-        public double tolerance
-    
     def __dealloc__(self):
         free(self.nodes)
         
@@ -809,11 +775,7 @@ cdef class OBBTree(object):
         return node
         
         
-cdef class OBBNode(object):
-    cdef:
-        OBBTree owner
-        obbnode_t node
-        
+cdef class OBBNode(object):   
     property parent:
         def __get__(self):
             cdef:
