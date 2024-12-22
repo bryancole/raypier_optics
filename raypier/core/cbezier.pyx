@@ -9,7 +9,9 @@ cimport numpy as cnp
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c
+                rotate_c, intersect_t
+                
+from .obbtree cimport OBBTree, intersection
 
 from numpy import math
 
@@ -185,3 +187,60 @@ cdef class BezierPatch():
                     
         return (points.reshape(-1,3), np.asarray(cells), uv.reshape(-1,2))
     
+    
+cdef class BezierPatchFace(Face):
+    cdef:
+        public BezierPatch bezier
+        public OBBTree obbtree
+        long long[:] workspace
+        #double[:,:] normals #I'm not sure I need normals
+        
+        ### Set the resolution of the mesh
+        unsigned int u_res, v_res
+        
+    def __cinit__(self, **kwds):
+        self.u_res = kwds.get("u_res", 50)
+        self.v_res = kwds.get("v_res", 50)
+        bezier = kwds["bezier"]
+        self.bezier = bezier
+        pts, cells, uvs = bezier.get_mesh(self.u_res, self.v_res)
+        
+        tree = OBBTree(pts.copy(), cells.copy())
+        #obbtree.max_level = self.max_level
+        #obbtree.number_of_cells_per_node = self.cells_per_node
+        if tree.level <= 0:
+            tree.build_tree()
+        self.workspace = np.zeros(tree.level+1, np.int64)
+        
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        """Intersects the given ray with this face.
+        
+        params:
+          p1 - the origin of the input ray, in local coords
+          p2 - the end-point of the input ray, in local coords
+          
+        returns:
+          the distance along the ray to the first valid intersection. No
+          intersection can be indicated by a negative value.
+        """
+        cdef:
+            intersection it
+            intersect_t out
+            
+        it = self.obbtree.intersect_with_line_c(p1, p2, self.workspace)
+        
+        out.dist = it.alpha * mag_(subvv_(p2,p1))
+        out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells
+        return out
+    
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+        """Compute the surface normal in local coordinates,
+        given a point on the surface (also in local coords).
+        """
+        cdef:
+            vector_t n
+            double[:] na
+            
+        return n
+        
+        
