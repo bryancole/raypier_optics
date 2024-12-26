@@ -9,11 +9,18 @@ cimport numpy as cnp
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, intersect_t
+                rotate_c, intersect_t, cross_, uv_coord_t
                 
 from .obbtree cimport OBBTree, intersection
 
 from numpy import math
+
+
+cdef intersect_t NO_INTERSECTION
+
+NO_INTERSECTION.dist = -1
+NO_INTERSECTION.face_idx = -1
+NO_INTERSECTION.piece_idx = 0
 
 
 factorial = math.factorial
@@ -21,7 +28,7 @@ factorial = math.factorial
 
 cdef struct vector3_t:
     vector_t p, dpdu, dpdv
-
+    
 
 cdef double clip(double a, double lower, double upper) nogil:
     if lower < upper:
@@ -197,10 +204,13 @@ cdef class BezierPatchFace(Face):
         
         ### Set the resolution of the mesh
         unsigned int u_res, v_res
+        double[:,:] uvs
+        public double atol
         
     def __cinit__(self, **kwds):
         self.u_res = kwds.get("u_res", 50)
         self.v_res = kwds.get("v_res", 50)
+        self.atol = kwds.get("atol", 1e-10)
         bezier = kwds["bezier"]
         self.bezier = bezier
         pts, cells, uvs = bezier.get_mesh(self.u_res, self.v_res)
@@ -211,6 +221,43 @@ cdef class BezierPatchFace(Face):
         if tree.level <= 0:
             tree.build_tree()
         self.workspace = np.zeros(tree.level+1, np.int64)
+        
+        self.uvs = uvs
+        
+    cdef uv_coord_t interpolate_cell(self, int cell_idx, vector_t pt):
+        cdef:
+            OBBTree tree=self.obbtree
+            int[:] cell
+            double x2,x3,y3, alpha0, alpha1, alpha2
+            double[:,:] uvs=self.uvs
+            vector_t p1, p2, p3, edge1, edge2, en1, en2
+            uv_coord_t out
+            
+        ###Now find the UV-coord of the cell intersection by linear barycentric interpolation
+        cell = tree.cells[cell_idx]
+        p1 = tree.get_point_c(cell[0])
+        p2 = tree.get_point_c(cell[1])
+        p3 = tree.get_point_c(cell[2])
+        
+        edge1 = subvv_(p2,p1)
+        edge2 = subvv_(p3,p1)
+        
+        en1 = norm_(edge1)
+        en2 = norm_(cross_(en1, cross_(edge1, edge2)))
+        
+        x2 = mag_(edge1)
+        x3 = dotprod_(edge2, en1)
+        y3 = dotprod_(edge2, en2)
+        
+        #Barycentric coefficients
+        alpha0 = -pt.x/x2 - pt.y/y3 + pt.y*x3/(x2*y3) + pt.z
+        alpha1 = (pt.x*y3 - pt.y*x3)/(x2*y3)
+        alpha2 = pt.y/y3
+        
+        out.u = alpha0 * uvs[cell[0],0] + alpha1 * uvs[cell[1],0] + alpha2 * uvs[cell[2],0]
+        out.v = alpha0 * uvs[cell[0],1] + alpha1 * uvs[cell[1],1] + alpha2 * uvs[cell[2],1]
+        return out
+        
         
     cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
@@ -224,13 +271,56 @@ cdef class BezierPatchFace(Face):
           intersection can be indicated by a negative value.
         """
         cdef:
-            intersection it
-            intersect_t out
+            intersection it #OBBTree specific intersection
+            intersect_t out #Face intersection data
+            # cdef struct intersect_t:
+            #     double dist
+            #     int face_idx
+            #     int piece_idx
             
-        it = self.obbtree.intersect_with_line_c(p1, p2, self.workspace)
+            OBBTree tree=self.obbtree
+            BezierPatch bezier=self.bezier
+            int[:] cell
+            double du, dv, dist, tol=self.atol
+            double[:,:] uvs=self.uvs
+            vector_t pt, d, normal
+            uv_coord_t uv
+            vector3_t pt_grads
+            
+        it = tree.intersect_with_line_c(p1, p2, self.workspace)
         
-        out.dist = it.alpha * mag_(subvv_(p2,p1))
-        out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells
+        if it.alpha < 0.0:
+            return NO_INTERSECTION
+        d = norm_(subvv_(p2,p1))
+        pt = addvv_(multvs_(p2, it.alpha), multvs_(p1, 1.0-it.alpha)) 
+        
+        #out.dist = it.alpha * mag_(subvv_(p2,p1))
+        #out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells
+        
+        ###Now find the UV-coord of the cell intersection by linear barycentric interpolation
+        uv = self.interpolate_cell(it.cell_idx, pt)
+        
+        for i in range(100):
+            pt_grads = bezier._eval_pt_and_grads(uv.u, uv.v)
+            
+            normal = norm_(cross_(pt_grads.dpdu, pt_grads.dpdv))
+            dist = dotprod_(subvv_(pt_grads.pt, p1), normal)/dotprod_(d,normal)
+            dp = subvv_(addvv_(p1, multvs_(d, dist)), pt_grads.pt)
+            du = dotprod_(pt_grads.dpdu, dp) / mag_sq_(pt_grads.dpdu)
+            dv = dotprod_(pt_grads.dpdv, dp) / mag_sq_(pt_grads.dpdv)
+            
+            uv.u += du
+            uv.v += dv
+            
+            if (du < tol) and (dv < tol):
+                break
+        else:
+            return NO_INTERSECTION
+        
+        pt = bezier._eval_pt(uv.u, uv.v)
+        
+        out.dist = mag_(subvv_(pt,p1))
+        out.uv = uv
         return out
     
     cdef vector_t compute_normal_c(self, vector_t p, int piece):
