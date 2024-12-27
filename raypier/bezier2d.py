@@ -1,9 +1,9 @@
 
-from raypier.core.cbezier import BezierPatch
+from raypier.core.cbezier import BezierPatch, BezierPatchFace
 from raypier.core.ctracer import FaceList
 from raypier.bases import Optic, Traceable
 
-from traits.api import Instance, Array
+from traits.api import Instance, Array, Str
 from traitsui.api import View, Item, VGroup
 from tvtk.api import tvtk
 
@@ -11,6 +11,7 @@ import numpy as np
 
 
 class BSplinePatch(Optic):
+    name = Str("Bezier Surface Patch")
     control_points = Array(shape=(None,None,3), dtype=np.float64)
     
     bezier = Instance(BezierPatch)
@@ -24,7 +25,12 @@ class BSplinePatch(Optic):
                        )
     
     def _faces_default(self):
+        #We need quite a lax tolerance because the initial intersection test using
+        #the bezier mesh has a more significant deviation from the true surface
+        cfaces = [BezierPatchFace(bezier=self.bezier, invert_normals=True, tolerance=0.01,
+                                  u_res=50, v_res=50, atol=1e-5)]
         fl = FaceList(owner=self)
+        fl.faces = cfaces
         return fl
     
     def _bezier_default(self):
@@ -45,7 +51,7 @@ class BSplinePatch(Optic):
     def _pipeline_default(self):
         mesh_src = self.mesh_src
         def make_mesh():
-            pts, cells = self.bezier.get_mesh(50,50)
+            pts, cells, uvs = self.bezier.get_mesh(50,50)
             out = mesh_src.poly_data_output
             out.points = pts
             out.polys = cells

@@ -2063,7 +2063,7 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         size_t i, j, n_sets=len(face_sets)
         vector_t point
         orientation_t orient
-        int idx, nearest_set=-1, nearest_idx=-1, nearest_piece
+        int nearest_set=-1, nearest_idx=-1
         ray_t *ray
         RayCollection new_rays
         intersect_t it, nearest_it
@@ -2085,13 +2085,16 @@ cdef RayCollection trace_segment_c(RayCollection rays,
         #print "points", P1, P2
         for j in range(n_sets):
             face_set = face_sets[j]
-            #intersect_c returns the face idx of the intersection, or -1 otherwise
+            #intersect_c returns an intersect_t structure which contains the idx of the
+            # intersecting face.
+            #The call to FaceList.intersect_c() modifies the ray.length value such
+            #that further calls only intersect if the intersection is closer than
+            #the previous one.
             it = (<FaceList>face_set).intersect_c(ray, point)
             if it.face_idx >= 0:
                 nearest_set = j
                 nearest_it = it
                 nearest_idx = it.face_idx
-                nearest_piece = it.piece_idx
         if nearest_idx >= 0:
             #print "GET FACE", nearest.face_idx, len(all_faces)
             face = all_faces[nearest_idx]

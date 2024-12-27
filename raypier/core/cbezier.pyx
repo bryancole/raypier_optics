@@ -9,7 +9,7 @@ cimport numpy as cnp
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, intersect_t, cross_, uv_coord_t
+                rotate_c, intersect_t, cross_, uv_coord_t, invert_
                 
 from .obbtree cimport OBBTree, intersection
 
@@ -206,20 +206,23 @@ cdef class BezierPatchFace(Face):
         unsigned int u_res, v_res
         double[:,:] uvs
         public double atol
+        public int invert_normals
         
     def __cinit__(self, **kwds):
-        self.u_res = kwds.get("u_res", 50)
-        self.v_res = kwds.get("v_res", 50)
+        self.u_res = kwds.get("u_res", 20)
+        self.v_res = kwds.get("v_res", 20)
         self.atol = kwds.get("atol", 1e-10)
+        self.invert_normals = 1 if kwds.get("invert_normals", 0) else 0
         bezier = kwds["bezier"]
         self.bezier = bezier
         pts, cells, uvs = bezier.get_mesh(self.u_res, self.v_res)
         
-        tree = OBBTree(pts.copy(), cells.copy())
-        #obbtree.max_level = self.max_level
-        #obbtree.number_of_cells_per_node = self.cells_per_node
+        tree = OBBTree(pts.copy(), np.ascontiguousarray(cells, dtype=np.int32))
+        tree.max_level = kwds.get("max_level",100)
+        tree.number_of_cells_per_node = kwds.get("cells_per_node", 2)
         if tree.level <= 0:
             tree.build_tree()
+        self.obbtree = tree
         self.workspace = np.zeros(tree.level+1, np.int64)
         
         self.uvs = uvs
@@ -239,6 +242,8 @@ cdef class BezierPatchFace(Face):
         p2 = tree.get_point_c(cell[1])
         p3 = tree.get_point_c(cell[2])
         
+        pt = subvv_(pt,p1)
+        
         edge1 = subvv_(p2,p1)
         edge2 = subvv_(p3,p1)
         
@@ -253,7 +258,7 @@ cdef class BezierPatchFace(Face):
         alpha0 = -pt.x/x2 - pt.y/y3 + pt.y*x3/(x2*y3) + pt.z
         alpha1 = (pt.x*y3 - pt.y*x3)/(x2*y3)
         alpha2 = pt.y/y3
-        
+        print("alpha:", alpha0 + alpha1 + alpha2)
         out.u = alpha0 * uvs[cell[0],0] + alpha1 * uvs[cell[1],0] + alpha2 * uvs[cell[2],0]
         out.v = alpha0 * uvs[cell[0],1] + alpha1 * uvs[cell[1],1] + alpha2 * uvs[cell[2],1]
         return out
@@ -281,16 +286,17 @@ cdef class BezierPatchFace(Face):
             OBBTree tree=self.obbtree
             BezierPatch bezier=self.bezier
             int[:] cell
-            double du, dv, dist, tol=self.atol
+            double du, dv, dist, tol=self.atol*self.atol
             double[:,:] uvs=self.uvs
             vector_t pt, d, normal
             uv_coord_t uv
             vector3_t pt_grads
             
         it = tree.intersect_with_line_c(p1, p2, self.workspace)
-        
-        if it.alpha < 0.0:
+        if it.alpha < self.tolerance:
+            print("no mesh intersection")
             return NO_INTERSECTION
+        
         d = norm_(subvv_(p2,p1))
         pt = addvv_(multvs_(p2, it.alpha), multvs_(p1, 1.0-it.alpha)) 
         
@@ -298,39 +304,46 @@ cdef class BezierPatchFace(Face):
         #out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells
         
         ###Now find the UV-coord of the cell intersection by linear barycentric interpolation
+        # This doesn't work right!
         uv = self.interpolate_cell(it.cell_idx, pt)
+        print("mesh intersection:", it.alpha, uv.u, uv.v)
         
         for i in range(100):
             pt_grads = bezier._eval_pt_and_grads(uv.u, uv.v)
             
             normal = norm_(cross_(pt_grads.dpdu, pt_grads.dpdv))
-            dist = dotprod_(subvv_(pt_grads.pt, p1), normal)/dotprod_(d,normal)
-            dp = subvv_(addvv_(p1, multvs_(d, dist)), pt_grads.pt)
+            dist = dotprod_(subvv_(pt_grads.p, p1), normal)/dotprod_(d,normal)
+            dp = subvv_(addvv_(p1, multvs_(d, dist)), pt_grads.p)
             du = dotprod_(pt_grads.dpdu, dp) / mag_sq_(pt_grads.dpdu)
             dv = dotprod_(pt_grads.dpdv, dp) / mag_sq_(pt_grads.dpdv)
             
             uv.u += du
             uv.v += dv
             
-            if (du < tol) and (dv < tol):
+            if (du*du < tol) and (dv*dv < tol):
                 break
         else:
             return NO_INTERSECTION
-        
+        print("iteractions:", i, du, dv)
         pt = bezier._eval_pt(uv.u, uv.v)
         
         out.dist = mag_(subvv_(pt,p1))
         out.uv = uv
         return out
     
-    cdef vector_t compute_normal_c(self, vector_t p, int piece):
-        """Compute the surface normal in local coordinates,
-        given a point on the surface (also in local coords).
-        """
+    cdef void compute_normal_and_tangent_c(self, vector_t p, intersect_t *it, vector_t *normal, vector_t *tangent):
         cdef:
+            BezierPatch bezier=self.bezier
+            uv_coord_t uv
+            vector3_t pt_grads
             vector_t n
-            double[:] na
             
-        return n
+        uv = it.uv
+        pt_grads = bezier._eval_pt_and_grads(uv.u, uv.v)
+        
+        n = norm_(cross_(pt_grads.dpdu, pt_grads.dpdv))
+        normal[0] = invert_(n) if self.invert_normals else n
+        tangent[0] = norm_(pt_grads.dpdu)
+        
         
         
