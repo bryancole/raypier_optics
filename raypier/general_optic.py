@@ -212,7 +212,7 @@ class GeneralLens(BaseLens):
         surfaces = sorted(self.surfaces, key=attrgetter("z_height"))
         cfaces = []
         mats = [air,] + self.materials + [air,]
-        if len(mats) < len(surfaces) + 1:
+        if len(mats) < (len(surfaces) + 1):
             mats += [air,] * (len(surfaces)-len(mats) + 1)
         ###FIXME: need to iterate in order of z_height to get the
         ###the materials on the correct sides.

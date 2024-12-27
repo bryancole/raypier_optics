@@ -1932,11 +1932,12 @@ cdef class FaceList(object):
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point, intersect_t *it):
         cdef: 
             orientation_t out
-            int piece=it[0].nearest_idx
+            #int piece=it[0].face_idx
         
         point = transform_c(self.inv_trans, point)
-        out.normal = face.compute_normal_c(point, piece)
-        out.tangent = face.compute_tangent_c(point, piece)
+        face.compute_normal_and_tangent_c(point, it, &(out.normal), &(out.tangent))
+        #out.normal = face.compute_normal_c(point, piece)
+        #out.tangent = face.compute_tangent_c(point, piece)
         if face.invert_normal:
             out.normal = invert_(out.normal)
             out.tangent = invert_(out.tangent)
@@ -2089,11 +2090,11 @@ cdef RayCollection trace_segment_c(RayCollection rays,
             if it.face_idx >= 0:
                 nearest_set = j
                 nearest_it = it
-                #nearest_idx = it.face_idx
-                #nearest_piece = it.piece_idx
+                nearest_idx = it.face_idx
+                nearest_piece = it.piece_idx
         if nearest_idx >= 0:
             #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_it.face_idx]
+            face = all_faces[nearest_idx]
             face.count += 1
             #print "ray length", ray.length
             point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
@@ -2240,11 +2241,11 @@ cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets,
             if it.face_idx >= 0:
                 nearest_set = j
                 nearest_it = it
-                #nearest_idx = it.face_idx
+                nearest_idx = it.face_idx
                 #nearest_piece = it.piece_idx
         if nearest_idx >= 0:
             #print "GET FACE", nearest.face_idx, len(all_faces)
-            face = all_faces[nearest_it.face_idx]
+            face = all_faces[nearest_idx]
             face.count += 1
             #print "ray length", ray.length
             point = addvv_(ray.origin, multvs_(ray.direction, ray.length))
