@@ -1,6 +1,6 @@
 
 from raypier.tracer import RayTraceModel
-from raypier.bezier2d import BSplinePatch
+from raypier.bezier2d import BezierSinglePatch
 
 from raypier.sources import ParallelRaySource
 from raypier.gausslet_sources import CollimatedGaussletSource
@@ -12,9 +12,9 @@ ctrl_pts = [[[-9,-9,0], [-3,-9,0], [3,-9,0], [9, -9, 0]],
                 [[-9,9,0], [-3,9,0], [3,9,0], [9, 9, 0]],
                 ]
 
-patch = BSplinePatch(control_points=ctrl_pts)
+patch = BezierSinglePatch(control_points=ctrl_pts)
 
-if False:
+if True:
     src = ParallelRaySource(origin=(0,0,-50.0),
                             direction=(0,0,1),
                             radius = 3.0,

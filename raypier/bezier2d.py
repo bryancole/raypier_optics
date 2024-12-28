@@ -10,7 +10,10 @@ from tvtk.api import tvtk
 import numpy as np
 
 
-class BSplinePatch(Optic):
+class BezierSinglePatch(Optic):
+    """
+    The default material is a PECMaterial, i.e. mirror
+    """
     name = Str("Bezier Surface Patch")
     control_points = Array(shape=(None,None,3), dtype=np.float64)
     
