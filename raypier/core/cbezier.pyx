@@ -227,11 +227,11 @@ cdef class BezierPatchFace(Face):
         
         self.uvs = uvs
         
-    cdef uv_coord_t interpolate_cell(self, int cell_idx, vector_t pt):
+    cdef uv_coord_t interpolate_cell_c(self, int cell_idx, vector_t pt):
         cdef:
             OBBTree tree=self.obbtree
             int[:] cell
-            double x2,x3,y3, alpha0, alpha1, alpha2
+            double x2,x3,y3, alpha0, alpha1, alpha2, px, py
             double[:,:] uvs=self.uvs
             vector_t p1, p2, p3, edge1, edge2, en1, en2
             uv_coord_t out
@@ -241,8 +241,6 @@ cdef class BezierPatchFace(Face):
         p1 = tree.get_point_c(cell[0])
         p2 = tree.get_point_c(cell[1])
         p3 = tree.get_point_c(cell[2])
-        
-        pt = subvv_(pt,p1)
         
         edge1 = subvv_(p2,p1)
         edge2 = subvv_(p3,p1)
@@ -254,11 +252,20 @@ cdef class BezierPatchFace(Face):
         x3 = dotprod_(edge2, en1)
         y3 = dotprod_(edge2, en2)
         
-        #Barycentric coefficients
-        alpha0 = -pt.x/x2 - pt.y/y3 + pt.y*x3/(x2*y3) + pt.z
-        alpha1 = (pt.x*y3 - pt.y*x3)/(x2*y3)
-        alpha2 = pt.y/y3
-        print("alpha:", alpha0 + alpha1 + alpha2)
+        ### We could pre-calculate en1 and en2 for every cell in advance. And
+        ### also pre-calc x2, x3 and y3
+        
+        pt = subvv_(pt,p1)
+        px = dotprod_(pt, en1)
+        py = dotprod_(pt, en2)
+        
+        #Barycentric coefficients, after some rearrangement
+        alpha2 = (x2*y3)
+        alpha1 = py*x3 - px*y3
+        alpha0 = (alpha1 - py*x2 + x2*y3)/alpha2#-px/x2 - pt.y/y3 + pt.y*x3/(x2*y3) + pt.z
+        alpha1 = -alpha1/alpha2 #(pt.x*y3 - pt.y*x3)/(x2*y3)
+        alpha2 = py/y3
+        
         out.u = alpha0 * uvs[cell[0],0] + alpha1 * uvs[cell[1],0] + alpha2 * uvs[cell[2],0]
         out.v = alpha0 * uvs[cell[0],1] + alpha1 * uvs[cell[1],1] + alpha2 * uvs[cell[2],1]
         return out
@@ -294,19 +301,13 @@ cdef class BezierPatchFace(Face):
             
         it = tree.intersect_with_line_c(p1, p2, self.workspace)
         if it.alpha < self.tolerance:
-            print("no mesh intersection")
             return NO_INTERSECTION
         
         d = norm_(subvv_(p2,p1))
         pt = addvv_(multvs_(p2, it.alpha), multvs_(p1, 1.0-it.alpha)) 
         
-        #out.dist = it.alpha * mag_(subvv_(p2,p1))
-        #out.piece_idx = <int>(it.cell_idx) #casting long to int. Hopefully there are not too many cells
-        
         ###Now find the UV-coord of the cell intersection by linear barycentric interpolation
-        # This doesn't work right!
-        uv = self.interpolate_cell(it.cell_idx, pt)
-        print("mesh intersection:", it.alpha, uv.u, uv.v)
+        uv = self.interpolate_cell_c(it.cell_idx, pt)
         
         for i in range(100):
             pt_grads = bezier._eval_pt_and_grads(uv.u, uv.v)
@@ -344,6 +345,5 @@ cdef class BezierPatchFace(Face):
         n = norm_(cross_(pt_grads.dpdu, pt_grads.dpdv))
         normal[0] = invert_(n) if self.invert_normals else n
         tangent[0] = norm_(pt_grads.dpdu)
-        
         
         

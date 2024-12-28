@@ -28,7 +28,7 @@ class BSplinePatch(Optic):
         #We need quite a lax tolerance because the initial intersection test using
         #the bezier mesh has a more significant deviation from the true surface
         cfaces = [BezierPatchFace(bezier=self.bezier, invert_normals=True, tolerance=0.01,
-                                  u_res=50, v_res=50, atol=1e-5)]
+                                  u_res=50, v_res=50, atol=1e-10)]
         fl = FaceList(owner=self)
         fl.faces = cfaces
         return fl

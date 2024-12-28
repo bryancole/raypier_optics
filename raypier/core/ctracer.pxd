@@ -245,7 +245,7 @@ cdef class FaceList(object):
     cpdef void sync_transforms(self)
     cdef intersect_t intersect_c(self, ray_t *ray, vector_t end_point)
     cdef intersect_t intersect_one_face_c(self, ray_t *ray, vector_t end_point, int face_idx)
-    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
+    cdef intersect_t intersect_para_c(self, para_t *ray, vector_t ray_end, Face face)
     #cdef orientation_t compute_orientation_c(self, Face face, vector_t point, int piece)
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point, intersect_t *it)
 

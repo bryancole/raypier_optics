@@ -35,6 +35,12 @@ from cython.operator cimport dereference
 cdef:
     int NPARA = 6
     
+cdef intersect_t NO_INTERSECTION
+
+NO_INTERSECTION.dist = -1
+NO_INTERSECTION.face_idx = -1
+NO_INTERSECTION.piece_idx = 0
+    
 
 ray_dtype = np.dtype([('origin', np.double, (3,)),
                         ('direction', np.double, (3,)),
@@ -1906,28 +1912,29 @@ cdef class FaceList(object):
         it = self.intersect_c(&r.ray, P1_)
         return it.face_idx
     
-    cdef int intersect_para_c(self, para_t *ray, vector_t ray_end, Face face):
+    cdef intersect_t intersect_para_c(self, para_t *ray, vector_t ray_end, Face face):
         cdef:
             vector_t p1 = transform_c(self.inv_trans, ray.origin)
             vector_t p2 = transform_c(self.inv_trans, ray_end)
             unsigned int i
             double dist
-            intersect_t it
+            intersect_t it=NO_INTERSECTION
         
         it = face.intersect_c(p1, p2, 0)
         #print("p1:", p1.x, p1.y, p1.z, "p2:", p2.x, p2.y, p2.z, "rlen:", ray.length, "dist:", dist)
         if face.tolerance < it.dist < ray.length:
             ray.length = it.dist
-            return 0
-        return -1
+            it.face_idx = face.idx
+        return it
     
     def intersect_para(self, ParabasalRay r, Face face):
-        cdef vector_t P1_
-        cdef int idx
+        cdef: 
+            vector_t P1_
+            intersect_t it
         
         P1_ = addvv_(r.ray.origin, multvs_(r.ray.direction, r.ray.length))
-        idx = self.intersect_para_c(&r.ray, P1_, face)
-        return idx
+        it = self.intersect_para_c(&r.ray, P1_, face)
+        return it.face_idx
     
     cdef orientation_t compute_orientation_c(self, Face face, vector_t point, intersect_t *it):
         cdef: 
@@ -2262,7 +2269,7 @@ cdef GaussletCollection trace_gausslet_c(GaussletCollection gausslets,
                                                     orient,
                                                     child_rays
                                                     )
-            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length, nearest_piece)
+            trace_parabasal_rays(gausslet, child_rays, face, face_set, new_gausslets, max_length, &nearest_it)
             
     for j in range(n_decomp):
         face = decomp_faces[j]
@@ -2328,7 +2335,7 @@ cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets,
                                                     child_rays
                                                     )
             trace_parabasal_rays(gausslet, child_rays, face, face_set, 
-                                 new_gausslets, max_length, nearest_piece)
+                                 new_gausslets, max_length, &it)
             
     for j in range(n_decomp):
         face = decomp_faces[j]
@@ -2341,7 +2348,8 @@ cdef GaussletCollection trace_one_face_gausslet_c(GaussletCollection gausslets,
 
 
 cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face face, FaceList face_set, 
-                          GaussletCollection new_gausslets, double max_length, int piece):
+                          GaussletCollection new_gausslets, double max_length, intersect_t *it):
+    ### I don't think 'it' is required.
     cdef:
         unsigned int i,j
         para_t *para_ray
@@ -2350,19 +2358,19 @@ cdef void trace_parabasal_rays(gausslet_t *g_in, RayCollection base_rays, Face f
         vector_t point[6]
         orientation_t orient[6]
         InterfaceMaterial material = (<InterfaceMaterial>(face.material))
-        intersect_t it
-        
-    it.piece_idx = piece
+        intersect_t it_para
         
     for j in range(6):
         para_ray = g_in.para + j
         ray_end = addvv_(para_ray.origin, 
                         multvs_(para_ray.direction, 
                                 max_length))
-        if face_set.intersect_para_c(para_ray, ray_end, face):
+        
+        it_para = face_set.intersect_para_c(para_ray, ray_end, face)
+        if it_para.face_idx < 0:
             return
         point[j] = addvv_(para_ray.origin, multvs_(para_ray.direction, para_ray.length))
-        orient[j] = face_set.compute_orientation_c(face, point[j], &it)
+        orient[j] = face_set.compute_orientation_c(face, point[j], &it_para)
     
     for i in range(base_rays.n_rays):
         gausslet.base_ray = base_rays.rays[i]
