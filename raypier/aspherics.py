@@ -1,7 +1,7 @@
 
 from traits.api import Float, Str
 
-from .lenses import AsphericLens
+from .lenses import AsphericLens, PlanoAsphericLens
 from .core.cmaterials import CoatedDispersiveMaterial
 from .dispersion import NamedDispersionCurve, NondispersiveCurve
 
@@ -125,5 +125,32 @@ class Thorlabs352440(AsphericLens):
         return m
     
     
+class Thorlabs_A230_A(PlanoAsphericLens):
+    name = "Thorlabs_A230"
+    diameter = 6.33
+    CT = 2.94 # center thickness
+    A_conic = -0.1263039 
+    A_curvature = -3.48 # CURV # NOTE THAT CURVATURE IN ZEMAX IS 1/RADIUS, WHEREAS RAYPIER IS RADIUS!
+    A4 = 1.2606314E-03
+    A6 = 1.0900023E-04 
+    A8 = -3.2255631E-07
+    A10 = 7.8343862E-07
+    A12 = 0
+    A14 = 0
+    A16 = 0
     
+    coating_thickness = Float(0.283) #microns
+    coating_refractive_index = Float(1.37)
+    
+    def _material_default(self):
+        #glass = NondispersiveCurve(1.786) #980nm
+        glass = NamedDispersionCurve("S-NPH1")
+        cri = self.coating_refractive_index
+        coating = NondispersiveCurve(refractive_index=cri)
+        air = NondispersiveCurve(1.0)
+        
+        m = CoatedDispersiveMaterial(dispersion_inside=glass,
+                                     dispersion_outside=air,
+                                     dispersion_coating=coating)
+        return m
     

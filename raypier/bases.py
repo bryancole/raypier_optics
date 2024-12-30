@@ -32,6 +32,7 @@ import numpy
 import threading, os, itertools
 from itertools import chain, islice, count
 import yaml
+import traceback
 from abc import ABCMeta
 
 from raypier.constraints import BaseConstraint
@@ -612,4 +613,10 @@ class Result(HasTraits, RaypierObject):
         
         @param tracer: the RayTraceModel instance
         """
-        raise NotImplementedError
+        try:
+            self._calc_result()
+        except:
+            traceback.print_exc()
+        
+    def _calc_result(self):
+        raise NotImplementedError()
