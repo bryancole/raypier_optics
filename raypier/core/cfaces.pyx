@@ -138,12 +138,15 @@ cdef class ShapedFace(Face):
     
 
 cdef class CircularFace(Face):
-    cdef public double diameter, offset, z_plane
+    cdef:
+        public double diameter, offset, z_plane
+        public int invert_normals
     
     params = ['diameter', 'offset']
     
     def __cinit__(self, **kwds):
         self.z_plane = kwds.get('z_plane', 0.0)
+        self.invert_normals = kwds.get("invert_normals", False)
     
     cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
@@ -181,7 +184,10 @@ cdef class CircularFace(Face):
         cdef vector_t normal
         normal.x=0
         normal.y=0
-        normal.z=-1
+        if self.invert_normals:
+            normal.z=1
+        else:
+            normal.z=-1
         return normal
     
     

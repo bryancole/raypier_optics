@@ -4,7 +4,7 @@ A module for Results subclasses
 
 
 from traits.api import Instance, Float, on_trait_change,\
-            Button, DictStrFloat, Str
+            Button, DictStrFloat, Str, Int, Tuple
 
 from traitsui.api import View, Item
 
@@ -13,6 +13,7 @@ from raypier.sources import BaseRaySource
 #from raypier.tracer import RayTraceModel
 from raypier.core.ctracer import Face
 from raypier.dispersion import FusedSilica
+from raypier.core.find_focus import find_ray_focus
 
 from traitsui.editors.api import DropEditor,TitleEditor
 
@@ -35,15 +36,6 @@ class TargetResult(Result):
                        title="Optical path length",
                        resizable=True,
                        )
-    
-    def calc_result(self, tracer):
-        try:
-            self._calc_result()
-        except:
-            traceback.print_exc()
-        
-    def _calc_result(self):
-        raise NotImplementedError()
         
     @on_trait_change("source, target")
     def update(self):
@@ -185,8 +177,37 @@ class GroupVelocityDispersion(MeanOpticalPathLength):
         self.tod = third_deriv[idx]
         
         
-class FocalPoint(TargetResult):
-    pass #TODO
+class FocalPoint(Result):
+    abstract = False
+    name = "Focal Point"
+    source = Instance(BaseRaySource)
+    
+    focus = Tuple(Float,Float,Float)
+    
+    ray_generation = Int(-1)
+    
+    traits_view = View(Item('result', style="readonly"),
+                       Item('source', editor=DropEditor()),
+                       Item('ray_generation', style="simple"),
+                       title="Optical path length",
+                       resizable=True,
+                       )
+    
+    def _calc_result(self):
+        selected = self.source.traced_rays[self.ray_generation]
+        focus = find_ray_focus(selected)
+        self.result = tuple(focus)
+        print("CALC FOCUS", self.result)
+        
+    @on_trait_change("target")
+    def update(self):
+        if self.target is None:
+            return
+        if self.source.traced_rays:
+            try:
+                self._calc_result()
+            except:
+                traceback.print_exc()
 
 
 class Divergence(TargetResult):

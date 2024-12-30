@@ -27,7 +27,7 @@ from raypier.bases import Optic, normaliseVector, NumEditor,\
     ComplexEditor, Traceable, transformPoints, transformNormals,\
     ShapedOptic
     
-from raypier.core.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace
+from raypier.core.cfaces import CircularFace, SphericalFace, ConicRevolutionFace, AsphericFace, ShapedPlanarFace
 from raypier.core.ctracer import FaceList
 from raypier.core.cshapes import CircleShape as cCircleShape
 from raypier.core.cmaterials import DielectricMaterial, CoatedDispersiveMaterial, PECMaterial, SingleLayerCoatedMaterial
@@ -406,9 +406,9 @@ class BiConicLens(PlanoConicLens):
         self.profile = profile
         
         
-class AsphericLens(SurfaceOfRotationLens):
+class PlanoAsphericLens(SurfaceOfRotationLens):
     abstract = False
-    name = "Bi-Aspheric Lens"
+    name = "Plano-Aspheric Lens"
     
     CT = Float(5.0, desc="centre thickness")
     diameter = Float(25.0)
@@ -423,6 +423,62 @@ class AsphericLens(SurfaceOfRotationLens):
     A12 = Float(0.0)
     A14 = Float(0.0)
     A16 = Float(0.0)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,  
+                       Item('n_inside'),
+                       Item('CT', editor=NumEditor),
+                       Item('diameter', editor=NumEditor),
+                       VGroup(
+                           Item('A_curvature', editor=NumEditor),
+                           Item('A_conic', editor=NumEditor),
+                           Item('A4', editor=NumEditor),
+                           Item('A6', editor=NumEditor),
+                           Item('A8', editor=NumEditor),
+                           Item('A10', editor=NumEditor),
+                           label="A Surface",
+                           show_border = True
+                           )
+                       )
+                    )
+    
+    def eval_A(self, y):
+        y2=numpy.asarray(y)**2
+        R = self.A_curvature
+        beta = (1 + self.A_conic)
+        z = self.A4*(y2**2) + self.A6*(y2**3) + self.A8*(y2**4) + self.A10*(y2**5) + y2 / (R*(1 + numpy.sqrt(1 - beta*y2/(R**2))))
+        return -z
+    
+    @on_trait_change("CT, diameter, A_conic, A_curvature, A4, A6, A8, A10")
+    def config_profile(self):
+        n_segments = 20 #number of lines in the curved section
+        r_max = self.diameter/2 #maximum radius
+        r = numpy.linspace(0,r_max, n_segments)
+        
+        #list of tuples [(r, z(r)), ...]
+        profile = list(zip(r, self.eval_A(r)))
+        
+        profile.extend([(r_max, self.CT), (0.0, self.CT)])
+        self.profile = profile
+        
+    def make_faces(self):
+        shape = cCircleShape(radius=self.diameter/2)
+        fl = [AsphericFace(owner=self, shape=shape,
+                                material=self.material,
+                                conic_const=self.A_conic,
+                                z_height=0.0, curvature=self.A_curvature,
+                                A4=-self.A4, A6=-self.A6, A8=-self.A8, A10=-self.A10,
+                                A12=-self.A12, A14=-self.A14, A16=-self.A16,
+                                invert_normals=True,
+                                atol=1e-16),
+                ShapedPlanarFace(owner=self, material=self.material,
+                                 z_height=self.CT, shape=shape)
+                ]
+        return fl
+    
+        
+class AsphericLens(PlanoAsphericLens):
+    name = "Bi-Aspheric Lens"
     
     B_curvature = Float(25.0)
     B_conic = Float(-0.0)
@@ -492,13 +548,6 @@ class AsphericLens(SurfaceOfRotationLens):
                                 A12=-self.B12, A14=-self.B14, A16=-self.B16,
                                 atol=1e-16)]
         return fl
-    
-    def eval_A(self, y):
-        y2=numpy.asarray(y)**2
-        R = self.A_curvature
-        beta = (1 + self.A_conic)
-        z = self.A4*(y2**2) + self.A6*(y2**3) + self.A8*(y2**4) + self.A10*(y2**5) + y2 / (R*(1 + numpy.sqrt(1 - beta*y2/(R**2))))
-        return -z
     
     def eval_B(self, y):
         y2=numpy.asarray(y)**2
