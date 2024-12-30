@@ -26,6 +26,34 @@ NO_INTERSECTION.piece_idx = 0
 factorial = math.factorial
 
 
+cdef double N_basis(double t, int p, int idx, double[:] knots) nogil:
+    """
+    B-Spline normal basis function.
+    t - the parameter value
+    p - degree
+    idx - know index
+    knots - an array of knot-values
+    """
+    cdef:
+        double denom, out
+        
+    if p==0:
+        if (knots[idx]<=t) and (t < knots[idx+1]):
+            return 1.0
+        else:
+            return 0.0
+    
+    denom = knots[idx+p] - knots[idx]
+    if denom == 0.0:
+        return 0.0
+    out = ((t - knots[idx])/denom)*N_basis(t, p-1, idx, knots)
+    denom = knots[idx+p+1] - knots[idx+1]
+    if denom == 0.0:
+        return 0.0
+    out += ((knots[idx+p+1] - t)/denom)*N_basis(t, p-1, idx+1, knots)
+    return out
+
+
 cdef struct vector3_t:
     vector_t p, dpdu, dpdv
     
@@ -49,13 +77,87 @@ cdef double[:] binomial(int n):
     return np.array([factorial(n)/(factorial(i)*factorial(n-i)) for i in range(n+1)])
 
 
-cdef class BezierPatch():
+cdef class BaseUVPatch():
+    cdef vector_t _eval_pt(self, double u, double v) nogil:
+        cdef:
+            vector_t out
+        return out
+    
+    cdef vector3_t _eval_pt_and_grads(self, double u, double v) nogil:
+        cdef:
+            vector3_t out
+        return out
+    
+    def eval_pt(self, double u, double v):
+        cdef:
+            vector_t out
+        out = self._eval_pt(u,v)
+        return (out.x, out.y, out.z)
+    
+    def eval_pt_and_grad(self, double u, double v):
+        cdef:
+            int i
+            vector3_t out
+        out = self._eval_pt_and_grad(u,v)
+        return [(out.p.x, out.p.y, out.p.z),
+                (out.dpdu.x, out.dpdu.y, out.dpdu.z),
+                (out.dpdv.x, out.dpdv.y, out.dpdv.z)]
+    
+    def get_mesh(self, unsigned int N, unsigned int M, u_range=1., v_range=1.):
+        """
+        Evaluates a triangular mesh over the patch area with resolution (N,M)
+        for the two u,v coordinates
+        
+        returns : tuple(double[:,3] points, int[:,3] triangles, double[:,2] uv_coords)
+        """
+        cdef:
+            double du=u_range/(N-1), dv=v_range/(M-1), u, v
+            vector_t pt
+            double[:,:,:] out
+            double[:,:,:] uv_out
+            long[:,:] pt_ids
+            long long[:,:] cells
+            int i,j, ct=0
+            
+        points = np.empty((N,M,3), dtype=np.float64)
+        uv = np.empty((N,M,2), dtype=np.float64)
+        out = points
+        uv_out = uv
+        pt_ids = np.arange(N*M).reshape(N,M)
+        cells = np.empty(((N-1)*(M-1)*2,3), np.int64)
+        
+        with nogil:
+            for i in range(N):
+                for j in range(M):
+                    u = i*du
+                    v = j*dv
+                    uv_out[i,j,0] = u
+                    uv_out[i,j,1] = v
+                    pt = self._eval_pt(u, v)
+                    out[i,j,0] = pt.x
+                    out[i,j,1] = pt.y
+                    out[i,j,2] = pt.z
+                    
+            for i in range(N-1):
+                for j in range(M-1):
+                    cells[ct,0] = pt_ids[i,j]
+                    cells[ct,1] = pt_ids[i,j+1]
+                    cells[ct,2] = pt_ids[i+1,j+1]
+                    ct += 1
+                    cells[ct,0] = pt_ids[i,j]
+                    cells[ct,1] = pt_ids[i+1,j+1]
+                    cells[ct,2] = pt_ids[i+1,j]
+                    ct += 1
+                    
+        return (points.reshape(-1,3), np.asarray(cells), uv.reshape(-1,2))
+
+
+cdef class BezierPatch(BaseUVPatch):
     cdef:
         readonly int order_n, order_m
         double[:,:,:] _control_pts
         double[:] binom_n
         double[:] binom_m
-        
         
     def __init__(self, unsigned int N, unsigned int M):
         self.order_n = <int>N
@@ -131,68 +233,72 @@ cdef class BezierPatch():
                 
         return out
     
-    def eval_pt(self, double u, double v):
-        cdef:
-            vector_t out
-        out = self._eval_pt(u,v)
-        return (out.x, out.y, out.z)
     
-    def eval_pt_and_grad(self, double u, double v):
-        cdef:
-            int i
-            vector3_t out
-        out = self._eval_pt_and_grad(u,v)
-        return [(out.p.x, out.p.y, out.p.z),
-                (out.dpdu.x, out.dpdu.y, out.dpdu.z),
-                (out.dpdv.x, out.dpdv.y, out.dpdv.z)]
     
-    def get_mesh(self, unsigned int N, unsigned int M):
-        """
-        Evaluates a triangular mesh over the patch area with resolution (N,M)
-        for the two u,v coordinates
+cdef class BSplinePatch(BaseUVPatch):
+    """
+    In each BSpline dimension, for (n+1) control points, and with degree p,
+    we require (p+n+2) knots.
+    """
+    cdef:
+        readonly int order_n, order_m
+        double[:,:,:] _control_pts
+        double[:] u_knots
+        double[:] v_knots
+        public int u_degree, v_degree
         
-        returns : tuple(double[:,3] points, int[:,3] triangles, double[:,2] uv_coords)
-        """
-        cdef:
-            double du=1./(N-1), dv=1./(M-1), u, v
-            vector_t pt
-            double[:,:,:] out
-            double[:,:,:] uv_out
-            long[:,:] pt_ids
-            long long[:,:] cells
-            int i,j, ct=0
+    def __init__(self, unsigned int N, unsigned int M):
+        self.order_n = <int>N
+        self.order_m = <int>M
+        self._control_pts = np.zeros((N+1,M+1,3))
+        
+    property u_knots:
+        def __get__(self):
+            return np.asarray(self.u_knots)
+        
+        def __set__(self, double[:] knots):
+            self.u_knots = np.ascontiguousarray(knots)
             
-        points = np.empty((N,M,3), dtype=np.float64)
-        uv = np.empty((N,M,2), dtype=np.float64)
-        out = points
-        uv_out = uv
-        pt_ids = np.arange(N*M).reshape(N,M)
-        cells = np.empty(((N-1)*(M-1)*2,3), np.int64)
+    property v_knots:
+        def __get__(self):
+            return np.asarray(self.v_knots)
         
-        with nogil:
-            for i in range(N):
-                for j in range(M):
-                    u = i*du
-                    v = j*dv
-                    uv_out[i,j,0] = u
-                    uv_out[i,j,1] = v
-                    pt = self._eval_pt(u, v)
-                    out[i,j,0] = pt.x
-                    out[i,j,1] = pt.y
-                    out[i,j,2] = pt.z
-                    
-            for i in range(N-1):
-                for j in range(M-1):
-                    cells[ct,0] = pt_ids[i,j]
-                    cells[ct,1] = pt_ids[i,j+1]
-                    cells[ct,2] = pt_ids[i+1,j+1]
-                    ct += 1
-                    cells[ct,0] = pt_ids[i,j]
-                    cells[ct,1] = pt_ids[i+1,j+1]
-                    cells[ct,2] = pt_ids[i+1,j]
-                    ct += 1
-                    
-        return (points.reshape(-1,3), np.asarray(cells), uv.reshape(-1,2))
+        def __set__(self, double[:] knots):
+            self.v_knots = np.ascontiguousarray(knots)        
+                
+    property control_pts:
+        def __get__(self):
+            return np.asarray(self._control_pts)
+        
+        def __set__(self, pts_in):
+            cdef:
+                double[:,:,:] ctrl_pts=pts_in
+            print("Got shape", ctrl_pts.shape, pts_in.shape)
+            if pts_in.shape != (self.order_n+1, self.order_m+1, 3):
+                raise ValueError("Control points array must have shape (%d,%d,3). Got %r"%(self.order_n+1, self.order_m+1, ctrl_pts.shape))
+            self._control_pts = ctrl_pts #.copy()
+        
+    cdef vector_t _eval_pt(self, double u, double v) nogil:
+        cdef:
+            int i,j, N=self.order_n, M=self.order_m, u_deg=self.u_degree, v_deg=self.v_degree
+            vector_t out
+            double[:] u_knots = self.u_knots
+            double[:] v_knots = self.v_knots
+            double coef
+            double[:,:,:] ctrl=self._control_pts
+            
+        out.x = 0.0
+        out.y = 0.0
+        out.z = 0.0
+            
+        for i in range(self.order_n+1):
+            for j in range(self.order_m+1):
+                coef = N_basis(u, u_deg, i, u_knots)*N_basis(v, v_deg, j, v_knots)
+                out.x += coef*ctrl[i,j,0]
+                out.y += coef*ctrl[i,j,1]
+                out.z += coef*ctrl[i,j,2]
+                
+        return out
     
     
 cdef class BezierPatchFace(Face):

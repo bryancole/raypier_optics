@@ -1,5 +1,5 @@
 
-from raypier.core.cbezier import BezierPatch, BezierPatchFace
+from raypier.core.cbezier import BezierPatch, BezierPatchFace, BSplinePatch
 from raypier.core.ctracer import FaceList
 from raypier.bases import Optic, Traceable
 
@@ -10,15 +10,8 @@ from tvtk.api import tvtk
 import numpy as np
 
 
-class BezierSinglePatch(Optic):
-    """
-    The default material is a PECMaterial, i.e. mirror
-    """
-    name = Str("Bezier Surface Patch")
+class BaseUVPatch(Optic):
     control_points = Array(shape=(None,None,3), dtype=np.float64)
-    
-    bezier = Instance(BezierPatch)
-    
     mesh_src = Instance(tvtk.ProgrammableSource, (), transient=True)
     ctrl_pt_src = Instance(tvtk.ProgrammableSource, (), transient=True)
     
@@ -26,30 +19,6 @@ class BezierSinglePatch(Optic):
                        Traceable.uigroup,
                        )
                        )
-    
-    def _faces_default(self):
-        #We need quite a lax tolerance because the initial intersection test using
-        #the bezier mesh has a more significant deviation from the true surface
-        cfaces = [BezierPatchFace(bezier=self.bezier, invert_normals=True, tolerance=0.01,
-                                  u_res=50, v_res=50, atol=1e-10)]
-        fl = FaceList(owner=self)
-        fl.faces = cfaces
-        return fl
-    
-    def _bezier_default(self):
-        ctrl_pts = self.control_points
-        N,M, *args = ctrl_pts.shape
-        patch = BezierPatch(N-1,M-1)
-        patch.control_pts = ctrl_pts
-        return patch
-        
-    def _control_points_default(self):
-        data = [[[-9,-9,0], [-3,-9,0], [3,-9,0], [9, -9, 0]],
-                [[-9,-3,0], [-3,-3,3], [3,-3,3], [9, -3, 0]],
-                [[-9,3,0], [-3,3,3], [3,3,3], [9, 3, 0]],
-                [[-9,9,0], [-3,9,0], [3,9,0], [9, 9, 0]],
-                ]
-        return np.array(data, dtype=np.float64)
     
     def _pipeline_default(self):
         mesh_src = self.mesh_src
@@ -106,4 +75,82 @@ class BezierSinglePatch(Optic):
         actors.append(act)
         
         return actors
-            
+
+
+class BezierSinglePatch(BaseUVPatch):
+    """
+    The default material is a PECMaterial, i.e. mirror
+    """
+    name = Str("Bezier Surface Patch")
+    bezier = Instance(BezierPatch)
+    
+    def _faces_default(self):
+        #We need quite a lax tolerance because the initial intersection test using
+        #the bezier mesh has a more significant deviation from the true surface
+        cfaces = [BezierPatchFace(bezier=self.bezier, invert_normals=True, tolerance=0.01,
+                                  u_res=50, v_res=50, atol=1e-10)]
+        fl = FaceList(owner=self)
+        fl.faces = cfaces
+        return fl
+    
+    def _bezier_default(self):
+        ctrl_pts = self.control_points
+        N,M, *args = ctrl_pts.shape
+        patch = BezierPatch(N-1,M-1)
+        patch.control_pts = ctrl_pts
+        return patch
+        
+    def _control_points_default(self):
+        data = [[[-9,-9,0], [-3,-9,0], [3,-9,0], [9, -9, 0]],
+                [[-9,-3,0], [-3,-3,3], [3,-3,3], [9, -3, 0]],
+                [[-9,3,0], [-3,3,3], [3,3,3], [9, 3, 0]],
+                [[-9,9,0], [-3,9,0], [3,9,0], [9, 9, 0]],
+                ]
+        return np.array(data, dtype=np.float64)
+    
+    
+class BSplineSinglePatch(BaseUVPatch):
+    name = Str("BSpline Surface Patch")
+    bspline = Instance(BSplinePatch)
+    
+    u_knots = Array()
+    v_knots = Array()
+    
+    # def _faces_default(self):
+    #     #We need quite a lax tolerance because the initial intersection test using
+    #     #the bezier mesh has a more significant deviation from the true surface
+    #     cfaces = [BezierPatchFace(bezier=self.bezier, invert_normals=True, tolerance=0.01,
+    #                               u_res=50, v_res=50, atol=1e-10)]
+    #     fl = FaceList(owner=self)
+    #     fl.faces = cfaces
+    #     return fl
+    
+    def _bspline_default(self):
+        ctrl_pts = self.control_points
+        N,M, *args = ctrl_pts.shape
+        patch = BSplinePatch(N-1,M-1)
+        patch.control_pts = ctrl_pts
+        patch.u_knots = self.u_knots
+        patch.v_knots = self.v_knots
+        return patch
+        
+    def _control_points_default(self):
+        data = [[(-44.3783965, -13.956608000000003, 0.0), (-44.3783965, -13.956608000000003, 50.0)], 
+                [(-51.80648887000841, 9.784359970257904, 0.0), (-26.902931958404587, -12.498303172462593, 50.0)], 
+                [(-31.628220000000002, 31.385614, 0.0), (-28.27639032948056, 37.47853386793429, 50.0)], 
+                [(28.903247680789157, 28.39060884033357, 0.0), (-6.514713, 3.249176, 50.0)], 
+                [(6.906227945225628, -23.726293952654803, 0.0), (11.917509383107664, -24.67958413884696, 50.0)], 
+                [(23.633918710105423, -40.34000411166008, 0.0), (30.655313796701574, 10.287457120427124, 50.0)], 
+                [(53.319759, -34.146309, 0.0), (53.319759, -34.146309, 50.0)]]
+        return np.array(data, dtype=np.float64)
+    
+    def _u_knots_default(self):
+        data = [0.0, 0.0, 0.0, 0.0, 46.86875896639466, 86.8150208656012, 124.91998295572799, 166.76909466075705, 
+                166.76909466075705, 166.76909466075705, 166.76909466075705]
+        return np.array(data, dtype=np.float64)
+    
+    def _v_knots_default(self):
+        data = [0.0, 0.0, 1.0, 1.0]
+        return np.array(data, dtype=np.float64)
+    
+    
