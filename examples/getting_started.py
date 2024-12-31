@@ -23,7 +23,7 @@ src = ParallelRaySource(origin=(0,0,-50.0),
                         display="wires",
                         opacity=0.1)
 
-model = RayTraceModel(optics=[lens1,lens2],
+model = RayTraceModel(optics=[lens2,lens1],
                         sources=[src])
 
 ###Now open the GUI###

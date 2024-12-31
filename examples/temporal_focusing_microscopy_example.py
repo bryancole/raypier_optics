@@ -70,6 +70,7 @@ lens2 = PlanoConvexLens(centre=(10.0,-30.0,0.0),
 
 ### Construct an aspheric objective using General Lens framework.
 ### This is intended to represent Edmund Optics #66-330
+
 circle = CircleShape(radius=10.0)
 s1 = AsphericFace(z_height=0.0,
                   curvature=1./8.107287E-02,

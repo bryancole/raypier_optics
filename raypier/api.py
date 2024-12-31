@@ -8,6 +8,8 @@ from .faces import PlanarFace, SphericalFace, CylindericalFace, AsphericFace, Co
         AxiconFace, DistortionFace
         
 from .lenses import PlanoConvexLens, PlanoConicLens, AsphericLens, BiConicLens
+
+from .windows import CircularWindow
         
 from .materials import OpticalMaterial, air, OpticalMaterialFromFormula
         

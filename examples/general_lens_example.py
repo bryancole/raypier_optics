@@ -39,7 +39,7 @@ f4 = PlanarFace(z_height=-9.0, invert=False)
 #                                 0.8974794,
 #                                 9.896161])
 
-faces = [f1,f1,f2,f3,f4]
+faces = [f1,f2,f3,f4]
 mats = [m1, m2,m3]
 
 lens = GeneralLens(centre=(0,0,50),
