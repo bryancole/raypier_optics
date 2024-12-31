@@ -5,6 +5,7 @@
 
 import numpy as np
 cimport numpy as cnp
+cimport cython
 
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
@@ -25,8 +26,24 @@ NO_INTERSECTION.piece_idx = 0
 
 factorial = math.factorial
 
+cdef struct vector3_t:
+    vector_t p, dpdu, dpdv
+    
+cdef struct basis_val:
+    double N
+    double dNdt
 
-cdef double N_basis(double t, int p, int idx, double[:] knots) nogil:
+
+def N_basis(double t, int p, int idx, double[:] knots):
+    return _N_basis(t,p,idx,knots)
+
+def N_basis_grad(double t, int p, int idx, double[:] knots):
+    cdef:
+        basis_val out
+    out = _N_basis_grad(t, p, idx, knots)
+    return (out.N, out.dNdt)
+
+cdef double _N_basis(double t, int p, int idx, double[:] knots) nogil:
     """
     B-Spline normal basis function.
     t - the parameter value
@@ -45,17 +62,47 @@ cdef double N_basis(double t, int p, int idx, double[:] knots) nogil:
     
     denom = knots[idx+p] - knots[idx]
     if denom == 0.0:
-        return 0.0
-    out = ((t - knots[idx])/denom)*N_basis(t, p-1, idx, knots)
+        out = 0.0
+    else:
+        out = ((t - knots[idx])/denom)*_N_basis(t, p-1, idx, knots)
     denom = knots[idx+p+1] - knots[idx+1]
-    if denom == 0.0:
-        return 0.0
-    out += ((knots[idx+p+1] - t)/denom)*N_basis(t, p-1, idx+1, knots)
+    if denom != 0.0:
+        out += ((knots[idx+p+1] - t)/denom)*_N_basis(t, p-1, idx+1, knots)
     return out
 
 
-cdef struct vector3_t:
-    vector_t p, dpdu, dpdv
+cdef basis_val _N_basis_grad(double t, int p, int idx, double[:] knots) nogil:
+    cdef:
+        double denom, nom
+        basis_val out, prev
+        
+    if p==0:
+        if (knots[idx]<=t) and (t < knots[idx+1]):
+            out.N=1.0
+            out.dNdt=0.0
+            return out
+        else:
+            out.N=0.0
+            out.dNdt=0.0
+            return out
+    
+    denom = knots[idx+p] - knots[idx]
+    if denom == 0.0:
+        out.N = 0.0
+        out.dNdt = 0.0
+    else:
+        prev = _N_basis_grad(t, p-1, idx, knots)
+        nom = ((t - knots[idx])/denom)
+        out.N = nom*prev.N
+        out.dNdt = (1./denom)*prev.N + nom*prev.dNdt
+        
+    denom = knots[idx+p+1] - knots[idx+1]
+    if denom != 0.0:
+        prev = _N_basis_grad(t, p-1, idx+1, knots)
+        nom = ((knots[idx+p+1] - t)/denom)
+        out.N += nom*prev.N
+        out.dNdt += (-1/denom)*prev.N + nom*prev.dNdt
+    return out
     
 
 cdef double clip(double a, double lower, double upper) nogil:
@@ -178,6 +225,9 @@ cdef class BezierPatch(BaseUVPatch):
                 raise ValueError("Control points array must have shape (%d,%d,3). Got %r"%(self.order_n+1, self.order_m+1, ctrl_pts.shape))
             self._control_pts = ctrl_pts #.copy()
         
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef vector_t _eval_pt(self, double u, double v) nogil:
         cdef:
             int i,j, N=self.order_n, M=self.order_m
@@ -200,6 +250,9 @@ cdef class BezierPatch(BaseUVPatch):
                 
         return out
     
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef vector3_t _eval_pt_and_grads(self, double u, double v) nogil:
         cdef:
             int i,j, N=self.order_n, M=self.order_m
@@ -278,13 +331,16 @@ cdef class BSplinePatch(BaseUVPatch):
                 raise ValueError("Control points array must have shape (%d,%d,3). Got %r"%(self.order_n+1, self.order_m+1, ctrl_pts.shape))
             self._control_pts = ctrl_pts #.copy()
         
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef vector_t _eval_pt(self, double u, double v) nogil:
         cdef:
             int i,j, N=self.order_n, M=self.order_m, u_deg=self.u_degree, v_deg=self.v_degree
             vector_t out
             double[:] u_knots = self.u_knots
             double[:] v_knots = self.v_knots
-            double coef
+            double coef1, coef2
             double[:,:,:] ctrl=self._control_pts
             
         out.x = 0.0
@@ -293,17 +349,48 @@ cdef class BSplinePatch(BaseUVPatch):
             
         for i in range(self.order_n+1):
             for j in range(self.order_m+1):
-                coef = N_basis(u, u_deg, i, u_knots)*N_basis(v, v_deg, j, v_knots)
-                out.x += coef*ctrl[i,j,0]
-                out.y += coef*ctrl[i,j,1]
-                out.z += coef*ctrl[i,j,2]
+                coef1 = _N_basis(u, u_deg, i, u_knots)
+                coef2 = _N_basis(v, v_deg, j, v_knots)
+                out.x += coef1*coef2*ctrl[i,j,0]
+                out.y += coef1*coef2*ctrl[i,j,1]
+                out.z += coef1*coef2*ctrl[i,j,2]
+                
+        return out
+    
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
+    cdef vector3_t _eval_pt_and_grads(self, double u, double v) nogil:
+        cdef:
+            int i,j, N=self.order_n, M=self.order_m, u_deg=self.u_degree, v_deg=self.v_degree
+            vector3_t out = [[0,0,0],[0,0,0],[0,0,0]]
+            double[:] u_knots = self.u_knots
+            double[:] v_knots = self.v_knots
+            basis_val coef1, coef2
+            double[:,:,:] ctrl=self._control_pts
+            
+        for i in range(self.order_n+1):
+            for j in range(self.order_m+1):
+                u_coef = _N_basis_grad(u, u_deg, i, u_knots)
+                v_coef = _N_basis_grad(v, v_deg, j, v_knots)
+                out.p.x += u_coef.N*v_coef.N*ctrl[i,j,0]
+                out.p.y += u_coef.N*v_coef.N*ctrl[i,j,1]
+                out.p.z += u_coef.N*v_coef.N*ctrl[i,j,2]
+                
+                out.dpdu.x += u_coef.dNdt*v_coef.N*ctrl[i,j,0]
+                out.dpdu.y += u_coef.dNdt*v_coef.N*ctrl[i,j,1]
+                out.dpdu.z += u_coef.dNdt*v_coef.N*ctrl[i,j,2]
+                
+                out.dpdv.x += v_coef.dNdt*u_coef.N*ctrl[i,j,0]
+                out.dpdv.y += v_coef.dNdt*u_coef.N*ctrl[i,j,1]
+                out.dpdv.z += v_coef.dNdt*u_coef.N*ctrl[i,j,2]
                 
         return out
     
     
-cdef class BezierPatchFace(Face):
+cdef class UVPatchFace(Face):
     cdef:
-        public BezierPatch bezier
+        public BaseUVPatch patch
         public OBBTree obbtree
         long long[:] workspace
         #double[:,:] normals #I'm not sure I need normals
@@ -319,9 +406,9 @@ cdef class BezierPatchFace(Face):
         self.v_res = kwds.get("v_res", 20)
         self.atol = kwds.get("atol", 1e-10)
         self.invert_normals = 1 if kwds.get("invert_normals", 0) else 0
-        bezier = kwds["bezier"]
-        self.bezier = bezier
-        pts, cells, uvs = bezier.get_mesh(self.u_res, self.v_res)
+        patch = kwds["patch"]
+        self.patch = patch
+        pts, cells, uvs = patch.get_mesh(self.u_res, self.v_res)
         
         tree = OBBTree(pts.copy(), np.ascontiguousarray(cells, dtype=np.int32))
         tree.max_level = kwds.get("max_level",100)
@@ -333,6 +420,9 @@ cdef class BezierPatchFace(Face):
         
         self.uvs = uvs
         
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef uv_coord_t interpolate_cell_c(self, int cell_idx, vector_t pt):
         cdef:
             OBBTree tree=self.obbtree
@@ -376,7 +466,9 @@ cdef class BezierPatchFace(Face):
         out.v = alpha0 * uvs[cell[0],1] + alpha1 * uvs[cell[1],1] + alpha2 * uvs[cell[2],1]
         return out
         
-        
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
         """Intersects the given ray with this face.
         
@@ -397,7 +489,7 @@ cdef class BezierPatchFace(Face):
             #     int piece_idx
             
             OBBTree tree=self.obbtree
-            BezierPatch bezier=self.bezier
+            BaseUVPatch patch=self.patch
             int[:] cell
             double du, dv, dist, tol=self.atol*self.atol
             double[:,:] uvs=self.uvs
@@ -416,7 +508,7 @@ cdef class BezierPatchFace(Face):
         uv = self.interpolate_cell_c(it.cell_idx, pt)
         
         for i in range(100):
-            pt_grads = bezier._eval_pt_and_grads(uv.u, uv.v)
+            pt_grads = patch._eval_pt_and_grads(uv.u, uv.v)
             
             normal = norm_(cross_(pt_grads.dpdu, pt_grads.dpdv))
             dist = dotprod_(subvv_(pt_grads.p, p1), normal)/dotprod_(d,normal)
@@ -432,21 +524,24 @@ cdef class BezierPatchFace(Face):
         else:
             return NO_INTERSECTION
         print("iteractions:", i, du, dv)
-        pt = bezier._eval_pt(uv.u, uv.v)
+        pt = patch._eval_pt(uv.u, uv.v)
         
         out.dist = mag_(subvv_(pt,p1))
         out.uv = uv
         return out
     
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.initializedcheck(False)
     cdef void compute_normal_and_tangent_c(self, vector_t p, intersect_t *it, vector_t *normal, vector_t *tangent):
         cdef:
-            BezierPatch bezier=self.bezier
+            BaseUVPatch patch=self.patch
             uv_coord_t uv
             vector3_t pt_grads
             vector_t n
             
         uv = it.uv
-        pt_grads = bezier._eval_pt_and_grads(uv.u, uv.v)
+        pt_grads = patch._eval_pt_and_grads(uv.u, uv.v)
         
         n = norm_(cross_(pt_grads.dpdu, pt_grads.dpdv))
         normal[0] = invert_(n) if self.invert_normals else n
