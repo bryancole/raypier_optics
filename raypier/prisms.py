@@ -64,6 +64,19 @@ class Extrusion(Optic):
         fl.faces = self.make_faces()
         return fl
     
+    def make_step_shape(self):
+        from raypier.step_export import make_extruded_profile
+        
+        shape = make_extruded_profile(self.centre, 
+                                      self.direction, 
+                                      self.x_axis, 
+                                      self.z_height_1, 
+                                      self.z_height_2, 
+                                      list(self.profile))
+        print("Prism:", shape)
+        return shape, "blue"
+        
+    
     def make_faces(self):
         z1 = self.z_height_1
         z2 = self.z_height_2

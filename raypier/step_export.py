@@ -15,10 +15,12 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from OCC import BRepPrimAPI, BRep, STEPControl, TopoDS, gp, \
+from OCC.Core import BRepPrimAPI, BRep, STEPControl, TopoDS, gp, \
         BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom, TopAbs, TopExp,\
-        XCAFApp, STEPCAFControl, TDocStd, TCollection,\
-        XCAFDoc, Quantity, TopLoc
+        XCAFApp, STEPCAFControl, STEPControl, TDocStd, TCollection,\
+        XCAFDoc, Quantity, TopLoc, XSControl
+from OCC.Extend.ShapeFactory import make_extrusion, make_face
+        
 from itertools import tee
 import itertools
 import numpy
@@ -295,6 +297,18 @@ def make_OAP(EFL, diameter, height, centre, direction, x_axis):
     #nurbs = BRepBuilderAPI.BRepBuilderAPI_NurbsConvert(loc)
     return loc #toshape(nurbs)
 
+def make_extruded_profile(centre, direction, x_axis,
+                          z_height1 : float, z_height2 : float, 
+                          profile: "list[tuple[float,float]]"):
+    
+    length = z_height2-z_height1
+    points = ((x,y,z_height1) for x,y in profile)
+    wire = make_wire(points, close=True)
+    face = make_face(wire)
+    prism = make_extrusion(face,length,vector=gp.gp_Vec(0., 0., 1.))
+    return position_shape(prism, centre, direction, x_axis)
+    
+
 def make_spherical_lens(CT, diameter, curvature, 
                         centre, direction, x_axis):
     cax = gp.gp_Ax2(gp.gp_Pnt(0,0,CT-curvature),
@@ -376,7 +390,7 @@ def make_spherical_lens2(CT1, CT2, diameter,
     return position_shape(toshape(solid), centre, direction, x_axis)
     
 
-def make_wire(listOfPoints, close=False):
+def make_wire(listOfPoints : "list[tuple[float,float,float]]", close=False):
     vertices = [BRepBuilderAPI.BRepBuilderAPI_MakeVertex(gp.gp_Pnt(*p))
                 for p in listOfPoints]
     edges = [BRepBuilderAPI.BRepBuilderAPI_MakeEdge(v1.Vertex(),v2.Vertex())
@@ -466,7 +480,7 @@ def fuse_shapes(shapeList):
     s1._builders = _builders
     return s1
 
-def export_shapes(shapeList, filename):
+def export_shapes(shapeList, filename, colorList=[]):
     print(shapeList)
     step_export = STEPControl.STEPControl_Writer()
     for shape in shapeList:
@@ -480,14 +494,11 @@ def get_color_map():
     return dict(list(zip(names,vals)))
     
 def export_shapes2(shapeList, filename, colorList=[]):
-    h_doc = TDocStd.Handle_TDocStd_Document()
-    app = XCAFApp.XCAFApp_Application_GetApplication().GetObject()
-    app.NewDocument(TCollection.TCollection_ExtendedString("MDTV-CAF"),h_doc)
-    doc = h_doc.GetObject()
-    h_shape_tool = XCAFDoc.XCAFDoc_DocumentTool().ShapeTool(doc.Main())
-    h_color_tool = XCAFDoc.XCAFDoc_DocumentTool().ColorTool(doc.Main())
-    shape_tool = h_shape_tool.GetObject()
-    color_tool = h_color_tool.GetObject()
+    doc = TDocStd.TDocStd_Document(TCollection.TCollection_ExtendedString("MDTV-CAF"))
+    app = XCAFApp.XCAFApp_Application_GetApplication()
+    app.NewDocument(TCollection.TCollection_ExtendedString("MDTV-CAF"),doc)
+    shape_tool = XCAFDoc.XCAFDoc_DocumentTool().ShapeTool(doc.Main())
+    color_tool = XCAFDoc.XCAFDoc_DocumentTool().ColorTool(doc.Main())
     top_label = shape_tool.NewShape()
     
     colorList.extend(["brown"]*(len(shapeList) - len(colorList)))
@@ -510,9 +521,35 @@ def export_shapes2(shapeList, filename, colorList=[]):
         
     mode = STEPControl.STEPControl_AsIs
     writer = STEPCAFControl.STEPCAFControl_Writer()
-    writer.Transfer(h_doc, mode)
+    writer.Transfer(doc, mode)
     writer.Write(str(filename))
+    
+def export_shapes3(shapeList, filename, colorList=[]):
+    ### initialisation
+    doc = TDocStd.TDocStd_Document(TCollection.TCollection_ExtendedString("MDTV-CAF"))
+    assert doc is not None
+
+    # Get root assembly
+    shape_tool = XCAFDoc.XCAFDoc_DocumentTool.ShapeTool(doc.Main())
+    colors = XCAFDoc.XCAFDoc_DocumentTool.ColorTool(doc.Main())
+    cmap = get_color_map()
+    colorMap = dict((c, Quantity.Quantity_Color(cmap.get(c, 133))) for c in colorList)
+    
+    for shape, color in zip(shapeList, colorList):
+        if not shape:
+            continue
+        print("color:", color, "shape", shape)
+        label = shape_tool.AddShape(shape)
+        c = colorMap[color]
+        colors.SetColor(label, c, XCAFDoc.XCAFDoc_ColorGen)
+    
+    WS = XSControl.XSControl_WorkSession()
+    writer = STEPCAFControl.STEPCAFControl_Writer(WS, False)
+    writer.Transfer(doc, STEPControl.STEPControl_AsIs)
+    status = writer.Write(filename)
+    print("status", status)
+    
     
 if __name__=="__main__":
     cyl = make_cylinder((1,2,3),(7,6,5),5,2, 0, (1,1,1) )
-    export_shapes2([cyl]*5, "test_step_export.stp")
+    export_shapes3([cyl]*5, "test_step_export.stp")

@@ -457,7 +457,7 @@ class RayTraceModel(HasQueue):
                 writer.write()
                 
     def write_to_STEP(self, fname):
-        from raypier.step_export import export_shapes2 as export_shapes
+        from raypier.step_export import export_shapes3 as export_shapes
         optics = self.optics
         sources = self.sources
         shapes_colors = [_f for _f in (o.make_step_shape() for o in optics) if _f]
