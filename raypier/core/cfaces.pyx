@@ -29,7 +29,7 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, Shape, ImplicitSurface, Distortion, intersect_t
+                rotate_c, Shape, ImplicitSurface, Distortion, intersect_t, cross_
 
 import numpy as np
 cimport numpy as np_
@@ -694,6 +694,13 @@ cdef class ExtrudedPlanarFace(Face):
     
     cdef vector_t compute_normal_c(self, vector_t p, int piece):
         return self.normal
+    
+    cdef vector_t compute_tangent_c(self, vector_t p, int piece):
+        cdef vector_t tangent
+        tangent.x = 0.0
+        tangent.y = 0.0
+        tangent.z = 1.0
+        return tangent
 
 #
 # Functions used for Bezier math.  should go in utils.pyx when there is one

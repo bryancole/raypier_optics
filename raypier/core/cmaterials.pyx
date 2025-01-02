@@ -779,10 +779,9 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
-        sin1 = sqrt(1 - cos1*cos1)
+        sin1 = sqrt(fabs(1 - cos1*cos1))
         
-        #print "TRACE"
-        #print normal, in_direction
+        #print("cosTheta", cosTheta)
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
@@ -799,17 +798,13 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         #apply Snell's law. These become complex.
         sin2 = (n1*sin1/n2)
         cos2 = csqrt(1 - sin2*sin2)
-        #print "cos1", cos1
-        #print "cos2", cos2
-        
-        #print "TIR", N2_sin2, cosTheta, N2, cos1
-        #print (normal.x, normal.y, normal.z), in_direction
+
         cosThetaNormal = multvs_(normal, cosTheta)
         
         #incoming power
         P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
                          E2_amp.real**2 + E2_amp.imag**2)
-        #print "P_in:", P_in, n1.real, E1_amp.real, E1_amp.imag, E2_amp.real, E2_amp.imag
+
         if P_in==0.0:
             return
         #print "P Incoming:", P_in
@@ -851,7 +846,6 @@ cdef class FullDielectricMaterial(DielectricMaterial):
         #Fresnel equations for transmission
         T_p = aspect * (2.0*cos1*n1) / ( n2*cos1 + n1*cos2 )
         T_s = aspect * (2.0*cos1*n1) / ( n2*cos2 + n1*cos1 )
-        #print "T_s", T_s, "T_p", T_p
         
         #modify in place to get reflected amplitudes
         T_s *= E1_amp

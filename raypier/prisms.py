@@ -146,10 +146,10 @@ class Extrusion(Optic):
         pass
 
 
-class Prism(Extrusion):
+class RightAnglePrism(Extrusion):
     name = "prism"
     abstract = False
-    height = Float(20.0) #distance from front face to apex
+    height = Float(20.0) #distance from front (hypotenuse) face to apex
     width = Float(20.0) #width of front face
     
     traits_view = View(VGroup(
@@ -170,6 +170,8 @@ class Prism(Extrusion):
         self.profile = [(-w,0),
                         (w,0),
                         (0,h)]
+        
+Prism = RightAnglePrism
         
         
 class Rhomboid(Extrusion):
