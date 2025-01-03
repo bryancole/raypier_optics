@@ -220,6 +220,7 @@ cdef class OBBTree(object):
         self.max_n_nodes = max_n_nodes
         self.nodes = <obbnode_t*>malloc(max_n_nodes*sizeof(obbnode_t))
         self.n_nodes = 0
+        self.tolerance = 0.1
         
     cdef obbnode_t get_node_c(self, unsigned long i):
         return self.nodes[i]
@@ -373,10 +374,10 @@ cdef class OBBTree(object):
             double alpha
             intersection res
             int i
+            double tol=self.tolerance/mag_(d)
             
         res.alpha = 1.0
         res.cell_idx = -1
-            
         workspace[0] = self.root_idx
         while depth > 0:
             depth -= 1
@@ -386,7 +387,7 @@ cdef class OBBTree(object):
                     for i in range(node.n_cells):
                         cell_idx = self.cell_ids[node.cell_list_idx+i]
                         alpha = self.line_intersects_cell_c(cell_idx, p1, d)
-                        if (alpha >= 0) and (alpha < res.alpha):
+                        if (alpha >= tol) and (alpha < res.alpha):
                             res.alpha = alpha
                             res.cell_idx = cell_idx
                 else:
