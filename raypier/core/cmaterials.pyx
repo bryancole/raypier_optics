@@ -875,7 +875,7 @@ cdef class FullDielectricMaterial(DielectricMaterial):
 cdef class FullDielectricDispersiveMaterial(InterfaceMaterial):
     """Represent a dispersive material with no coating."""
     cdef:
-        np_.npy_complex128[:] n_inside, n_outside
+        np_.complex128_t[:] n_inside, n_outside
         public BaseDispersionCurve dispersion_inside
         public BaseDispersionCurve dispersion_outside
         public double reflection_threshold, transmission_threshold
@@ -931,13 +931,13 @@ cdef class FullDielectricDispersiveMaterial(InterfaceMaterial):
         
         if cosTheta < 0.0: 
             #ray incident from outside going inwards
-            n1 = make_complex(self.n_outside[in_ray.wavelength_idx])
-            n2 = make_complex(self.n_inside[in_ray.wavelength_idx])
+            n1 = self.n_outside[in_ray.wavelength_idx]
+            n2 = self.n_inside[in_ray.wavelength_idx]
             flip = 1
             #print "out to in", n1, n2
         else:
-            n1 = make_complex(self.n_inside[in_ray.wavelength_idx])
-            n2 = make_complex(self.n_outside[in_ray.wavelength_idx])
+            n1 = self.n_inside[in_ray.wavelength_idx]
+            n2 = self.n_outside[in_ray.wavelength_idx]
             flip = -1
             #print "in to out", n1, n2
             
