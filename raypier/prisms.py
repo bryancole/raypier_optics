@@ -18,9 +18,9 @@
 
 from traits.api import HasTraits, Array, Float, Complex,\
             Property, List, Instance, on_trait_change, Range, Any,\
-            Tuple, Event, cached_property, Set, Int, Trait, Bool
+            Tuple, Event, cached_property, Set, Int, Trait, Bool, observe
 from traitsui.api import View, Item, ListEditor, VSplit,\
-            RangeEditor, ScrubberEditor, HSplit, VGroup, Heading
+            RangeEditor, ScrubberEditor, HSplit, VGroup, Heading, InstanceEditor
 from tvtk.api import tvtk
 from tvtk.pyface.scene_model import SceneModel
 from tvtk.pyface.scene_editor import SceneEditor
@@ -31,8 +31,10 @@ from itertools import chain, islice, tee
 #             Traceable, NumEditor, dotprod, transformPoints, transformNormals
 
 from raypier.bases import Optic, Traceable
-from raypier.core.cfaces import PolygonFace, ExtrudedPlanarFace
+from raypier.core.cfaces import PolygonFace, ExtrudedPlanarFace, OrientedPolygonFace
 from raypier.core.ctracer import FaceList
+from raypier.materials import BaseOpticalMaterial, OpticalMaterial
+from raypier.core.cmaterials import FullDielectricDispersiveMaterial
 
 
 def pairwise(itr):
@@ -73,7 +75,6 @@ class Extrusion(Optic):
                                       self.z_height_1, 
                                       self.z_height_2, 
                                       list(self.profile))
-        print("Prism:", shape)
         return shape, "blue"
         
     
@@ -146,8 +147,8 @@ class Extrusion(Optic):
         pass
 
 
-class RightAnglePrism(Extrusion):
-    name = "prism"
+class Prism(Extrusion):
+    name = "Prism"
     abstract = False
     height = Float(20.0) #distance from front (hypotenuse) face to apex
     width = Float(20.0) #width of front face
@@ -171,7 +172,144 @@ class RightAnglePrism(Extrusion):
                         (w,0),
                         (0,h)]
         
-Prism = RightAnglePrism
+
+class RightAnglePrism(Optic):
+    """
+    A more convenient righ-angle prism optic which aligns the centre of the hypotenuse face as the origin and
+    the normal of the hypotenuse is placed along the z-axis. The hypotenuse is aligned along the local x-axis.
+    """
+    abstract = False
+    name = "Right-angle prism"
+    ### The short side of the prism
+    side_length = Float(10.0)
+    ### height along the "extrusion axis"
+    height = Float(10.0)
+    
+    dispersion = Instance(BaseOpticalMaterial)
+    
+    trace_ends = Bool(True)
+    
+    ###Visualisation objects
+    data_source = Instance(tvtk.ProgrammableSource, (), transient=True)
+    extrude = Instance(tvtk.LinearExtrusionFilter, (), 
+                       {'capping': True, 
+                        'extrusion_type':'vector',
+                        'vector': (0.,1.,0.)},
+                        transient=True)
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('trace_ends'),
+                       Item('side_length'),
+                       Item('height'),
+                       Item('dispersion', style="custom", editor=InstanceEditor())
+                       )
+                       )
+    
+    def make_step_shape(self):
+        from raypier.step_export import make_general_extrusion
+        s_len = self.side_length
+        h_len = numpy.sqrt(2*(s_len**2))/2
+        y = self.height / 2.
+        
+        points = [(-h_len,-y,0.),(0.,-y,-h_len),(h_len,-y,0.)]
+        length = self.height
+        vector = (0.,1.,0.)
+        
+        shape = make_general_extrusion(self.centre, 
+                                      self.direction, 
+                                      self.x_axis, 
+                                      points, length, vector)
+        return shape, 'purple3'
+    
+    @on_trait_change("n_inside, n_outside")
+    def n_changed(self):
+        pass
+    
+    @observe("side_length, height, trace_ends")
+    def on_param_changed(self, evt):
+        self.faces.faces = self.make_faces()
+    
+    def _dispersion_default(self):
+        return OpticalMaterial(glass_name="N-BK7")
+    
+    def _material_default(self):
+        dispersion_curve = self.dispersion.dispersion_curve
+        m = FullDielectricDispersiveMaterial(dispersion_inside=dispersion_curve)
+        return m
+    
+    def _faces_default(self):
+        fl = FaceList(owner=self)
+        fl.faces = self.make_faces()
+        return fl
+    
+    def make_faces(self):
+        s_len = self.side_length
+        h_len = numpy.sqrt(2*(s_len**2))/2
+        y = self.height/2
+        hypot = OrientedPolygonFace(normal=(0,0,1), 
+                                    x_axis=(1,0,0), 
+                                    origin=(0,0,0),
+                                    xy_points=[(-h_len,-y),(-h_len,y),(h_len,y),(h_len,-y)])
+        
+        side1 = OrientedPolygonFace(normal=(1,0,-1), 
+                                    x_axis=(-1,0,-1), 
+                                    origin=(0,0,-h_len),
+                                    xy_points=[(-s_len,-y),(-s_len,y),(0,y),(0,-y)])
+        
+        side2 = OrientedPolygonFace(normal=(-1,0,-1), 
+                                    x_axis=(-1,0,1), 
+                                    origin=(0,0,-h_len),
+                                    xy_points=[(s_len,-y),(s_len,y),(0,y),(0,-y)])
+        faces = [hypot, side1, side2]
+        if self.trace_ends:
+            pts = [(h_len,0),(0,h_len), (-h_len,0)]
+            top = OrientedPolygonFace(normal=(0,1,0), 
+                                    x_axis=(1,0,0), 
+                                    origin=(0,y,0),
+                                    xy_points=pts)
+            bottom = OrientedPolygonFace(normal=(0,-1,0), 
+                                    x_axis=(-1,0,0), 
+                                    origin=(0,-y,0),
+                                    xy_points=pts)
+            faces.extend([top, bottom])
+            
+        for f in faces:
+            f.material=self.material
+            
+        return faces
+    
+    @on_trait_change("side_length, height")
+    def config_pipeline(self):
+        self.extrude.scale_factor = self.height
+        self.faces.faces = self.make_faces()
+        self.update=True
+        
+    def _pipeline_default(self):
+        self.config_pipeline()
+        source = self.data_source
+        def execute():
+            s_len = self.side_length
+            h_len = numpy.sqrt(2*(s_len**2))/2
+            y = self.height / 2.
+            
+            points = numpy.array([(-h_len,-y,0.),(0.,-y,-h_len),(h_len,-y,0.)])            
+            cells = [list(range(3)),]
+            
+            output = source.poly_data_output
+            output.points = points
+            output.polys = cells
+        source.set_execute_method(execute)
+        print("Made PIPELINE")
+        
+        extrude = self.extrude
+        extrude.scale_factor = self.height
+        extrude.input_connection = source.output_port
+        
+        t = self.transform
+        transf = tvtk.TransformFilter(input_connection=extrude.output_port, 
+                                      transform=t)
+        return transf
         
         
 class Rhomboid(Extrusion):

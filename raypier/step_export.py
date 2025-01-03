@@ -1,3 +1,5 @@
+#@PydevCodeAnalysisIgnore
+
 #    Copyright 2009, Teraview Ltd., Bryan Cole
 #
 #    This file is part of Raypier.
@@ -15,15 +17,33 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#@PydevCodeAnalysisIgnore
+
 from OCC.Core import BRepPrimAPI, BRep, STEPControl, TopoDS, gp, \
         BRepBuilderAPI, BRepAlgoAPI, BRepOffsetAPI, Geom, TopAbs, TopExp,\
         XCAFApp, STEPCAFControl, STEPControl, TDocStd, TCollection,\
-        XCAFDoc, Quantity, TopLoc, XSControl
+        XCAFDoc, Quantity, TopLoc, XSControl, Interface, TDF
 from OCC.Extend.ShapeFactory import make_extrusion, make_face
+from OCC.Core.TDataStd import TDataStd_Name
+from OCC.Extend.DataExchange import write_step_file
+
         
 from itertools import tee
 import itertools
 import numpy
+
+
+def find_color(label, colorTool):
+    col = Quantity.Quantity_ColorRGBA()
+    status = False
+    while not status and label != None:
+        try:
+            status = colorTool.GetColor(label, XCAFDoc.XCAFDoc_ColorSurf, col)
+        except:
+            break
+        label = label.Father()
+    return (col.GetRGB().Red(), col.GetRGB().Green(), col.GetRGB().Blue(), col.Alpha(), status, col)
+
 
 def pairs(itr):
     a,b = tee(itr)
@@ -307,7 +327,16 @@ def make_extruded_profile(centre, direction, x_axis,
     face = make_face(wire)
     prism = make_extrusion(face,length,vector=gp.gp_Vec(0., 0., 1.))
     return position_shape(prism, centre, direction, x_axis)
-    
+
+def make_general_extrusion(centre, direction, x_axis,
+                           points: "list[tuple[float,float,float]]",
+                           length: float,
+                           vector: "tuple[float,float,float]" ):
+    wire = make_wire(points, close=True)
+    face = make_face(wire)
+    v = gp.gp_Vec(*vector)
+    prism = make_extrusion(face,length,vector=v)
+    return position_shape(prism, centre, direction, x_axis)
 
 def make_spherical_lens(CT, diameter, curvature, 
                         centre, direction, x_axis):
@@ -464,8 +493,12 @@ def make_rays_pipes(listOfRays, radius=0.1):
     for vlist in v_lists:
         cylinders = (make_cylinder_2(s, e, radius) for s,e in pairs(vlist))
         spheres = (make_sphere(p, radius) for p in vlist[1:-1])
-        interleave = list(next(it) for it in itertools.cycle([cylinders,
-                                                          spheres]))
+        interleave = []
+        for it in itertools.cycle([cylinders,spheres]):
+            try:
+                interleave.append(next(it))
+            except StopIteration:
+                break
         shapes.append(_fuse(interleave))
         #shapes.extend(cylinders)
     return make_compound(shapes)
@@ -490,6 +523,7 @@ def export_shapes(shapeList, filename, colorList=[]):
 def get_color_map():
     c = [a for a in dir(Quantity) if a.startswith("Quantity_NOC_")]
     names = [a.split('_')[-1].lower() for a in c]
+    print("Colour names:", names)
     vals = [getattr(Quantity, n) for n in c]
     return dict(list(zip(names,vals)))
     
@@ -524,27 +558,61 @@ def export_shapes2(shapeList, filename, colorList=[]):
     writer.Transfer(doc, mode)
     writer.Write(str(filename))
     
-def export_shapes3(shapeList, filename, colorList=[]):
+def export_shapes3(shapeList, filename, colorList=[], nameList=[]):
     ### initialisation
-    doc = TDocStd.TDocStd_Document(TCollection.TCollection_ExtendedString("MDTV-CAF"))
+    #
+    Interface.Interface_Static_SetCVal("write.step.schema", "AP214IS")
+    app = XCAFApp.XCAFApp_Application.GetApplication()
+    
+    fmt = "MDTV-CAF"
+    #fmt = "BinXCAF"
+    doc = TDocStd.TDocStd_Document(TCollection.TCollection_ExtendedString(fmt))
+    app.NewDocument(TCollection.TCollection_ExtendedString(fmt), doc)
+    #
     assert doc is not None
 
     # Get root assembly
     shape_tool = XCAFDoc.XCAFDoc_DocumentTool.ShapeTool(doc.Main())
     colors = XCAFDoc.XCAFDoc_DocumentTool.ColorTool(doc.Main())
+    
     cmap = get_color_map()
     colorMap = dict((c, Quantity.Quantity_Color(cmap.get(c, 133))) for c in colorList)
     
-    for shape, color in zip(shapeList, colorList):
+    tr = gp.gp_Trsf()
+    loc = TopLoc.TopLoc_Location(tr)
+    
+    root = shape_tool.NewShape()
+    #shape_tool.AddShape(root, True, True)
+    
+    for shape, color, name in zip(shapeList, colorList, nameList):
         if not shape:
             continue
-        print("color:", color, "shape", shape)
-        label = shape_tool.AddShape(shape)
         c = colorMap[color]
+        if shape.ShapeType()==TopAbs.TopAbs_COMPOUND:
+            label = shape_tool.AddShape(shape)
+            itr = TDF.TDF_ChildIterator(label, True)
+            while itr.More():
+                val = itr.Value()
+                c = Quantity.Quantity_Color(1.0,0.,0.,Quantity.Quantity_TOC_RGB)
+                colors.SetColor(val, c, XCAFDoc.XCAFDoc_ColorGen)
+                colors.SetColor(val, c, XCAFDoc.XCAFDoc_ColorCurv)
+                colors.SetColor(val, c, XCAFDoc.XCAFDoc_ColorSurf)
+                itr.Next()
+        else:
+            label = shape_tool.NewShape()
+            shape_tool.SetShape(label, shape)
+        
         colors.SetColor(label, c, XCAFDoc.XCAFDoc_ColorGen)
+        colors.SetColor(label, c, XCAFDoc.XCAFDoc_ColorCurv)
+        colors.SetColor(label, c, XCAFDoc.XCAFDoc_ColorSurf)
+        TDataStd_Name.Set(label, TCollection.TCollection_ExtendedString(name))
+        
+        #shape_tool.AddComponent(root, label, loc)
     
     WS = XSControl.XSControl_WorkSession()
     writer = STEPCAFControl.STEPCAFControl_Writer(WS, False)
+    #writer = STEPCAFControl.STEPCAFControl_Writer()
+    writer.SetColorMode(True)
     writer.Transfer(doc, STEPControl.STEPControl_AsIs)
     status = writer.Write(filename)
     print("status", status)

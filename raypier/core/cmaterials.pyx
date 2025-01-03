@@ -40,6 +40,11 @@ from .ctracer cimport InterfaceMaterial, norm_, dotprod_, \
 import numpy as np
 cimport numpy as np_
 
+@cython.inline
+@cython.nogil
+cdef double complex make_complex(np_.npy_complex128 z):
+    return z.real + I*z.imag
+
 
 cdef ray_t convert_to_sp(ray_t ray, vector_t normal):
     """Project the E-field components of a given ray
@@ -867,6 +872,148 @@ cdef class FullDielectricMaterial(DielectricMaterial):
             new_rays.add_ray_c(sp_ray)
             
             
+cdef class FullDielectricDispersiveMaterial(InterfaceMaterial):
+    """Represent a dispersive material with no coating."""
+    cdef:
+        np_.npy_complex128[:] n_inside, n_outside
+        public BaseDispersionCurve dispersion_inside
+        public BaseDispersionCurve dispersion_outside
+        public double reflection_threshold, transmission_threshold
+        
+    cdef on_set_wavelengths(self):
+        cdef:
+            double[:] wavelengths = self._wavelengths
+        self.n_inside = self.dispersion_inside.c_evaluate_n(wavelengths)
+        self.n_outside = self.dispersion_outside.c_evaluate_n(wavelengths)
+        
+    def __cinit__(self, **kwds):
+        self.dispersion_inside = kwds.get("dispersion_inside",vacuum)
+        self.dispersion_outside = kwds.get("dispersion_outside",vacuum)
+        self.reflection_threshold = kwds.get('reflection_threshold', 0.1)
+        self.transmission_threshold = kwds.get('transmission_threshold', 0.1)
+        
+    @cython.cdivision(True)
+    cdef void eval_child_ray_c(self,
+                            ray_t *in_ray, 
+                            unsigned int idx, 
+                            vector_t point,
+                            orientation_t orient,
+                            RayCollection new_rays):
+        """
+           ray - the ingoing ray
+           idx - the index of ray in it's RayCollection
+           point - the position of the intersection (in global coords)
+           normal - the outward normal vector for the surface
+        """
+        cdef:
+            vector_t cosThetaNormal, reflected, transmitted
+            vector_t tangent, tg2, in_direction, normal
+            ray_t sp_ray
+            complex_t cpx
+            double complex n1, n2, cos2, sin2, R_p, R_s, T_p, T_s, E1_amp, E2_amp
+            double cosTheta, cos1, sin1, P_in
+            double tan_mag_sq, c2
+            double Two_n1_cos1, aspect
+            int flip
+            
+        normal = norm_(orient.normal)
+        in_direction = norm_(in_ray.direction)
+        #print "in fields:", in_ray[0].E1_amp.real, in_ray[0].E1_amp.imag, in_ray[0].E2_amp.real, in_ray[0].E2_amp.imag
+        sp_ray = convert_to_sp(in_ray[0], normal)
+        sp_ray.accumulated_path += sp_ray.length * sp_ray.refractive_index.real
+        E1_amp = sp_ray.E1_amp.real + 1.0j*sp_ray.E1_amp.imag
+        E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
+        cosTheta = dotprod_(normal, in_direction)
+        cos1 = fabs(cosTheta)
+        sin1 = sqrt(fabs(1 - cos1*cos1))
+        
+        #print("cosTheta", cosTheta)
+        
+        if cosTheta < 0.0: 
+            #ray incident from outside going inwards
+            n1 = make_complex(self.n_outside[in_ray.wavelength_idx])
+            n2 = make_complex(self.n_inside[in_ray.wavelength_idx])
+            flip = 1
+            #print "out to in", n1, n2
+        else:
+            n1 = make_complex(self.n_inside[in_ray.wavelength_idx])
+            n2 = make_complex(self.n_outside[in_ray.wavelength_idx])
+            flip = -1
+            #print "in to out", n1, n2
+            
+        #apply Snell's law. These become complex.
+        sin2 = (n1*sin1/n2)
+        cos2 = csqrt(1 - sin2*sin2)
+
+        cosThetaNormal = multvs_(normal, cosTheta)
+        
+        #incoming power
+        P_in =  n1.real*(E1_amp.real**2 + E1_amp.imag**2 + \
+                         E2_amp.real**2 + E2_amp.imag**2)
+
+        if P_in==0.0:
+            return
+        #print "P Incoming:", P_in
+        #Fresnel equations for reflection
+        R_p = -(n2*cos1 - n1*cos2)/(n2*cos1 + n1*cos2)
+        R_s = -(n2*cos2 - n1*cos1)/(n2*cos2 + n1*cos1)
+        
+        #modify in place to get reflected amplitudes
+        R_s *= E1_amp
+        R_p *= E2_amp
+        
+        #print "P_R:", (cabs(R_s)**2 + cabs(R_p)**2)
+        
+        if ( n1.real*(cabs(R_s)**2 + cabs(R_p)**2)/P_in ) > self.reflection_threshold:
+            reflected = subvv_(in_direction, multvs_(cosThetaNormal, 2))
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = reflected
+            sp_ray.length = INF
+            sp_ray.E1_amp.real = R_s.real
+            sp_ray.E1_amp.imag = R_s.imag
+            sp_ray.E2_amp.real = -R_p.real
+            sp_ray.E2_amp.imag = -R_p.imag
+            sp_ray.parent_idx = idx
+            sp_ray.refractive_index.real = n1.real
+            sp_ray.refractive_index.imag = n1.imag
+            sp_ray.ray_type_id |= REFL_RAY
+            new_rays.add_ray_c(sp_ray)
+            
+        #normal transmission            
+        tangent = subvv_(in_direction, cosThetaNormal)
+        tg2 = multvs_(tangent, n1.real/n2.real) #This is an approximation for complex N
+        tan_mag_sq = mag_sq_(tg2)
+        c2 = sqrt(1-tan_mag_sq)
+        transmitted = subvv_(tg2, multvs_(normal, c2*flip))
+        
+        aspect = sqrt(cos2.real/cos1)
+        
+        #Fresnel equations for transmission
+        T_p = aspect * (2.0*cos1*n1) / ( n2*cos1 + n1*cos2 )
+        T_s = aspect * (2.0*cos1*n1) / ( n2*cos2 + n1*cos1 )
+        
+        #modify in place to get reflected amplitudes
+        T_s *= E1_amp
+        T_p *= E2_amp
+        
+        if ( n2.real*(cabs(T_s)**2 + cabs(T_p)**2)/P_in ) > self.transmission_threshold:
+            sp_ray.origin = point
+            sp_ray.normal = normal
+            sp_ray.direction = transmitted
+            sp_ray.length = INF
+            sp_ray.E1_amp.real = T_s.real
+            sp_ray.E1_amp.imag = T_s.imag
+            sp_ray.E2_amp.real = T_p.real
+            sp_ray.E2_amp.imag = T_p.imag
+            sp_ray.parent_idx = idx
+            sp_ray.refractive_index.real = n2.real
+            sp_ray.refractive_index.imag = n2.imag
+            sp_ray.ray_type_id &= ~REFL_RAY
+            new_rays.add_ray_c(sp_ray)
+            
+            
+            
 cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
     """
     A material with a single-layer dielectric coating at the interface.
@@ -911,7 +1058,7 @@ cdef class SingleLayerCoatedMaterial(FullDielectricMaterial):
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
-        sin1 = sqrt(1 - cos1*cos1)
+        sin1 = sqrt(fabs(1 - cos1*cos1))
         
         n2 = self.n_coating_.real + 1.0j*self.n_coating_.imag
         
@@ -1115,7 +1262,7 @@ cdef class CoatedDispersiveMaterial(InterfaceMaterial):
         E2_amp = sp_ray.E2_amp.real + 1.0j*sp_ray.E2_amp.imag
         cosTheta = dotprod_(normal, in_direction)
         cos1 = fabs(cosTheta)
-        sin1 = sqrt(1 - cos1*cos1)
+        sin1 = sqrt(fabs(1 - cos1*cos1))
         
         ctemp = self.n_coating[in_ray.wavelength_idx]
         n2 = ctemp.real + I*ctemp.imag#self.n_coating_.real + 1.0j*self.n_coating_.imag
