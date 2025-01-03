@@ -457,15 +457,17 @@ class RayTraceModel(HasQueue):
                 writer.write()
                 
     def write_to_STEP(self, fname):
-        from raypier.step_export import export_shapes2 as export_shapes
+        from raypier.step_export import export_shapes3 as export_shapes
         optics = self.optics
         sources = self.sources
-        shapes_colors = [_f for _f in (o.make_step_shape() for o in optics) if _f]
-        shapes_colors.extend([_f for _f in [s.make_step_shape() for s in sources] if _f])
         
-        shapes = [s for s,c in shapes_colors]
-        colors = [c for s,c in shapes_colors]
-        export_shapes(shapes, fname, colorList=colors)
+        all_exported = optics + sources
+        exported = ((s,c,n) for ((s,c),n) in ((o.make_step_shape(), o.name) for o in all_exported) if s)
+        
+        shapes, colors, names = zip(*exported)
+        #shapes = [s for s,c,n in shapes_colors]
+        #colors = [c for s,c,n in shapes_colors]
+        export_shapes(shapes, fname, colorList=colors, nameList=names)
         
     def ipython_view(self, width, height, view={}):
         import ipywidgets as widgets

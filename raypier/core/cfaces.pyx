@@ -29,7 +29,7 @@ cdef double INF=(DBL_MAX+DBL_MAX)
 from .ctracer cimport Face, sep_, \
         vector_t, ray_t, FaceList, subvv_, dotprod_, mag_sq_, norm_,\
             addvv_, multvs_, mag_, transform_t, Transform, transform_c,\
-                rotate_c, Shape, ImplicitSurface, Distortion, intersect_t
+                rotate_c, Shape, ImplicitSurface, Distortion, intersect_t, cross_
 
 import numpy as np
 cimport numpy as np_
@@ -700,6 +700,13 @@ cdef class ExtrudedPlanarFace(Face):
     
     cdef vector_t compute_normal_c(self, vector_t p, int piece):
         return self.normal
+    
+    cdef vector_t compute_tangent_c(self, vector_t p, int piece):
+        cdef vector_t tangent
+        tangent.x = 0.0
+        tangent.y = 0.0
+        tangent.z = 1.0
+        return tangent
 
 #
 # Functions used for Bezier math.  should go in utils.pyx when there is one
@@ -1040,10 +1047,9 @@ cdef class ExtrudedBezierFace(Face):
 
 
     
-cdef int point_in_polygon_c(double X, double Y, object obj):
+cdef int point_in_polygon_c(double X, double Y, double[:,:] pts):
     cdef int i, size, ct=0
     cdef double y1, y2, h, x, x1, x2
-    cdef np_.ndarray[np_.float64_t, ndim=2] pts=obj
     
     size = pts.shape[0]
     
@@ -1110,6 +1116,109 @@ cdef class PolygonFace(Face):
         normal.y=0
         normal.z=-1
         return normal
+    
+    
+cdef class OrientedPolygonFace(Face):
+    cdef:
+        vector_t _origin
+        vector_t _normal
+        vector_t _x_axis
+        vector_t _y_axis
+        double[:,:] _xy_points
+        
+    def __cinit__(self, **kwds):
+        for k in kwds:
+            setattr(self, k, kwds[k])
+        
+    property origin:
+        def __get__(self):
+            return (self._origin.x, self._origin.y, self._origin.z)
+        
+        def __set__(self, v):
+            cdef:
+                vector_t _origin
+            _origin.x = float(v[0])
+            _origin.y = float(v[1])
+            _origin.z = float(v[2])
+            self._origin = _origin
+        
+    property normal:
+        def __get__(self):
+            return (self._normal.x, self._normal.y, self._normal.z)
+        
+        def __set__(self, v):
+            cdef:
+                vector_t _normal
+            _normal.x = float(v[0])
+            _normal.y = float(v[1])
+            _normal.z = float(v[2])
+            self._normal = norm_(_normal)
+            self._y_axis = cross_(self._normal, self._x_axis)
+            
+    property x_axis:
+        def __get__(self):
+            return (self._x_axis.x, self._x_axis.y, self._x_axis.z)
+        
+        def __set__(self, v):
+            cdef:
+                vector_t _x_axis
+            _x_axis.x = float(v[0])
+            _x_axis.y = float(v[1])
+            _x_axis.z = float(v[2])
+            self._x_axis = norm_(_x_axis)
+            self._y_axis = cross_(self._normal, self._x_axis)
+            
+    property xy_points:
+        def __get__(self):
+            return np.asarray(self._xy_points).reshape(-1,2)
+        
+        def __set__(self, object xy):
+            cdef:
+                double[:,:] _xy
+            _xy = np.asarray(xy).astype(np.double)
+            if _xy.shape[1] != 2:
+                raise ValueError("XY points must be an array with shape (N,2)")
+            self._xy_points = _xy 
+            
+    cdef vector_t compute_normal_c(self, vector_t p, int piece):
+        return self._normal
+    
+    cdef vector_t compute_tangent_c(self, vector_t p, int piece):
+        return self._x_axis
+    
+    cdef intersect_t intersect_c(self, vector_t p1, vector_t p2, int is_base_ray):
+        cdef:
+            vector_t line, n = self._normal, o=self._origin
+            double max_length
+            double h, X, Y
+            intersect_t out=NO_INTERSECTION
+            
+        line = subvv_(p2, p1)
+        max_length = mag_(line)
+        line = norm_(line)
+        
+        h = dotprod_(line, n)
+        if h == 0.0: #line and plane are parallel
+            return NO_INTERSECTION
+            
+        h = dotprod_(subvv_(o, p1), n) / h 
+        
+        if (h<self.tolerance) or (h>max_length):
+            return NO_INTERSECTION
+        
+        #test for (X,Y) in polygon
+        if is_base_ray:
+            #re-use line to be the point-of-intersection
+            line = subvv_(addvv_(p1, multvs_(line,h)), o)
+            X = dotprod_(line, self._x_axis)
+            Y = dotprod_(line, self._y_axis)
+            if point_in_polygon_c(X,Y, self._xy_points)==1:
+                out.dist = h
+        else:
+            out.dist = h
+        return out
+    
+    
     
     
 cdef class OffAxisParabolicFace(Face):
