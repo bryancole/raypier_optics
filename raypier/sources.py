@@ -707,7 +707,7 @@ class GaussianBeamRaySource(SingleRaySource):
     See Paul D Colbourne - Proc. SPIE 9293, International Optical Design Conference 2014, 92931S
     and refs theirin.
     """
-    beam_waist = Float(100.0) #in microns
+    beam_waist = Float(100.0) #1/e**2 diameter, in microns
     number = Range(2,64,16)
     working_distance = Float(0.0) #the distance from the beam waist to the source location
     

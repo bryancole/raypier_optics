@@ -79,6 +79,7 @@ results_menu = Menu(name = "Results...",
 menubar = MenuBar(Menu(Action(name="Open...", action="open_file_action"),
                        Action(name="Save...", action="save_file_action"),
                        Action(name="Save As...", action="save_as_action"),
+                       Action(name="Export STEP...", action="export_step_action"),
                        name="File..."),
                   Menu(optics_menu,
                        sources_menu,
@@ -116,6 +117,16 @@ class RayTraceModelHandler(Controller):
                 model = info.ui.context['object']
                 model.load_from_yaml(fname)
             info.ui.title = fname
+            
+    def export_step_action(self, info):
+        dlg = FileDialog(parent=info.ui.control,
+                         action='save as', 
+                         wildcard=FileDialog.create_wildcard("STEP model", ["*.step", "*.stp"]))
+        ret = dlg.open()
+        if ret == FD_OK:
+            fname = dlg.path
+            model = info.ui.context['object']
+            model.write_to_STEP(fname)
         
     def insert_component(self, info, cls):
         tracer = info.ui.context['object']

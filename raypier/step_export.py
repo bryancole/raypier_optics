@@ -344,7 +344,7 @@ def make_spherical_lens(CT, diameter, curvature,
                     gp.gp_Dir(0,1,0),
                     gp.gp_Dir(1,0,0))
     circ = Geom.Geom_Circle(cax, curvature)
-    h_circ = Geom.Handle_Geom_Circle(circ)
+    #h_circ = Geom.Handle_Geom_Circle(circ)
     
     r = diameter/2.
     h2 = CT - curvature + numpy.sqrt(curvature**2 - r**2)
@@ -356,7 +356,7 @@ def make_spherical_lens(CT, diameter, curvature,
     #ps = p1,p2,p3,p4
     #vs = [BRepBuilderAPI.BRepBuilderAPI_MakeVertex(p) for p in ps]
     
-    e1 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(h_circ, p1,
+    e1 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(circ, p1,
                                                 p2)    
     e2 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p2,p3)
     e3 = BRepBuilderAPI.BRepBuilderAPI_MakeEdge(p3,p4)

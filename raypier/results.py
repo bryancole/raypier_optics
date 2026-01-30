@@ -4,7 +4,7 @@ A module for Results subclasses
 
 
 from traits.api import Instance, Float, on_trait_change,\
-            Button, DictStrFloat, Str, Int, Tuple
+            Button, DictStrFloat, Str, Int, Tuple, Array, Property, cached_property
 
 from traitsui.api import View, Item
 
@@ -29,6 +29,8 @@ class TargetResult(Result):
     name = Str("TargetResult")
     result = Float(label="Result", transient=True)
     
+    _target_rays = Property(observe="source.traced_rays, target")
+    
     traits_view = View(Item("name", style="readonly", editor=TitleEditor()), 
                        Item('result', style="readonly"),
                        Item('source', editor=DropEditor()),
@@ -48,7 +50,40 @@ class TargetResult(Result):
                 self._calc_result()
             except:
                 traceback.print_exc()
-        
+                
+    @cached_property
+    def _get__target_rays(self):
+        if self.source is None:
+            return []
+        rays_in = self.source.traced_rays
+        if not rays_in:
+            return []
+        all_rays = (r.copy_as_array() for r in reversed(self.source.traced_rays))
+        idx = self.target.idx
+        return [rays[rays['end_face_idx']==idx] for rays in all_rays]
+                
+                
+class VectorResult(TargetResult):
+    result = Array(label="Result", transient=True)
+    
+    
+class RayMeanDirection(VectorResult):
+    name = Str("Beam Direction")
+    
+    def _calc_result(self):
+        last_rays = self._target_rays[0]
+        direction = last_rays['direction'].mean(axis=0)
+        self.result = direction/(numpy.sqrt((direction**2).sum()))
+    
+    
+class RayBeamCentre(VectorResult):
+    name = Str("Beam Centre")
+    
+    def _calc_result(self):
+        last_rays = self._target_rays[0]
+        end_point = last_rays['origin'] + last_rays['length'][:,numpy.newaxis]*last_rays['direction']
+        self.result = end_point.mean(axis=0)
+    
 
 class MeanOpticalPathLength(TargetResult):
     name = "Mean optical path length"
@@ -71,6 +106,8 @@ class MeanOpticalPathLength(TargetResult):
             return
         if self.source.traced_rays:
             self._calc_result()
+            
+    
     
     def _calc_result(self):
         all_rays = [r.copy_as_array() for r in reversed(self.source.traced_rays)]

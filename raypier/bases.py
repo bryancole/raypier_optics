@@ -243,6 +243,33 @@ class ModelObject(Renderable):
         #print "set direction", -phi, -theta
         self._orientation = -phi, -theta
         
+    def rotate_about_axis(self, angle: "float, degrees", 
+                          axis: "3-vector", 
+                          ):
+        """Rotate about an axis defined in the global coordinate system"""
+        ### First get a transform for the orientations
+        temp = tvtk.Transform()
+        o,e = self._orientation
+        temp.rotate_z(o)
+        temp.rotate_x(e)
+        temp.rotate_z(self.rotation)
+        
+        ### Then apply axis rotation
+        temp.post_multiply()
+        temp.rotate_wxyz(angle, *axis)
+        print("ROTATE", angle)
+        ### Now convert back to o, e & rotation
+        m = temp.matrix.to_array()
+        
+        np=numpy
+        o2 = 180*np.arctan2(m[0,2], -m[1,2])/np.pi
+        e2 = 180*np.arccos(m[2,2])/np.pi
+        r2 = 180*np.arctan2(m[2,0],m[2,1])/np.pi
+        
+        self._orientation = o2, e2
+        self.rotation = r2
+        
+        
     def make_step_shape(self):
         """Creates an OpenCascade BRep Shape
         representation of the object, which can be

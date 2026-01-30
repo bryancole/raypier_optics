@@ -324,9 +324,12 @@ class RectMirror(BaseMirror):
         position = self.centre
         direction = self.direction
         x_axis = self.x_axis
+        offset = self.offset
         dz = self.thickness
         dx = self.length
         dy = self.width
+        
+        position = numpy.array(position) + offset*numpy.array(x_axis)
         
         box = make_box(position, direction, x_axis, dx, dy, dz)
         
