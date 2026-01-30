@@ -10,7 +10,7 @@ patch = BSplineSinglePatch()
 
 
 if True:
-    src = ParallelRaySource(origin=(0,0,-50.0),
+    src = ParallelRaySource(origin=(0,25,-150.0),
                             direction=(0,0,1),
                             radius = 3.0,
                             rings=2,
