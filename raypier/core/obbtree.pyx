@@ -3,7 +3,6 @@
 Implementation of a Oriented Boundary Boxx Tree (OBB Tree) spatial search algorithm.
 Somewhat copied from the vtkOBBTree implementation.
 """
-from PIL.TiffImagePlugin import II
 
 cdef extern from "math.h":
     double M_PI
