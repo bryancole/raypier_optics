@@ -7,6 +7,7 @@ from raypier.core.cimplicit_surfs import Intersection, Union, Difference, Invert
 from tvtk.api import tvtk
 
 from traits.api import HasStrictTraits, Instance, Tuple, observe, Float
+import numpy as np
 
 
 class BaseImplicitSurface(HasStrictTraits):
@@ -17,6 +18,11 @@ class BaseImplicitSurface(HasStrictTraits):
 class Plane(BaseImplicitSurface):
     origin = Tuple(0.,0.,0.)
     normal = Tuple(0.,0.,1.)
+    
+    def _normalise_normal(self):
+        n = np.array(self.normal)
+        mag = np.sqrt(sum(a**2 for a in self.normal))
+        self.normal = tuple(a/mag for a in self.normal)
     
     def _c_surface_default(self):
         return csurfs.Plane(origin=self.origin, normal=self.normal)
