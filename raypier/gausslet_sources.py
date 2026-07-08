@@ -260,6 +260,7 @@ class SingleGaussletSource(BaseGaussletSource):
         angles = (numpy.arange(6)*numpy.pi/3.)[:,None]
         offsets = numpy.cos(angles)*d1[None,:] + numpy.sin(angles)*d2[None,:]
         offsets *= self.beam_waist
+        offsets += origin[None,:]
         
         data = numpy.zeros((1,), dtype=gausslet_dtype)
         base_ray = data['base_ray']

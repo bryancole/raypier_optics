@@ -19,6 +19,9 @@ class Plane(BaseImplicitSurface):
     origin = Tuple(0.,0.,0.)
     normal = Tuple(0.,0.,1.)
     
+    def __repr__(self):
+        return f"<Plane: origin={self.origin}, normal={self.normal}>"
+    
     def _normalise_normal(self):
         n = np.array(self.normal)
         mag = np.sqrt(sum(a**2 for a in self.normal))

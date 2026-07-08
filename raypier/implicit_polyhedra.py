@@ -16,6 +16,7 @@ import numpy as np
 from numpy.linalg import solve, det
 from collections import defaultdict
 from scipy.spatial import Delaunay
+from scipy.spatial.qhull import QhullError
 
 
 def get_intersection_of_planes(*planes : "tuple(p1,p2,p3)") -> "None | tuple(x,y,z)":
@@ -29,6 +30,7 @@ def get_intersection_of_planes(*planes : "tuple(p1,p2,p3)") -> "None | tuple(x,y
 class Polyhedron(Optic):
     """
     Defines the 3D volumn enclosed by N planes.
+    The plane normals are the *outward* normals.
     """
     name = "Polyhedron"
     planes = List(Plane)
@@ -99,15 +101,24 @@ class Polyhedron(Optic):
                 cov = np.cov(p_pts-centre, rowvar=False)
                 eig_vals, eig_vecs = np.linalg.eig(cov)
                 order = np.argsort(eig_vals)
-                ax1 = eig_vecs[order[-1]]
-                ax2 = eig_vecs[order[-2]]
+                ax1 = eig_vecs[:,order[-1]]
+                ax2 = eig_vecs[:,order[-2]]
                 u = np.dot(p_pts,ax1)
                 v = np.dot(p_pts,ax2)
                 pts_2d = np.column_stack([u,v])
                 ### Then triangulate
-                tri = Delaunay(pts_2d)
-                for t in tri.simplices:
-                    cells.append([p_verts[idx] for idx in t])
+                try:
+                    tri = Delaunay(pts_2d)
+                    for t in tri.simplices:
+                        cells.append([p_verts[idx] for idx in t])
+                except QhullError:
+                    print(f"Failed to triangulate plane {p}\n"
+                          f"with points: {p_pts}\n"
+                          f"UV pts:\n{u}\n{v}\n"
+                          f"Ax:\n{ax1}\n{ax2}\n"
+                          f"eig_vals: {eig_vals}\n"
+                          f"eig_vecs: {eig_vecs}")
+                    
         return verts, cells
                 
                 
@@ -118,6 +129,8 @@ class Polyhedron(Optic):
         def execute():
             print("RECAL VTK DATA")
             verts, cells = self.get_points_and_cells()
+            print(verts)
+            print(cells)
             output = source.poly_data_output
             output.points = verts #points, actually
             output.polys = cells
@@ -132,27 +145,9 @@ class Polyhedron(Optic):
                                       transform=t)
         return transf
     
-
-class RightAnglePrism(Polyhedron):
-    ### The short side of the prism
-    side_length = Float(10.0)
-    ### height along the "extrusion axis"
-    height = Float(10.0)
     
-    angle_error = Float(0.0) #in arcmin
-    pyramid_error = Float(0.0) #in arcmin
-    
+class DispersivePolyhedron(Polyhedron):
     dispersion = Instance(BaseOpticalMaterial)
-    
-    traits_view = View(VGroup(
-                       Traceable.uigroup,
-                       Item('side_length'),
-                       Item('height'),
-                       Item('angle_error'),
-                       Item('pyramid_error'),
-                       Item('dispersion', style="custom", editor=InstanceEditor())
-                       )
-                       )
     
     @on_trait_change("n_inside, n_outside")
     def n_changed(self):
@@ -165,6 +160,31 @@ class RightAnglePrism(Polyhedron):
         dispersion_curve = self.dispersion.dispersion_curve
         m = FullDielectricDispersiveMaterial(dispersion_inside=dispersion_curve)
         return m
+    
+
+class RightAnglePrism(DispersivePolyhedron):
+    """
+    A right-angle prism which can include angle- and pyramid-errors on the side-faces.
+    """
+    ### The short side of the prism
+    side_length = Float(10.0)
+    ### height along the "extrusion axis"
+    height = Float(10.0)
+    
+    angle_error = Float(0.0) #in arcmin
+    pyramid_error = Float(0.0) #in arcmin
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('side_length'),
+                       Item('height'),
+                       Item('angle_error'),
+                       Item('pyramid_error'),
+                       Item('dispersion', style="custom", editor=InstanceEditor())
+                       )
+                       )
+    
+    
     
     def make_step_shape(self):
         from raypier.step_export import make_general_extrusion
@@ -209,3 +229,59 @@ class RightAnglePrism(Polyhedron):
         p5 = Plane(origin=(0.,0.,-sa), normal=(-1.,0.,-1.))
         return [p1,p2,p3,p4,p5]
     
+    
+class Rhomboid(DispersivePolyhedron):
+    name = "Rhomboid Polyhedra"
+    abstract = False
+    height = Float(15.0) #distance between parallel faces
+    width = Float(15.0) #width of parallel faces
+    slant = Float(45.0) #angle of the oblique faces
+    z_height_1 = Float(0.0)
+    z_height_2 = Float(20.0)
+    
+    angle_error = Float(0.0) #in arcmin
+    pyramid_error = Float(0.0) #in arcmin
+    
+    traits_view = View(VGroup(
+                       Traceable.uigroup,
+                       Item('n_inside'),
+                       Item('z_height_1'),
+                       Item('z_height_2'),
+                       Item('height'),
+                       Item('width'),
+                       Item('slant'),
+                       Item('angle_error'),
+                       Item('pyramid_error')
+                       )
+                       )
+    
+    @on_trait_change("height, width, slant, z_height_1, z_height_2, angle_error, pyramid_error")
+    def on_planes_update(self):
+        self.data_source.modified()
+        self.planes = self.make_planes()
+        self.faces.faces = self.make_faces()
+        self.update=True
+        
+    def _planes_default(self):
+        return self.make_planes()
+    
+    def make_planes(self):
+        z_min, z_max = self.z_height_1,self.z_height_2
+        if z_min > z_max:
+            z_max, z_min = z_min, z_max
+        p1 = Plane(origin=(0.,0.,z_min), normal=(0.,0.,-1.))
+        p2 = Plane(origin=(0.,0.,z_max), normal=(0.,0.,1.))
+        h = self.height/2
+        w = self.width/2
+        p3 = Plane(origin=(0.,-h,0.), normal=(0.,-1.,0.))
+        p4 = Plane(origin=(0.,h,0.), normal=(0.,1.,0.))
+        angle = self.slant*np.pi/180
+        angle_err = (np.pi*self.angle_error/(2*60.*180))
+        a = np.cos(angle + angle_err)
+        b = np.sin(angle + angle_err)
+        z_err = np.sin(np.pi*self.pyramid_error/(2*60.*180))
+        p5 = Plane(origin=(-w,0.,0.), normal=(-a,b,z_err))
+        a = np.cos(angle - angle_err)
+        b = np.sin(angle - angle_err)
+        p6 = Plane(origin=(w,0.,0.), normal=(a,-b,z_err))
+        return [p1,p2,p3,p4,p5,p6]

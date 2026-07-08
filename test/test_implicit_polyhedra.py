@@ -3,7 +3,11 @@ import unittest
 import numpy as np
 print("Numpy:", np.__version__)
 
-from raypier.implicit_polyhedra import Plane, get_intersection_of_planes, Intersection, Polyhedron
+from raypier.implicit_polyhedra import Plane, get_intersection_of_planes, Intersection, Polyhedron,\
+    RightAnglePrism, Rhomboid
+    
+from raypier.tracer import RayTraceModel
+from raypier.sources import ParallelRaySource
 
 
 
@@ -34,10 +38,7 @@ class TestPlanesIntersection(unittest.TestCase):
             
     
 class TestPolyhedron(unittest.TestCase):
-    def test_visualisation(self):
-        from raypier.tracer import RayTraceModel
-        from raypier.sources import ParallelRaySource
-        
+    def test_visualisation(self):        
         p1 = Plane(origin=(1.2,3.2,2.7), normal=(-1.0,0.,0.))
         p2 = Plane(origin=(2.5,1.6,1.7), normal=(0.,-1.,0.))
         p3 = Plane(origin=(-2.5,2.6,2.1), normal=(0.,0.,-1.))
@@ -68,4 +69,14 @@ class TestPolyhedron(unittest.TestCase):
         for vert in phdr.get_vertices():
             print(vert)
             
+    def test_view_rhomboid(self):
+        rhom = Rhomboid(width=15, height=7., z_height_2=7.0)
+        for p in rhom.planes:
+            print(p)
+        print(f"verts: {list(rhom.get_vertices())}")
+        
+        src = ParallelRaySource(origin=(0,0,-20), direction=(0,0,1.))
+        
+        model = RayTraceModel(optics=[rhom,],sources=[src,])
+        model.configure_traits()
         
